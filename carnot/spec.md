@@ -142,11 +142,13 @@ The following functions are expected to be available to participants during the 
 
 ## Core functions
 
-These are the core functions necessary for the Carnot consensus protocol, to be executed in response of incoming messages, except for `timeout` which is triggered by a participant configurable timer.     
+These are the core functions necessary for the Carnot consensus protocol and correspond to the actions to take for each input event.
+A total order on input events is enforced by appending them into a queue, from which the abstract consensus machine will pop them one by one.
+The special `timeout` routine is triggered by a timer and results in appending a `Timeout` event to the queue.
      
 ### Receive block
 
-```python3
+```python
 def receive_block(block: Block):
     if block.id() is known or block.view <=LATEST_COMMITTED_VIEW:
         return
