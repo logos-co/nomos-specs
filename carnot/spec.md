@@ -1,10 +1,11 @@
-# Carnot Specification
-This is the pseudocode specification of the Carnot consensus algorithm.
+Psuedocode specification of the Carnot consensus algorithm.
 In this specification we will omit any cryptographic material, block validity and proof checks. A real implementation is expected to check those before hitting this code.
 In addition, all types can be expected to have their invariants checked by the type contract, e.g. in an instance of type `Qc::Aggregate` the `high_qc` field is always the most recent qc among the aggregate qcs and the code can skip this check.
 
 'Q:' is used to indicate unresolved questions.
 Notation is loosely based on CDDL.
+
+
 
 ## Messages
 A critical piece in the protocol, these are the different kind of messages used by participants during the protocol execution.
@@ -136,7 +137,16 @@ LATEST_COMMITTED_VIEW: View
 HIGH_COMMITTED_QC:Qc # This is not needed for consensus but actually helps a lot for any node fallen behind to catchup.
 COLLECTION: Q?
 ```
+```python
+def member_of_internal_com():
+    pass
 
+def member_of_root():
+    pass
+
+def member_of_leaf():
+    pass
+```
 
 ## Available Functions
 The following functions are expected to be available to participants during the execution of the protocol:
@@ -365,14 +375,14 @@ Func receive(newView) {
 ### Timeout
 ```python
 def timeout():
-    if (member_of_internal_com() AND not member_of_root()) OR member_of_leaf:
-                        let timeoutMsg = create_newView(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
+    if member_of_internal_com() and not member_of_root() or member_of_leaf():
+                        timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
                         send(timeoutMsg, parent_committee())
                  
                 
     if member_of_root():
-                        let timeoutMsg = create_newView(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
-                        send(timeoutMsg,root_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
+                        timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
+                        send(timeoutMsg, root_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
                 
 
 ```     
