@@ -390,12 +390,18 @@ def receive(timeoutMsg: TimeoutMsg):
     PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view].append(timeoutMsg)
     if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority(None, PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view]):
         timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])
-        reset(current_view) ###
+        stop_timer(current_view) ### stopping the timer here and starting it upon receving the timeout_qc in the main
+        
         ### Here we can simply broadcast so that everyone receives the timeout_qc sooner. 
-        ### But it may cause problem at the network layer due to so many msgs. Though if Waku
-        ### can avoid forwarding duplicate qcs then broadcast is a better option.
+        ### But it may cause problem at the network layer due to  many duplicate timeout_qcs 
+        ### by many nodes Though if Waku can avoid forwarding duplicate qcs then broadcast is 
+        ### a better option.
+        ### Alternatively, the timeout_qc can be forwarded to children as well as parent committees
+        ### for faster dissimination. But currently, timeout_qc is forwarded to parent committee, until
+        ### it reaches the next leader who propagates it to the whole network.
+        send(timeout_qc, own_committee()) ####helps nodes to sync quicker but not required
         if member_of_root():
-            send(timeout_qc, leader(view+1)) 
+            send(timeout_qc, leader(view+1))
         else:
             send(timeout_qc, parent_committee())
         return timeout_qc
