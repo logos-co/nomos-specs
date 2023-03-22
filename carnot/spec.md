@@ -11,7 +11,7 @@ Notation is loosely based on CDDL.
 A critical piece in the protocol, these are the different kind of messages used by participants during the protocol execution.
 * `Block`: propose a new block
 * `Vote`: vote for a block proposal
-* `NewView`: propose to jump to a new view after a proposal for the current one was not received before a configurable timeout.
+* `TimeoutMsg`: propose to jump to a new (next) view after a proposal for the current one was not received before a configurable timeout.
 
 
 ### Block
@@ -100,7 +100,7 @@ voter: Id
 ? qc: Qc
 ```
 qc is the optional field containing the QC built by root nodes from 2/3 + 1 votes from their child committees and forwarded the the next view leader.
-
+# While adding votes, timeout msgs etc, make sure duplicate msgs are discarded. 
 ```python
 @dataclass
 class Vote:
@@ -110,17 +110,23 @@ class Vote:
     qc: Option[Qc]
 ```
 
-### NewView
-```
+### TimeoutMsg
 view: View
 high_qc: Qc
+high_committed_qc : Qc
+timeout_qc: Qc
+sender: Id
 ```
 
 ```python
 @dataclass
-class NewView:
+class TimeoutMsg:
     view: View
     high_qc: Qc
+    high_committed_qc: Qc
+    timeout_qc: Qc
+    sender: Id
+
 ```
 
 ## Local Variables
@@ -135,23 +141,27 @@ CURRENT_VIEW: View
 LOCAL_HIGH_QC: Qc
 LATEST_COMMITTED_VIEW: View
 HIGH_COMMITTED_QC:Qc # This is not needed for consensus but actually helps a lot for any node fallen behind to catchup.
-COLLECTION: Q?
+PENDING_VOTE_COLLECTION: dict() #id here presents Hash of the block returnd by block.Id()
+PENDING_TIMEOUTMSG_COLLECTION: dict()
 ```
 ```python
 def member_of_internal_com():
-    pass
+    return True
+
 
 def member_of_root():
-    pass
+    return True
+
 
 def member_of_leaf():
-    pass
+    return True
+    
 ```
 
 ## Available Functions
 The following functions are expected to be available to participants during the execution of the protocol:
 * `leader(view)`: returns the leader of the view.
-* `reset_timer()`: resets timer. If the timer expires the `timeout` routine is triggered.
+* `reset_timer(view)`: resets timer for a specific view. If the timer expires the `timeout` routine is triggered.
 * `extends(block, ancestor)`: returns true if block is descendant of the ancestor in the chain.
 
 * `download(view)`: Download missing block for the view.
@@ -160,14 +170,14 @@ The following functions are expected to be available to participants during the 
 
 * `member_of_root_com()`: returns true if the participant executing the function is member of the root committee withing the tree overlay.
 
-* `member_of_internal_com()`: returns truee if the participant executing the function is member of internal committees within the committee tree overlay
+* `member_of_internal_com()`: returns true if the participant executing the function is member of internal committees within the committee tree overlay
 
 * `child_committee(participant)`: returns true if the participant passed as argument is member of the child committee of the participant executing the function.
 
-* `supermajority(votes)`: the behavior changes with the position of a participant in the overlay:
+* `supermajority(votes, TimeoutMsgs)`: the behavior changes with the position of a participant in the overlay:
     * Root committee: returns if the number of distinctive signers of votes for a block in the child committee is equal to the threshold.
 
-* `leader_supermajority(votes)`: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1
+* `leader_supermajority(votes, TimeoutMsgs)`: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1
 
 * `morethanSsupermajority(votes)`: returns if the number of distinctive signers of votes for a block is is more than the threshold: TODO
 * `parent_committe`: return the parent committee of the participant executing the function withing the committee tree overlay. Result is undefined if called from a participant in the root committee.
@@ -207,7 +217,7 @@ def receive_block(block: Block):
             else:
                 send(vote, parent_commitee())
             current_view += 1
-            reset_timer()
+            reset_timer(current_view) # needs to be updated after pacemaker is completed.
             try_to_commit_grandparent(block)
 ```
 ##### Auxiliary functions
@@ -372,9 +382,11 @@ Func receive(newView) {
     }
 }
 ```
+###### This is all part of pacemaker (liveness) module
 ### Timeout
-```python
+```python3
 def timeout():
+    save_consensus_state()
     if member_of_internal_com() and not member_of_root() or member_of_leaf():
                         timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
                         send(timeoutMsg, parent_committee())
@@ -383,9 +395,21 @@ def timeout():
     if member_of_root():
                         timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
                         send(timeoutMsg, root_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
-                
 
-```     
+```
+```python3
+def receive(timeoutMsg: TimeoutMsg):
+    if CURRENT_VIEW > timeoutMsg.view:
+        return
+    PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view].append(timeoutMsg)
+    if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority(None, PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view]):
+        timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])
+        reset(current_view)
+        return timeout_qc
+    return
+
+
+```
 
 
 We need to make sure that qcs can't be removed from aggQc when going up the tree
