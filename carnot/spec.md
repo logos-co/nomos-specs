@@ -91,7 +91,7 @@ class Vote:
 ```python
 class Timeout:
     view: View
-    high_qc: Qc
+    high_qc: AggregateQc
 ```
 
 ## Local Variables
@@ -305,37 +305,30 @@ def receive_vote(vote: Vote):
             broadcast(block)
 ```
 
-### Receive NewView
-```Ruby
+### Receive Timeout
+```python
 # Failure Case
-Func receive(newView) {
+def receive(timeout: Timeout):
     # download the missing block 
-    if newview.highQC.block missing {
-        let block = download(new_view.high_qc.block)
+    if timeout.high_qc().block is missing:
+        block = download(timeout.high_qc.block)
         receive(block)
-    }
 
     # It's an old message. Ignore it.
-    if newView.view < current_view {
-        return 
-    }
-
-    # Q: this was update_high_qc_and_view(new_view.high_qc, Null)
-    update_high_qc(new_view.high_qc)
-
-    if member_of_internal_com() {
-        collection[newView.view].append(newView)
-        if supermajority[newView.view]{
-            newViewQC=buildQC(collection[newView.view])
-            if member_of_root(){
-                send(newViewQC, leader(view+1))
-                curView++
-            } else {
-                send(newViewQC, parent_committee())
-            }
-        }
-    }
-}
+    if timeout.view < CURRENT_VIEW:
+        return
+    
+    update_high_qc(timeout.high_qc())
+    
+    if member_of_internal_com():
+        COLLECTION[timeout.view].append(timeout)
+        if supermajority(timeout.view):
+            new_view_qc = build_qc(COLLECTION[timeout.view])
+            if member_of_root():
+                send(new_view_qc, leader(CURRENT_VIEW +1))
+                CURRENT_VIEW += 1
+            else:
+                send(new_view_qc, parent_committee())
 ```
 ### Timeout
 ```python
