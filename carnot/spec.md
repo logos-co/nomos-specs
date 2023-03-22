@@ -404,7 +404,14 @@ def receive(timeoutMsg: TimeoutMsg):
     PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view].append(timeoutMsg)
     if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority(None, PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view]):
         timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])
-        reset(current_view)
+        reset(current_view) ###
+        ### Here we can simply broadcast so that everyone receives the timeout_qc sooner. 
+        ### But it may cause problem at the network layer due to so many msgs. Though if Waku
+        ### can avoid forwarding duplicate qcs then broadcast is a better option.
+        if member_of_root():
+            send(timeout_qc, leader(view+1)) 
+        else:
+            send(timeout_qc, parent_committee())
         return timeout_qc
     return
 
