@@ -1,25 +1,21 @@
-Psuedocode specification of the Carnot consensus algorithm.
+# Carnot Specification
+This is the pseudocode specification of the Carnot consensus algorithm.
 In this specification we will omit any cryptographic material, block validity and proof checks. A real implementation is expected to check those before hitting this code.
 In addition, all types can be expected to have their invariants checked by the type contract, e.g. in an instance of type `Qc::Aggregate` the `high_qc` field is always the most recent qc among the aggregate qcs and the code can skip this check.
 
 'Q:' is used to indicate unresolved questions.
 Notation is loosely based on CDDL.
 
-
-
 ## Messages
 A critical piece in the protocol, these are the different kind of messages used by participants during the protocol execution.
 * `Block`: propose a new block
 * `Vote`: vote for a block proposal
-* `TimeoutMsg`: propose to jump to a new (next) view after a proposal for the current one was not received before a configurable timeout.
+* `Timeout`: propose to jump to a new view after a proposal for the current one was not received before a configurable timeout.
 
 
 ### Block
+
 (sometimes also called proposal)
-```
-view: View
-qc: Qc
-``` 
 We assume an unique identifier of the block can be obtained, for example by hashing its contents. We will use the `id()` function to access the identifier of the current block.
 We also assume that a unique tree order of blocks can be determined, and in particular each participant can identify the parent of each block. We will use the `parent()` function to access such parent block.
         
@@ -31,51 +27,37 @@ class Block:
 ```
 
 ##### View
-```
-view_n: uint
-```
-a monotonically increasing number (considerations about the size?)
+
+A monotonically increasing number (considerations about the size?)
 
 ```python
 View = int
 ```
 
 ##### Qc
-There are currently two different types of QC:
-```
-Qc = Standard / Aggregate
-```
 
+There are currently two different types of QC:
 ```python
 Qc = StandardQc | AggregateQc
 ```
 
 ###### Standard
-```
-view: View
-block: Id
-```
+
 Q: there can only be one block on which consensus in achieved for a view, so maybe the block field is redundant?
 
 ```python
-
-@dataclass
 class StandardQc:
     view: View
     block: Id
 ```
 
 ###### Aggregate
-```
-view: View
-high_qc: Qc
-```
+
 `high_qc` is `Qc` for the most recent view among the aggregated ones. The rest of the qcs are ignored in the rest of this algorithm. 
 
 We assume there is a  `block` function available that returns the block for the Qc. In case of a standard qc, this is trivially qc.block, while for aggregate it can be obtained by accessing `high_qc`. `high_qc` is guaranteed to be a 'Standard' qc.
 
 ```python
-@dataclass
 class AggregateQc:
     view: View
     qcs: List[Qc]
@@ -88,21 +70,15 @@ class AggregateQc:
 undef, will assume a 32-byte opaque string
 
 ```python
-Id = bytearray
+Id: bytes = bytearray(32)
 ```
 
 ### Vote
+
 A vote for `block` in `view`
-```      
-block: Id
-view: View 
-voter: Id
-? qc: Qc
-```
 qc is the optional field containing the QC built by root nodes from 2/3 + 1 votes from their child committees and forwarded the the next view leader.
-# While adding votes, timeout msgs etc, make sure duplicate msgs are discarded. 
+
 ```python
-@dataclass
 class Vote:
     block: Id
     view: View
@@ -127,6 +103,12 @@ class TimeoutMsg:
     timeout_qc: Qc
     sender: Id
 
+### Timeout
+
+```python
+class Timeout:
+    view: View
+    high_qc: Qc
 ```
 
 ## Local Variables
@@ -190,9 +172,11 @@ The following functions are expected to be available to participants during the 
 
 
 ## Core functions
+
 These are the core functions necessary for the Carnot consensus protocol, to be executed in response of incoming messages, except for `timeout` which is triggered by a participant configurable timer.     
      
 ### Receive block
+
 ```python3
 def receive_block(block: Block):
     if block.id() is known or block.view <=LATEST_COMMITTED_VIEW:
@@ -217,12 +201,12 @@ def receive_block(block: Block):
             else:
                 send(vote, parent_commitee())
             current_view += 1
-            reset_timer(current_view) # needs to be updated after pacemaker is completed.
+            reset_timer()
             try_to_commit_grandparent(block)
 ```
 ##### Auxiliary functions
-```python
 
+```python
 def safe_block(block: Block):
     match block.qc:
         case StandardQc() as standard:
@@ -279,7 +263,9 @@ def update_high_qc(qc: Qc):
 ```
 
 ### Receive Vote
+
 Q: this whole function needs to be revised
+
 ```python
 
 def receive_vote(vote: Vote):
