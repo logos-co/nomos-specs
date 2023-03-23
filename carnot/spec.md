@@ -87,13 +87,12 @@ class Vote:
 ```
 
 ### TimeoutMsg
-view: View
+view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
 high_qc: Qc
 high_committed_qc : Qc
 timeout_qc: Qc
 sender: Id
 ```
-
 ```python
 @dataclass
 class TimeoutMsg:
@@ -111,6 +110,25 @@ class Timeout:
     high_qc: Qc
 ```
 
+### TimeoutMsg_qc
+view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
+high_qcs: list[Qc]
+high_committed_qc : Qc
+timeout_qc: Qc
+sender: Id
+```
+
+
+```python
+@dataclass
+class TimeoutMsg_qc:
+   high_qcs: list[Qc]
+    high_committed_qc : Qc
+    timeout_qc: Qc
+    sender: Id
+```
+
+
 ## Local Variables
 Participants in the protocol are expected to mainting the following data in addition to the DAG of received proposal:
 * `current_view`
@@ -125,7 +143,10 @@ LATEST_COMMITTED_VIEW: View
 HIGH_COMMITTED_QC:Qc # This is not needed for consensus but actually helps a lot for any node fallen behind to catchup.
 PENDING_VOTE_COLLECTION: dict() #id here presents Hash of the block returnd by block.Id()
 PENDING_TIMEOUTMSG_COLLECTION: dict()
+LAST_VIEW_TIMEOUT_QC: Timeout_qc
+
 ```
+
 ```python
 def member_of_internal_com():
     return True
@@ -410,5 +431,26 @@ def receive(timeoutMsg: TimeoutMsg):
 
 ```
 
+```python3
+def receive(timeout_qc: Timeout_qc):
+    pass
+```
+```python3
+def increment_view_qc (qc: Qc):
+    if qc.view < CURRENT_VIEW:
+        return false
+    LAST_VIEW_TIMEOUT_QC = None
+    start_timer(qc.view+1)
+    return true
+```
+
+```python3
+def increment_view_timeout_qc (timeout_qc: Timeout_qc):
+    if timeout_qc==None or timeout_qc.view < CURRENT_VIEW:
+        return false
+    LAST_VIEW_TIMEOUT_QC = timeout_qc
+    start_timer(qc.view+1)
+    return true
+```
 
 We need to make sure that qcs can't be removed from aggQc when going up the tree
