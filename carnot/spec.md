@@ -184,7 +184,7 @@ The following functions are expected to be available to participants during the 
 
 * `morethanSsupermajority(votes)`: returns if the number of distinctive signers of votes for a block is is more than the threshold: TODO
 * `parent_committe`: return the parent committee of the participant executing the function withing the committee tree overlay. Result is undefined if called from a participant in the root committee.
-
+* `oblivious_adjacent_committees()`: returns the committees from which a node has not received the timeout_qc.
 
 <!-- #####Supermajority of child votes is 2/3 +1 votes from members of child committees
 #####Supermajority for the qc to be included in the block, should have at least 2/3+1 votes from both children of the root committee and overal 2/3 +1
@@ -209,6 +209,7 @@ def receive_block(block: Block):
         receive(parent)
         
     if safe_block(block):
+        
         # This is not in the original spec, but 
         # let's validate I have this clear.
         assert block.view == current_view
@@ -221,22 +222,26 @@ def receive_block(block: Block):
                 send(vote, leader(current_view + 1))
             else:
                 send(vote, parent_commitee())
-            current_view += 1
-            reset_timer()
+           # current_view += 1
+           # reset_timer()
+            increment_view_qc(block.qc)
             try_to_commit_grandparent(block)
 ```
 ##### Auxiliary functions
 
 ```python
-def safe_block(block: Block):
+def safe_block_qc (block: Block):
     match block.qc:
         case StandardQc() as standard:
             # Previous leader did not fail and its proposal was certified
-            if standard.view <= LATEST_COMMITED_BLOCK:
+         #   if standard.view <= LATEST_COMMITED_BLOCK:
+            if standard.view < CURRENT_VIEW:
                 return False
+            increment_view_qc(standard.view+1)
+
             # this check makes sure block is not old 
             # and the previous leader did not fail
-            return block.view >= LATEST_COMMITED_BLOCK and block.view == (standard.view + 1)        
+            return block.view >= CURRENT_VIEW and block.view == (standard.view + 1)        
         
         case AggregateQc() as aggregated_qc:
             # Verification of block.aggQC.highQC along 
@@ -345,10 +350,10 @@ def receive_vote(vote: Vote):
             # in the leader, as it's a granchild, not a child
             send(vote, leader(current_view + 1))
 
-    if leader(view): # Q? Which view? CURRENT_VIEW or vote.view?
+    if leader(vote.view+1): # Q? Which view? CURRENT_VIEW or vote.view?  => Ans: vote.view+1 Vote for the view 
         if vote.view < CURRENT_VIEW - 1:
             return
-
+        
         # Q: No filtering? I can just create a key and  vote?
         COLLECTION[vote.block].append(vote)
         if supermajority(collection[vote.block]):
@@ -357,7 +362,7 @@ def receive_vote(vote: Vote):
             broadcast(block)
 ```
 
-### Receive NewView
+### Receive NewView ===> We are not using NewView any more but use timeoutMsg instead.
 ```Ruby
 # Failure Case
 Func receive(newView) {
@@ -408,10 +413,13 @@ def timeout():
 def receive(timeoutMsg: TimeoutMsg):
     if CURRENT_VIEW > timeoutMsg.view:
         return
+    if timeoutMsg.view <= LAST_VIEW_TIMEOUT_QC.view:
+        return
+    update_high_qc(timeoutMsg.high_qc)
     PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view].append(timeoutMsg)
     if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority(None, PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view]):
         timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])
-        stop_timer(current_view) ### stopping the timer here and starting it upon receving the timeout_qc in the main
+         ### stopping the timer here and starting it upon receving the timeout_qc in the main
         
         ### Here we can simply broadcast so that everyone receives the timeout_qc sooner. 
         ### But it may cause problem at the network layer due to  many duplicate timeout_qcs 
@@ -422,9 +430,11 @@ def receive(timeoutMsg: TimeoutMsg):
         ### it reaches the next leader who propagates it to the whole network.
         send(timeout_qc, own_committee()) ####helps nodes to sync quicker but not required
         if member_of_root():
-            send(timeout_qc, leader(view+1))
+          #  send(timeout_qc, leader(view+1))
+         send(timeout_qc, child_committee())
         else:
             send(timeout_qc, parent_committee())
+            send(timeout_qc, child_committee())
         return timeout_qc
     return
 
@@ -433,8 +443,30 @@ def receive(timeoutMsg: TimeoutMsg):
 
 ```python3
 def receive(timeout_qc: Timeout_qc):
-    pass
+    if Timeout_qc.view < CURRENT_VIEW:
+        return
+    if Timeout_qc.view <= LAST_VIEW_TIMEOUT_QC.view: # Do not propagate and old timeout QC or the one the node already have propagated.
+        return
+    #stop_timer(current_view)
+    if member_of_internal_com():
+        send(timeout_qc, oblivious_adjacent_committees())
+    increment_view_timeout_qc(timeout_qc.view)
+
+    #Recalculate New Overlay
+    if member_of_Leaf():
+        create_sync_Msg (CURRENT_VIEW,Timeout_qc)
+   # else:
+    #    send(timeout_qc, parent_committee())
 ```
+
+```python3
+def receive(sync_Msg: Sync_Msg):
+    pass
+
+```
+
+
+
 ```python3
 def increment_view_qc (qc: Qc):
     if qc.view < CURRENT_VIEW:
@@ -451,6 +483,13 @@ def increment_view_timeout_qc (timeout_qc: Timeout_qc):
     LAST_VIEW_TIMEOUT_QC = timeout_qc
     start_timer(timeout_qc.view+1)
     return true
+```
+
+```python3
+def start_timer(next_view: int):
+    stop_timer(CURRENT_VIEW)
+    CURRENT_VIEW = next_view
+    timer_start(duration)
 ```
 
 We need to make sure that qcs can't be removed from aggQc when going up the tree
