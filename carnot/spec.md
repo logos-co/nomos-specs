@@ -177,7 +177,7 @@ The following functions are expected to be available to participants during the 
 
 * `child_committee(participant)`: returns true if the participant passed as argument is member of the child committee of the participant executing the function.
 
-* `supermajority(votes, TimeoutMsgs)`: the behavior changes with the position of a participant in the overlay:
+* `supermajority()`: the behavior changes with the position of a participant in the overlay:
     * Root committee: returns if the number of distinctive signers of votes for a block in the child committee is equal to the threshold.
 
 * `leader_supermajority(votes, TimeoutMsgs)`: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1
@@ -313,7 +313,8 @@ def receive_vote(vote: Vote):
             self_vote = build_vote()
             send(self_vote, parent_committee)
             # Q: why here?
-            current_view += 1
+            current_view += 1 # increment_view should be used instead of this.
+            
             reset_timer()
             # Q: why do we do this here? 
             try_to_commit_grand_parent(block)
@@ -417,17 +418,9 @@ def receive(timeoutMsg: TimeoutMsg):
         return
     update_high_qc(timeoutMsg.high_qc)
     PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view].append(timeoutMsg)
-    if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority(None, PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view]):
+    #Supermajority
+    if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority():
         timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])
-         ### stopping the timer here and starting it upon receving the timeout_qc in the main
-        
-        ### Here we can simply broadcast so that everyone receives the timeout_qc sooner. 
-        ### But it may cause problem at the network layer due to  many duplicate timeout_qcs 
-        ### by many nodes Though if Waku can avoid forwarding duplicate qcs then broadcast is 
-        ### a better option.
-        ### Alternatively, the timeout_qc can be forwarded to children as well as parent committees
-        ### for faster dissimination. But currently, timeout_qc is forwarded to parent committee, until
-        ### it reaches the next leader who propagates it to the whole network.
         send(timeout_qc, own_committee()) ####helps nodes to sync quicker but not required
         if member_of_root():
           #  send(timeout_qc, leader(view+1))
@@ -466,7 +459,27 @@ def receive(sync_Msg: Sync_Msg):
         high_qc=sync_Msg.qc
     if sync_Msg.committed_qc.view>high_committed_qc.view:
         high_committed_qc=sync_Msg.committed_qc
-    Pending_sync_Msgs[sync_Msg.view]
+    if len(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])== supermajority():
+         if member_of_internal() and not member_of_root():
+                sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
+                send(sync_Msg, parent_committee())
+        if member_of_root():
+             sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
+
+             sync_Msg_qc = create_sync_Msg_qc (PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
+             sync_Msg.sync_qc = sync_Msg_qc
+             send(sync_Msg, leader(sync_Msg.view))
+        if leader(sync_Msg.view):
+            
+             
+            
+                
+
+            
+            
+            
+        
+        
     
 
 ```
