@@ -455,21 +455,30 @@ def receive(timeout_qc: Timeout_qc):
 
 ```python3
 def receive(sync_Msg: Sync_Msg):
+    if CURRENT_VIEW > sync_Msg.view:
+        return  
+    
+        # Update and download missing blocks.
     if sync_Msg.qc.view>high_qc.view:
         high_qc=sync_Msg.qc
     if sync_Msg.committed_qc.view>high_committed_qc.view:
         high_committed_qc=sync_Msg.committed_qc
+                
     if len(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])== supermajority():
          if member_of_internal() and not member_of_root():
                 sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
                 send(sync_Msg, parent_committee())
-        if member_of_root():
+         if member_of_root():
              sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
-
              sync_Msg_qc = create_sync_Msg_qc (PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
              sync_Msg.sync_qc = sync_Msg_qc
              send(sync_Msg, leader(sync_Msg.view))
-        if leader(sync_Msg.view):
+         if leader(sync_Msg.view):
+             
+             
+             
+            
+            
             
              
             
