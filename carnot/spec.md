@@ -454,14 +454,20 @@ def receive(timeout_qc: Timeout_qc):
 
     #Recalculate New Overlay
     if member_of_Leaf():
-        create_sync_Msg (CURRENT_VIEW,Timeout_qc)
+        sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
+        send(sync_Msg, parent_committee())
    # else:
     #    send(timeout_qc, parent_committee())
 ```
 
 ```python3
 def receive(sync_Msg: Sync_Msg):
-    pass
+    if sync_Msg.qc.view>high_qc.view:
+        high_qc=sync_Msg.qc
+    if sync_Msg.committed_qc.view>high_committed_qc.view:
+        high_committed_qc=sync_Msg.committed_qc
+    Pending_sync_Msgs[sync_Msg.view]
+    
 
 ```
 
