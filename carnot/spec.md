@@ -398,7 +398,7 @@ Func receive(newView) {
 ###### This is all part of pacemaker (liveness) module
 ### Timeout
 ```python3
-def timeout():
+def local_timeout():
     save_consensus_state()
     if member_of_internal_com() and not member_of_root() or member_of_leaf():
                         timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
@@ -411,7 +411,7 @@ def timeout():
 
 ```
 ```python3
-def receive(timeoutMsg: TimeoutMsg):
+def receive_timeoutMsgs(timeoutMsg: TimeoutMsg):
     if CURRENT_VIEW > timeoutMsg.view:
         return
     if timeoutMsg.view <= LAST_VIEW_TIMEOUT_QC.view:
@@ -435,7 +435,7 @@ def receive(timeoutMsg: TimeoutMsg):
 ```
 
 ```python3
-def receive(timeout_qc: Timeout_qc):
+def receive_timeout_qc(timeout_qc: Timeout_qc):
     if Timeout_qc.view < CURRENT_VIEW:
         return
     if Timeout_qc.view <= LAST_VIEW_TIMEOUT_QC.view: # Do not propagate and old timeout QC or the one the node already have propagated.
@@ -454,7 +454,7 @@ def receive(timeout_qc: Timeout_qc):
 ```
 
 ```python3
-def receive(sync_Msg: Sync_Msg):
+def receive_syncMsg(sync_Msg: Sync_Msg):
     if CURRENT_VIEW > sync_Msg.view:
         return  
     
