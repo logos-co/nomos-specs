@@ -89,8 +89,7 @@ class Vote:
 ### TimeoutMsg
 view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
 high_qc: Qc
-high_committed_qc : Qc
-timeout_qc: Qc
+timeout_qc: TimeoutMsg_qc
 sender: Id
 ```
 ```python
@@ -98,7 +97,6 @@ sender: Id
 class TimeoutMsg:
     view: View
     high_qc: Qc
-    high_committed_qc: Qc
     timeout_qc: Qc
     sender: Id
 
@@ -113,7 +111,6 @@ class Timeout:
 ### TimeoutMsg_qc
 view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
 high_qcs: list[Qc]
-high_committed_qc : Qc
 sender: Id
 ```
 
@@ -122,7 +119,6 @@ sender: Id
 @dataclass
 class TimeoutMsg_qc:
    high_qcs: list[Qc]
-    high_committed_qc : Qc
     timeout_qc: Qc
     sender: Id
 ```
@@ -139,26 +135,12 @@ Participants in the protocol are expected to mainting the following data in addi
 CURRENT_VIEW: View
 LOCAL_HIGH_QC: Qc
 LATEST_COMMITTED_VIEW: View
-HIGH_COMMITTED_QC:Qc # This is not needed for consensus but actually helps a lot for any node fallen behind to catchup.
 PENDING_VOTE_COLLECTION: dict() #id here presents Hash of the block returnd by block.Id()
 PENDING_TIMEOUTMSG_COLLECTION: dict()
 LAST_VIEW_TIMEOUT_QC: Timeout_qc
 
 ```
 
-```python
-def member_of_internal_com():
-    return True
-
-
-def member_of_root():
-    return True
-
-
-def member_of_leaf():
-    return True
-    
-```
 
 ## Available Functions
 The following functions are expected to be available to participants during the execution of the protocol:
@@ -181,7 +163,7 @@ The following functions are expected to be available to participants during the 
     * For leader: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1 
 
 * `morethanSsupermajority(votes)`: returns if the number of distinctive signers of votes for a block is is more than the threshold: TODO
-* `parent_committe`: return the parent committee of the participant executing the function withing the committee tree overlay. Result is undefined if called from a participant in the root committee.
+* `parent_committee`: return the parent committee of the participant executing the function withing the committee tree overlay. Result is undefined if called from a participant in the root committee.
 * `oblivious_adjacent_committees()`: returns the committees from which a node has not received the timeout_qc.
 
 <!-- #####Supermajority of child votes is 2/3 +1 votes from members of child committees
@@ -206,14 +188,11 @@ def receive_block(block: Block):
         parent: Block = download(block.parent())
         receive(parent)
         
-    if safe_block(block):
-        
+    if safe_block(block):   
         # This is not in the original spec, but 
         # let's validate I have this clear.
         assert block.view == current_view
-        
         update_high_qc(block.qc)
-
         vote = create_vote()
         if member_of_leaf_committee():
             if member_of_root_committee():
@@ -223,7 +202,7 @@ def receive_block(block: Block):
            # current_view += 1
            # reset_timer()
             increment_view_qc(block.qc)
-            try_to_commit_grandparent(block)
+            if try_to_commit_grandparent(block)
 ```
 ##### Auxiliary functions
 
@@ -263,7 +242,7 @@ def try_to_commit_grand_parent(block: Block):
             isinstance(block.qc, (StandardQc, )) and # Q: Is this necessary? Yes, this is very important for safety.
             isinstance(parent.qc, (StandardQc, )) # Q: Is this necessary?
     )
-    # Update last_committed_view ?
+    # Update last_committed_view ? (Ans: Yes, last_committed_view has to be updated.)
 ```
 
 ```python
@@ -283,7 +262,9 @@ def update_high_qc(qc: Qc):
             high_qc = qc.high_qc()
             if high_qc.view != LOCAL_HIGH_QC.view:
                 LOCAL_HIGH_QC = high_qc
-                # Q: same thing about missing views. (some missing views may not have even generated any blocks.)
+                # Q: same thing about missing views. (Ans: This is a different case. A node might have a higher local_high_qc but other
+                # nodes where not able to see it due to failure. Now since a new leader is being selected, we need to make sure the high_qc is
+                # synched across network.)
 ```
 
 ### Receive Vote
@@ -296,21 +277,20 @@ def receive_vote(vote: Vote):
     if vote.block is missing:
         block = download(vote.block)
         receive(block)
-        
+    if vote.view < CURRENT_VIEW: # Unless we collect votes for attestation for rewards (PoS)
+                return
+    
     if leader(vote.view+1): # Q? Which view? CURRENT_VIEW or vote.view?  => Ans: vote.view+1 Vote for the view 
         if root_commitee(vote.voter):
-            if vote.view < CURRENT_VIEW - 1:
-                return
-            
-            # Q: No filtering? I can just create a key and  vote?
+            # Q: No filtering? I can just create a key and  vote? (Ans: A check is added to confirm the root_commitee voter)
             PENDING_VOTE_COLLECTION[vote.block].append(vote)
             if  len(PENDING_VOTE_COLLECTION[vote.block])==supermajority():
                 qc = build_qc(PENDING_VOTE_COLLECTION[vote.block])
-                block = build_block(qc)
+                block = build_block(txs,CURRENT_VIEW+1,qc, AggQC=None)
                 broadcast(block)
         
-    # Q: we should probably return if we already received this vote
-    if member_of_internal_com() and not_member_of_root():
+    # Q: we should probably return if we already received this vote (Ans: Yes. It should be done, for all types of messages received. votes should be counted from )
+    if member_of_internal_com() and not member_of_root():
         if child_commitee(vote.voter):
             PENDING_VOTE_COLLECTION[vote.block].append(vote)
        # else:
@@ -322,11 +302,8 @@ def receive_vote(vote: Vote):
                 # Q: should we send it to everyone in the committee?
                 self_vote = build_vote()
                 send(self_vote, parent_committee)
-                # Q: why here?
-                
-                # reset_timer()
-                # Q: why do we do this here? 
-    #            try_to_commit_grand_parent(block) (Not needed)
+               
+               
     
     if member_of_root():
         if child_commitee(vote.voter):
@@ -368,13 +345,13 @@ def receive_vote(vote: Vote):
 ```python3
 def local_timeout():
     save_consensus_state()
-    if member_of_internal_com() and not member_of_root() or member_of_leaf():
-                        timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
+    if (member_of_internal_com() and not member_of_root()) or member_of_leaf():
+                        timeoutMsg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
                         send(timeoutMsg, parent_committee())
                  
                 
     if member_of_root():
-                        timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
+                        timeoutMsg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
                         send(timeoutMsg, root_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
 
 ```
@@ -382,9 +359,9 @@ def local_timeout():
 def receive_timeoutMsgs(timeoutMsg: TimeoutMsg):
     if CURRENT_VIEW > timeoutMsg.view:
         return
-    if timeoutMsg.view <= LAST_VIEW_TIMEOUT_QC.view:
+    if timeoutMsg.view <= LAST_VIEW_TIMEOUT_QC.view: 
         return
-    update_high_qc(timeoutMsg.high_qc)
+    #update_high_qc(timeoutMsg.high_qc)
     PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view].append(timeoutMsg)
     #Supermajority
     if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority():
@@ -415,7 +392,7 @@ def receive_timeout_qc(timeout_qc: Timeout_qc):
 
     #Recalculate New Overlay
     if member_of_Leaf():
-        sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
+        sync_Msg = create_sync_Msg (CURRENT_VIEW, LOCAL_High_QC)
         send(sync_Msg, parent_committee())
    # else:
     #    send(timeout_qc, parent_committee())
@@ -424,41 +401,26 @@ def receive_timeout_qc(timeout_qc: Timeout_qc):
 ```python3
 def receive_syncMsg(sync_Msg: Sync_Msg):
     if CURRENT_VIEW > sync_Msg.view:
-        return  
-    
+        return    
         # Update and download missing blocks.
-    if sync_Msg.qc.view>high_qc.view:
-        high_qc=sync_Msg.qc
-    if sync_Msg.committed_qc.view>high_committed_qc.view:
-        high_committed_qc=sync_Msg.committed_qc
-        
+    if sync_Msg.qc.view>LOCAL_HIGH_QC.view:
+        LOCAL_HIGH_QC=sync_Msg.qc
+    if LAST_VIEW_TIMEOUT_QC.view<sync_Msg.last_view_timeout_Msg_qc.view: # This is not needed for consensus. But helps a node catchup if it missed timeout msgs. 
+       LAST_VIEW_TIMEOUT_QC = sync_Msg.last_view_timeout_Msg_qc
     PENDING_SYNCMSG_COLLECTION[sync_Msg.view].append(sync_Msg)
     if len(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])== supermajority():
-         if member_of_internal() and not member_of_root():
-                sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
-                send(sync_Msg, parent_committee())
-         if member_of_root():
-             sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
-             sync_Msg_qc = create_sync_Msg_qc (PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
-             sync_Msg.sync_qc = sync_Msg_qc
-             send(sync_Msg, leader(sync_Msg.view))
-         if leader(sync_Msg.view):
-             
-             
-             
-            
-            
-            
-             
-            
-                
-
-            
-            
-            
-        
-        
-    
+        if member_of_internal() and not member_of_root():
+            sync_Msg = create_sync_Msg (CURRENT_VIEW, LOCAL_HIGH_QC)
+            send(sync_Msg, parent_committee())
+        if member_of_root():
+            sync_Msg = create_sync_Msg (CURRENT_VIEW, LOCAL_HIGH_QC)
+            sync_Msg_qc = create_sync_Msg_qc (PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
+            sync_Msg.sync_qc = sync_Msg_qc
+            send(sync_Msg, leader(sync_Msg.view))
+        if  leader(sync_Msg.view):
+                AggQC = build_AggQC(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
+                block = build_block(txs,CURRENT_VIEW+1,qc=None, AggQC)
+                broadcast(block)
 
 ```
 
