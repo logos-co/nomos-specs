@@ -206,14 +206,11 @@ def receive_block(block: Block):
         parent: Block = download(block.parent())
         receive(parent)
         
-    if safe_block(block):
-        
+    if safe_block(block):   
         # This is not in the original spec, but 
         # let's validate I have this clear.
         assert block.view == current_view
-        
         update_high_qc(block.qc)
-
         vote = create_vote()
         if member_of_leaf_committee():
             if member_of_root_committee():
@@ -296,21 +293,21 @@ def receive_vote(vote: Vote):
     if vote.block is missing:
         block = download(vote.block)
         receive(block)
-        
+    
     if leader(vote.view+1): # Q? Which view? CURRENT_VIEW or vote.view?  => Ans: vote.view+1 Vote for the view 
         if root_commitee(vote.voter):
-            if vote.view < CURRENT_VIEW - 1:
+            if vote.view < CURRENT_VIEW:
                 return
             
-            # Q: No filtering? I can just create a key and  vote?
+            # Q: No filtering? I can just create a key and  vote? (Ans: A check is added to confirm the root_commitee voter)
             PENDING_VOTE_COLLECTION[vote.block].append(vote)
             if  len(PENDING_VOTE_COLLECTION[vote.block])==supermajority():
                 qc = build_qc(PENDING_VOTE_COLLECTION[vote.block])
-                block = build_block(qc)
+                block = build_block(txs,CURRENT_VIEW+1,qc, AggQC=None)
                 broadcast(block)
         
-    # Q: we should probably return if we already received this vote
-    if member_of_internal_com() and not_member_of_root():
+    # Q: we should probably return if we already received this vote (Ans: Yes. It should be done, for all types of messages received. votes should be counted from )
+    if member_of_internal_com() and not member_of_root():
         if child_commitee(vote.voter):
             PENDING_VOTE_COLLECTION[vote.block].append(vote)
        # else:
@@ -368,7 +365,7 @@ def receive_vote(vote: Vote):
 ```python3
 def local_timeout():
     save_consensus_state()
-    if member_of_internal_com() and not member_of_root() or member_of_leaf():
+    if (member_of_internal_com() and not member_of_root()) or member_of_leaf():
                         timeoutMsg = create_timeout(CURRENT_VIEW,HIGH_QC,HIGH_COMMITTED_QC, TIMEOUT_QC)
                         send(timeoutMsg, parent_committee())
                  
@@ -424,41 +421,30 @@ def receive_timeout_qc(timeout_qc: Timeout_qc):
 ```python3
 def receive_syncMsg(sync_Msg: Sync_Msg):
     if CURRENT_VIEW > sync_Msg.view:
-        return  
-    
+        return    
         # Update and download missing blocks.
     if sync_Msg.qc.view>high_qc.view:
         high_qc=sync_Msg.qc
     if sync_Msg.committed_qc.view>high_committed_qc.view:
         high_committed_qc=sync_Msg.committed_qc
-        
     PENDING_SYNCMSG_COLLECTION[sync_Msg.view].append(sync_Msg)
     if len(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])== supermajority():
-         if member_of_internal() and not member_of_root():
-                sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
-                send(sync_Msg, parent_committee())
-         if member_of_root():
-             sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
-             sync_Msg_qc = create_sync_Msg_qc (PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
-             sync_Msg.sync_qc = sync_Msg_qc
-             send(sync_Msg, leader(sync_Msg.view))
-         if leader(sync_Msg.view):
-             
-             
-             
-            
-            
-            
-             
-            
+        if member_of_internal() and not member_of_root():
+            sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
+            send(sync_Msg, parent_committee())
+        if member_of_root():
+            sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
+            sync_Msg_qc = create_sync_Msg_qc (PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
+            sync_Msg.sync_qc = sync_Msg_qc
+            send(sync_Msg, leader(sync_Msg.view))
+        if  leader(sync_Msg.view):
+                AggQC = (view, high_qc) 
+                 AggQC = build_AggQC(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
+                block = build_block(txs,CURRENT_VIEW+1,qc, AggQC=None)
+                broadcast(block)
                 
-
-            
-            
-            
-        
-        
-    
+             
+             
 
 ```
 
