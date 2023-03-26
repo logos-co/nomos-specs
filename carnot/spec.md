@@ -114,7 +114,6 @@ class Timeout:
 view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
 high_qcs: list[Qc]
 high_committed_qc : Qc
-timeout_qc: Qc
 sender: Id
 ```
 
@@ -178,9 +177,8 @@ The following functions are expected to be available to participants during the 
 * `child_committee(participant)`: returns true if the participant passed as argument is member of the child committee of the participant executing the function.
 
 * `supermajority()`: the behavior changes with the position of a participant in the overlay:
-    * Root committee: returns if the number of distinctive signers of votes for a block in the child committee is equal to the threshold.
-
-* `leader_supermajority(votes, TimeoutMsgs)`: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1
+    *  committee members: returns if the number of distinctive signers of votes, for a block in the child committee is equal to the threshold.
+    * For leader: returns if the number of distinct voters for a block is 2/3 + 1 for both children committees of root committee and overall 2/3 + 1 
 
 * `morethanSsupermajority(votes)`: returns if the number of distinctive signers of votes for a block is is more than the threshold: TODO
 * `parent_committe`: return the parent committee of the participant executing the function withing the committee tree overlay. Result is undefined if called from a participant in the root committee.
@@ -237,7 +235,7 @@ def safe_block_qc (block: Block):
          #   if standard.view <= LATEST_COMMITED_BLOCK:
             if standard.view < CURRENT_VIEW:
                 return False
-            increment_view_qc(standard.view+1)
+           # increment_view_qc(standard.view+1)
 
             # this check makes sure block is not old 
             # and the previous leader did not fail
@@ -262,7 +260,7 @@ def try_to_commit_grand_parent(block: Block):
     grand_parent = parent.parent()
     return (
             parent.view == (grand_parent.view + 1) and
-            isinstance(block.qc, (StandardQc, )) and # Q: Is this necessary?
+            isinstance(block.qc, (StandardQc, )) and # Q: Is this necessary? Yes, this is very important for safety.
             isinstance(parent.qc, (StandardQc, )) # Q: Is this necessary?
     )
     # Update last_committed_view ?
@@ -279,13 +277,13 @@ def update_high_qc(qc: Qc):
                 LOCAL_HIGH_QC = qc
             # Q: The original pseudocde checked for possilbly
             # missing view and downloaded them, but I think
-            # we already dealt with this in receive_block
+            # we already dealt with this in receive_block (You are right!)
         # Unhappy case
         case Aggregate() as qc:
             high_qc = qc.high_qc()
             if high_qc.view != LOCAL_HIGH_QC.view:
                 LOCAL_HIGH_QC = high_qc
-                # Q: same thing about missing views
+                # Q: same thing about missing views. (some missing views may not have even generated any blocks.)
 ```
 
 ### Receive Vote
@@ -298,103 +296,73 @@ def receive_vote(vote: Vote):
     if vote.block is missing:
         block = download(vote.block)
         receive(block)
-
+        
+    if leader(vote.view+1): # Q? Which view? CURRENT_VIEW or vote.view?  => Ans: vote.view+1 Vote for the view 
+        if root_commitee(vote.voter):
+            if vote.view < CURRENT_VIEW - 1:
+                return
+            
+            # Q: No filtering? I can just create a key and  vote?
+            PENDING_VOTE_COLLECTION[vote.block].append(vote)
+            if  len(PENDING_VOTE_COLLECTION[vote.block])==supermajority():
+                qc = build_qc(PENDING_VOTE_COLLECTION[vote.block])
+                block = build_block(qc)
+                broadcast(block)
+        
     # Q: we should probably return if we already received this vote
     if member_of_internal_com() and not_member_of_root():
         if child_commitee(vote.voter):
-            COLLECTION[vote.block].append(vote)
-        else:
+            PENDING_VOTE_COLLECTION[vote.block].append(vote)
+       # else:
             # Q: not returning here would mean it's extremely easy to
             # trigger building a new vote in the following branches
-            return
-        
-        if supermajority(COLLECTION[vote.block]):
-            # Q: should we send it to everyone in the committee?
-            self_vote = build_vote()
-            send(self_vote, parent_committee)
-            # Q: why here?
-            current_view += 1 # increment_view should be used instead of this.
-            
-            reset_timer()
-            # Q: why do we do this here? 
-            try_to_commit_grand_parent(block)
+          #  return
+          #  (return is not necessary as long as it stays within if scope)
+            if len(PENDING_VOTE_COLLECTION[vote.block])==supermajority():
+                # Q: should we send it to everyone in the committee?
+                self_vote = build_vote()
+                send(self_vote, parent_committee)
+                # Q: why here?
+                
+                # reset_timer()
+                # Q: why do we do this here? 
+    #            try_to_commit_grand_parent(block) (Not needed)
     
     if member_of_root():
         if child_commitee(vote.voter):
-            COLLECTION[vote.block].append(vote)
-        else:
+            PENDING_VOTE_COLLECTION[vote.block].append(vote)
+        # else:
             # Q: not returning here would mean it's extremely easy to
             # trigger building a new vote in the following branches
-            return
+        #    return
+        #  Ans: return is not necessary as long as it stays within if scope
 
-        if supermajority(COLLECTION[vote.block]):
             # Q: The vote to send is not the one received but
-            # the one build by this participant, right?
-            self_vote = build_vote();
-            qc = build_qc(collection[vote.block])
-            self_vote.qc=qc
-            send(self_vote, leader(current_view + 1))
-            # Q: why here?
-            current_view += 1
-            reset_timer()
-            # Q: why here?
-            try_to_commit_grandparent(block)
+            
+            if len(PENDING_VOTE_COLLECTION[vote.block])==supermajority():
+                # Q: The vote to send is not the one received but
+                # the one build by this participant, right?
+                self_vote = build_vote(); 
+                qc = build_qc(PENDING_VOTE_COLLECTION[vote.block])
+                self_vote.qc=qc
+                send(self_vote, leader(current_view + 1))
+          
 
 
         # Q: this means that we send a message for every incoming
         # message after the threshold has been reached, i.e. a vote
         # from a node in the leaf committee can trigger
         # at least height(tree) messages.
-        if morethanSsupermajority(collection[vote.block]):
-            # just forward the vote to the leader
-            # Q: But then childcommitte(vote.voter) would return false
-            # in the leader, as it's a granchild, not a child
-            send(vote, leader(current_view + 1))
+            if len(PENDING_VOTE_COLLECTION[vote.block]) > supermajority():
+                # just forward the vote to the leader
+                # Q: But then childcommitte(vote.voter) would return false
+                # in the leader, as it's a granchild, not a child
+                send(vote, leader(current_view + 1))
 
-    if leader(vote.view+1): # Q? Which view? CURRENT_VIEW or vote.view?  => Ans: vote.view+1 Vote for the view 
-        if vote.view < CURRENT_VIEW - 1:
-            return
-        
-        # Q: No filtering? I can just create a key and  vote?
-        COLLECTION[vote.block].append(vote)
-        if supermajority(collection[vote.block]):
-            qc = build_qc(collection[vote.block])
-            block = build_block(qc)
-            broadcast(block)
+    
 ```
 
-### Receive NewView ===> We are not using NewView any more but use timeoutMsg instead.
-```Ruby
-# Failure Case
-Func receive(newView) {
-    # download the missing block 
-    if newview.highQC.block missing {
-        let block = download(new_view.high_qc.block)
-        receive(block)
-    }
 
-    # It's an old message. Ignore it.
-    if newView.view < current_view {
-        return 
-    }
-
-    # Q: this was update_high_qc_and_view(new_view.high_qc, Null)
-    update_high_qc(new_view.high_qc)
-
-    if member_of_internal_com() {
-        collection[newView.view].append(newView)
-        if supermajority[newView.view]{
-            newViewQC=buildQC(collection[newView.view])
-            if member_of_root(){
-                send(newViewQC, leader(view+1))
-                curView++
-            } else {
-                send(newViewQC, parent_committee())
-            }
-        }
-    }
-}
-```
 ###### This is all part of pacemaker (liveness) module
 ### Timeout
 ```python3
@@ -463,7 +431,8 @@ def receive_syncMsg(sync_Msg: Sync_Msg):
         high_qc=sync_Msg.qc
     if sync_Msg.committed_qc.view>high_committed_qc.view:
         high_committed_qc=sync_Msg.committed_qc
-                
+        
+    PENDING_SYNCMSG_COLLECTION[sync_Msg.view].append(sync_Msg)
     if len(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])== supermajority():
          if member_of_internal() and not member_of_root():
                 sync_Msg = create_sync_Msg (CURRENT_VIEW, high_qc, high_committed_qc)
