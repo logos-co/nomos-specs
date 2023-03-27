@@ -86,29 +86,22 @@ class Vote:
     qc: Option[Qc]
 ```
 
-### TimeoutMsg
-view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
+### Timeout_Msg
+view: View  
 high_qc: Qc
-timeout_qc: TimeoutMsg_qc
 sender: Id
 ```
 ```python
 @dataclass
-class TimeoutMsg:
+class Timeout_Msg:
     view: View
     high_qc: Qc
-    timeout_qc: Qc
     sender: Id
 
-### Timeout
-
-```python
-class Timeout:
-    view: View
-    high_qc: Qc
 ```
 
-### TimeoutMsg_qc
+```python
+### Timeout_Msg_qc
 view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
 high_qcs: list[Qc]
 sender: Id
@@ -117,11 +110,29 @@ sender: Id
 
 ```python
 @dataclass
-class TimeoutMsg_qc:
-   high_qcs: list[Qc]
-    timeout_qc: Qc
-    sender: Id
+class Timeout_Msg_qc:
+view: View 
+high_qcs: list[Qc]
+sender: Id
 ```
+
+
+### Sync_Msg
+view: View   ### Currently the 3 QC fields are not being used. But I am keeping it as it might be useful to save a roundtrip during unhappy path.
+high_qc: Qc
+timeout_qc: Timeout_qc
+sender: Id
+```
+
+
+```python
+@dataclass
+class Sync_Msg:
+high_qc: Qc
+timeout_qc: timeout_qc
+sender: Id
+```
+
 
 
 ## Local Variables
@@ -289,7 +300,7 @@ def receive_vote(vote: Vote):
             PENDING_VOTE_COLLECTION[vote.block].append(vote)
             if  len(PENDING_VOTE_COLLECTION[vote.block])==supermajority():
                 qc = build_qc(PENDING_VOTE_COLLECTION[vote.block])
-                block = build_block(txs,CURRENT_VIEW+1,qc, AggQC=None)
+                block = build_block(txs,CURRENT_VIEW+1,qc, AggQC=None) # #build_block
                 broadcast(block)
         
     # Q: we should probably return if we already received this vote (Ans: Yes. It should be done, for all types of messages received. votes should be counted from )
@@ -332,11 +343,12 @@ def receive_vote(vote: Vote):
         # Q: this means that we send a message for every incoming
         # message after the threshold has been reached, i.e. a vote
         # from a node in the leaf committee can trigger
-        # at least height(tree) messages.
+        # at least height(tree) messages. (Ans: Root nodes only forward additional votes from their child committees.)
             if len(PENDING_VOTE_COLLECTION[vote.block]) > supermajority():
                 # just forward the vote to the leader
                 # Q: But then childcommitte(vote.voter) would return false
-                # in the leader, as it's a granchild, not a child
+                # in the leader, as it's a granchild, not a child. (Ans: Leader does not have a child. But it needs to count votes
+                # (individually and within qc) to make sure, threshold of votes is reached.)
                 send(vote, leader(current_view + 1))
 
     
@@ -346,29 +358,32 @@ def receive_vote(vote: Vote):
 ###### This is all part of pacemaker (liveness) module
 ### Timeout
 ```python3
+##### When a node timesout and cannot complete the view on time. It has to send its timeout_Msgs to the its parent committee. Since root 
+### committee does not have a parent it sends to itself
 def local_timeout():
     save_consensus_state()
+   
     if (member_of_internal_com() and not member_of_root()) or member_of_leaf():
-                        timeoutMsg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
-                        send(timeoutMsg, parent_committee())
-                 
-                
+        timeout_Msg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
+        send(timeout_Msg, parent_committee())
+              
     if member_of_root():
-                        timeoutMsg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
-                        send(timeoutMsg, root_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
+                        timeout_Msg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
+                        send(timeout_Msg, root_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
 
 ```
 ```python3
-def receive_timeoutMsgs(timeoutMsg: TimeoutMsg):
-    if CURRENT_VIEW > timeoutMsg.view:
+#######
+def receive_timeout_Msgs(timeout_Msg: Timeout_Msg):
+    if CURRENT_VIEW > timeout_Msg.view:
         return
-    if timeoutMsg.view <= LAST_VIEW_TIMEOUT_QC.view: 
+    if timeout_Msg.view <= LAST_VIEW_TIMEOUT_QC.view: 
         return
-    #update_high_qc(timeoutMsg.high_qc)
-    PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view].append(timeoutMsg)
+    #update_high_qc(timeout_Msg.high_qc)
+    PENDING_TIMEOUTMSG_COLLECTION[timeout_Msg.view].append(timeout_Msg)
     #Supermajority
-    if len(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])== supermajority():
-        timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeoutMsg.view])
+    if len(PENDING_TIMEOUTMSG_COLLECTION[timeout_Msg.view])== supermajority():
+        timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeout_Msg.view])
         send(timeout_qc, own_committee()) ####helps nodes to sync quicker but not required
         if member_of_root():
           #  send(timeout_qc, leader(view+1))
@@ -376,8 +391,8 @@ def receive_timeoutMsgs(timeoutMsg: TimeoutMsg):
         else:
             send(timeout_qc, parent_committee())
             send(timeout_qc, child_committee())
-        return timeout_qc
-    return
+     #   return timeout_qc
+    #return
 
 
 ```
@@ -402,14 +417,16 @@ def receive_timeout_qc(timeout_qc: Timeout_qc):
 ```
 
 ```python3
+
+
 def receive_syncMsg(sync_Msg: Sync_Msg):
     if CURRENT_VIEW > sync_Msg.view:
         return    
         # Update and download missing blocks.
     if sync_Msg.qc.view>LOCAL_HIGH_QC.view:
         LOCAL_HIGH_QC=sync_Msg.qc
-    if LAST_VIEW_TIMEOUT_QC.view<sync_Msg.last_view_timeout_Msg_qc.view: # This is not needed for consensus. But helps a node catchup if it missed timeout msgs. 
-       LAST_VIEW_TIMEOUT_QC = sync_Msg.last_view_timeout_Msg_qc
+    if LAST_VIEW_TIMEOUT_QC.view<sync_Msg.timeout_qc.view: # This is not needed for consensus. But helps a node catchup if it missed timeout msgs. 
+       LAST_VIEW_TIMEOUT_QC = sync_Msg.timeout_qc
     PENDING_SYNCMSG_COLLECTION[sync_Msg.view].append(sync_Msg)
     if len(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])== supermajority():
         if member_of_internal() and not member_of_root():
