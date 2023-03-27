@@ -202,7 +202,7 @@ def receive_block(block: Block):
            # current_view += 1
            # reset_timer()
             increment_view_qc(block.qc)
-            if try_to_commit_grandparent(block)
+          
 ```
 ##### Auxiliary functions
 
@@ -237,11 +237,14 @@ def safe_block_qc (block: Block):
 def try_to_commit_grand_parent(block: Block):
     parent = block.parent()
     grand_parent = parent.parent()
-    return (
-            parent.view == (grand_parent.view + 1) and
+    if (parent.view == (grand_parent.view + 1) and
             isinstance(block.qc, (StandardQc, )) and # Q: Is this necessary? Yes, this is very important for safety.
             isinstance(parent.qc, (StandardQc, )) # Q: Is this necessary?
-    )
+             ):
+        LAST_COMMITTED_VIEW=grand_parent.view
+        return true
+    else:
+        return false
     # Update last_committed_view ? (Ans: Yes, last_committed_view has to be updated.)
 ```
 
