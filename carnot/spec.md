@@ -89,6 +89,7 @@ class Vote:
 ### Timeout_Msg
 view: View  
 high_qc: Qc
+rb : RB   # Random Beacon
 sender: Id
 ```
 ```python
@@ -96,6 +97,7 @@ sender: Id
 class Timeout_Msg:
     view: View
     high_qc: Qc
+    rb: RB      
     sender: Id
 
 ```
@@ -362,88 +364,62 @@ def receive_vote(vote: Vote):
 ### committee does not have a parent it sends to itself
 def local_timeout():
     save_consensus_state()
-   
-    if (member_of_internal_com() and not member_of_root()) or member_of_leaf():
-        timeout_Msg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
-        send(timeout_Msg, parent_committee())
+    stop_timer(current_view)
+    
+    #ignore any happy path msg. Except Timeout_Msg from child committee
+    # Assumption here is that somehow RB also knows about the timeout and has already given the RB to rebuild the overlay tree.
+    # Received_RB() is not implemented but returns true if Overlay is recalculated due to current_view failure
+    # rb is the random beacon value for new overlay for current_view. It is included because if a node receives timeout_Msg and
+    # is somehow unaware of new overlay can built the overlay using the RB in timeout message.
+    
+    
               
-    if member_of_root():
-                        timeout_Msg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, TIMEOUT_QC)
-                        send(timeout_Msg, root_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
+    if member_of_leaf() and Received_RB(current_view):
+                        timeout_Msg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, LAST_VIEW_TIMEOUT_QC, rb)
+                        send(timeout_Msg, parent_committee()) # Need to be discussed. It can only be sent to the next leader but since the RB needs agreement to generate the seed for the leader+overlay, therefore newView is sent to the root_committee().
 
 ```
 ```python3
 #######
 def receive_timeout_Msgs(timeout_Msg: Timeout_Msg):
+  
+   
+    
     if CURRENT_VIEW > timeout_Msg.view:
         return
     if timeout_Msg.view <= LAST_VIEW_TIMEOUT_QC.view: 
         return
-    #update_high_qc(timeout_Msg.high_qc)
+ 
+    if not child_commitee(timeout_Msg.sender):
+        return
+    # Overlay is built if the node has not done so for the view timeout_Msg.view
+    # built_overlay(rb) is not defined. It takes random beacon as input and generates a new overlay.
+    if  not Received_RB(timeout_Msg.view,rb):
+        built_overlay(rb)
+     
+    if timeout_Msg.view>LOCAL_HIGH_QC.view:
+        LOCAL_HIGH_QC = timeout_Msg.high_qc
+    
+        
     PENDING_TIMEOUTMSG_COLLECTION[timeout_Msg.view].append(timeout_Msg)
     #Supermajority
     if len(PENDING_TIMEOUTMSG_COLLECTION[timeout_Msg.view])== supermajority():
         timeout_qc = create_timeout_qc(PENDING_TIMEOUTMSG_COLLECTION[timeout_Msg.view])
-        send(timeout_qc, own_committee()) ####helps nodes to sync quicker but not required
+        increment_view_timeout_qc(timeout_qc.view)
+        LAST_VIEW_TIMEOUT_QC = timeout_qc
+        timeout_Msg = create_timeout(CURRENT_VIEW,LOCAL_HIGH_QC, LAST_VIEW_TIMEOUT_QC)
         if member_of_root():
-          #  send(timeout_qc, leader(view+1))
-         send(timeout_qc, child_committee())
+            send(timeout_qc, leader(timeout_qc.view+1))
+        # send(timeout_qc, child_committee())
         else:
             send(timeout_qc, parent_committee())
-            send(timeout_qc, child_committee())
-     #   return timeout_qc
-    #return
-
-
-```
-
-```python3
-def receive_timeout_qc(timeout_qc: Timeout_qc):
-    if Timeout_qc.view < CURRENT_VIEW:
-        return
-    if Timeout_qc.view <= LAST_VIEW_TIMEOUT_QC.view: # Do not propagate and old timeout QC or the one the node already have propagated.
-        return
-    #stop_timer(current_view)
-    if member_of_internal_com():
-        send(timeout_qc, oblivious_adjacent_committees())
-    increment_view_timeout_qc(timeout_qc.view)
-
-    #Recalculate New Overlay
-    if member_of_Leaf():
-        sync_Msg = create_sync_Msg (CURRENT_VIEW, LOCAL_High_QC)
-        send(sync_Msg, parent_committee())
-   # else:
-    #    send(timeout_qc, parent_committee())
-```
-
-```python3
-
-
-def receive_syncMsg(sync_Msg: Sync_Msg):
-    if CURRENT_VIEW > sync_Msg.view:
-        return    
-        # Update and download missing blocks.
-    if sync_Msg.qc.view>LOCAL_HIGH_QC.view:
-        LOCAL_HIGH_QC=sync_Msg.qc
-    if LAST_VIEW_TIMEOUT_QC.view<sync_Msg.timeout_qc.view: # This is not needed for consensus. But helps a node catchup if it missed timeout msgs. 
-       LAST_VIEW_TIMEOUT_QC = sync_Msg.timeout_qc
-    PENDING_SYNCMSG_COLLECTION[sync_Msg.view].append(sync_Msg)
-    if len(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])== supermajority():
-        if member_of_internal() and not member_of_root():
-            sync_Msg = create_sync_Msg (CURRENT_VIEW, LOCAL_HIGH_QC)
-            send(sync_Msg, parent_committee())
-        if member_of_root():
-            sync_Msg = create_sync_Msg (CURRENT_VIEW, LOCAL_HIGH_QC)
-            sync_Msg_qc = create_sync_Msg_qc (PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
-            sync_Msg.sync_qc = sync_Msg_qc
-            send(sync_Msg, leader(sync_Msg.view))
-        if  leader(sync_Msg.view):
-                AggQC = build_AggQC(PENDING_SYNCMSG_COLLECTION[sync_Msg.view])
-                block = build_block(txs,CURRENT_VIEW+1,qc=None, AggQC)
+        if  leader(timeout_qc.view+1):
+                AggQC = build_AggQC(PENDING_TIMEOUTMSG_COLLECTION[timeout_Msg.view])
+                block = build_block(txs,CURRENT_VIEW,qc=None, AggQC)
                 broadcast(block)
 
-```
 
+```
 
 
 ```python3
@@ -471,4 +447,3 @@ def start_timer(next_view: int):
     timer_start(duration)
 ```
 
-We need to make sure that qcs can't be removed from aggQc when going up the tree
