@@ -43,6 +43,7 @@ class TestCarnotHappyPath(TestCase):
         carnot.receive_block(block5)
 
 
+# This  also covers the case when a block has a lower view number than its QC.
  def test_receive_block_has_old_view_number(self):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
@@ -69,3 +70,29 @@ class TestCarnotHappyPath(TestCase):
         carnot.receive_block(block5)
 
 
+
+
+ def test_receive_block_qc_view_is_higher_than_block_view_number(self):
+        carnot = Carnot(int_to_id(0))
+        genesis_block = self.add_genesis_block(carnot)
+        # 1
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
+        carnot.receive_block(block1)
+
+        # 2
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1))
+        carnot.receive_block(block2)
+
+        # 3
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2))
+        carnot.receive_block(block3)
+        # 4
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3))
+        carnot.receive_block(block4)
+
+        # 5 This is the old standard qc of block number 3. For standarnd QC we must always have qc.view==block.view-1.
+        # This block should be rejected based on the condition  below in block_is_safe().
+        #  block.view >= self.latest_committed_view and block.view == (standard.view + 1)
+        # block_is_safe() should return false.
+        block5 = Block(view=3, qc=StandardQc(block=block4.id(), view=4))
+        carnot.receive_block(block5)

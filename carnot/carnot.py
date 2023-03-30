@@ -175,7 +175,8 @@ class Carnot:
             case AggregateQc() as aggregated:
                 if aggregated.high_qc().view < self.latest_committed_view:
                     return False
-                return block.view >= self.current_view
+                return block.view >= self.current_view and block.view == aggregated.view+1 # AggregatedQC must be
+        #formed from previous round.
 
     def update_high_qc(self, qc: Qc):
         match (self.local_high_qc, qc):
