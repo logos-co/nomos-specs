@@ -190,9 +190,11 @@ class Carnot:
 
     def receive_block(self, block: Block):
         assert block.parent() in self.safe_blocks
+        # This condition is not needed because it will be true as qc of a block will hve lower view than
+        #the block.
+       # if block.qc.view < self.current_view:
+        #    return
 
-        if block.qc.view < self.current_view:
-            return
         if block.id() in self.safe_blocks or block.view <= self.latest_committed_view:
             return
 
