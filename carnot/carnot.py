@@ -1,10 +1,14 @@
 from dataclasses import dataclass
-from typing import TypeAlias, List, Set, Self, Optional
+from typing import TypeAlias, List, Set, Self, Optional, Dict
 from abc import abstractmethod
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
 Committee: TypeAlias = Set[Id]
+
+
+def int_to_id(i: int) -> Id:
+    return bytes(str(i), encoding="utf8")
 
 
 @dataclass
@@ -46,7 +50,7 @@ class Block:
         return self.qc.block
 
     def id(self) -> Id:
-        return int.to_bytes(hash(self), length=32, byteorder="little")
+        return int_to_id(hash((self.view, self.qc.view, self.qc.block)))
 
 
 @dataclass
@@ -123,7 +127,7 @@ class Overlay:
         pass
 
     @abstractmethod
-    def parent_committee(self, _id: Id) -> Option[Committee]:
+    def parent_committee(self, _id: Id) -> Optional[Committee]:
         """
         :param _id:
         :return: Some(parent committee) of the participant with Id _id withing the committee tree overlay
@@ -131,20 +135,22 @@ class Overlay:
         """
         pass
 
+    @abstractmethod
+    def super_majority_threshold(self, _id: Id) -> int:
+        """
+        Amount of distinct number of messages for a node with Id _id member of a committee
+        The return value may change depending on which committee the node is member of, including the leader
+        :return:
+        """
+        if self.is_leader(_id):
+            pass
+        elif self.member_of_root_committee(_id):
+            pass
+        else:
+            pass
+
 
 def download(view) -> Block:
-    raise NotImplementedError
-
-
-def supermajority(votes: Set[Vote]) -> bool:
-    raise NotImplementedError
-
-
-def leader_supermajorty(votes: Set[Vote]) -> bool:
-    raise NotImplementedError
-
-
-def more_than_supermajority(votes: Set[Vote]) -> bool:
     raise NotImplementedError
 
 
@@ -154,19 +160,20 @@ class Carnot:
         self.current_view: View = 0
         self.local_high_qc: Optional[Qc] = None
         self.latest_committed_view: View = 0
-        self.safe_blocks: Set[Id] = set()
+        self.safe_blocks: Dict[Id, Block] = dict()
         self.last_timeout_view_qc: Optional[TimeoutQc] = None
         self.last_timeout_view: Optional[View] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
+        self.committed_blocks: Dict[Id, Block] = dict()
 
     def block_is_safe(self, block: Block) -> bool:
         match block.qc:
             case StandardQc() as standard:
-                if standard.view <=self.latest_committed_view:
+                if standard.view < self.latest_committed_view:
                     return False
                 return block.view >= self.latest_committed_view and block.view == (standard.view + 1)
             case AggregateQc() as aggregated:
-                if aggregated.high_qc().view <= self.latest_committed_view:
+                if aggregated.high_qc().view < self.latest_committed_view:
                     return False
                 return block.view >= self.current_view
 
@@ -183,15 +190,21 @@ class Carnot:
 
     def receive_block(self, block: Block):
         assert block.parent() in self.safe_blocks
-        assert block.id() in self.safe_blocks or block.view <= self.latest_committed_view
+
+        if block.qc.view < self.current_view:
+            return
+        if block.id() in self.safe_blocks or block.view <= self.latest_committed_view:
+            return
 
         if self.block_is_safe(block):
-            self.safe_blocks.add(block.id())
+            self.safe_blocks[block.id()] = block
             self.update_high_qc(block.qc)
+            self.try_commit_grand_parent(block)
+            self.increment_view_qc(block.qc)
 
     def vote(self, block: Block, votes: Set[Vote]):
         assert block.id() in self.safe_blocks
-        assert supermajority(votes)
+        assert len(votes) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.child_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
 
@@ -224,7 +237,7 @@ class Carnot:
 
     def propose_block(self, view: View, quorum: Quorum):
         assert self.overlay.is_leader(self.id)
-        assert leader_supermajorty(quorum)
+        assert len(quorum) == self.overlay.super_majority_threshold(self.id)
 
         qc = self.build_qc(quorum)
         block = Block(view=view, qc=qc)
@@ -244,6 +257,28 @@ class Carnot:
 
     def broadcast(self, block):
         pass
+
+    def try_commit_grand_parent(self, block: Block):
+        parent = self.safe_blocks.get(block.parent())
+        grand_parent = self.safe_blocks.get(parent.parent())
+        # this case should just trigger on genesis_case,
+        # as the preconditions on outer calls should check on block validity
+        if not parent or not grand_parent:
+            return
+        can_commit = (
+                parent.view == (grand_parent.view + 1) and
+                isinstance(block.qc, (StandardQc, )) and
+                isinstance(parent.qc, (StandardQc, ))
+        )
+        if can_commit:
+            self.committed_blocks[block.id()] = block
+
+    def increment_view_qc(self, qc: Qc) -> bool:
+        if qc.view < self.current_view:
+            return False
+        self.last_timeout_view_qc = None
+        self.current_view = qc.view + 1
+        return True
 
 
 if __name__ == "__main__":
