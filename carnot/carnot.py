@@ -1,8 +1,6 @@
 from dataclasses import dataclass
-from typing import TypeAlias, List, Set, Self
-from rusty_results import Option, Some, Empty, Result, Ok, Err
+from typing import TypeAlias, List, Set, Self, Optional
 from abc import abstractmethod
-from pprint import pformat
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
@@ -56,7 +54,7 @@ class Vote:
     block: Id
     view: View
     voter: Id
-    qc: Option[Qc]
+    qc: Optional[Qc]
 
 
 @dataclass
@@ -154,11 +152,11 @@ class Carnot:
     def __init__(self, _id: Id):
         self.id: Id = _id
         self.current_view: View = 0
-        self.local_high_qc: Option[Qc] = Empty()
+        self.local_high_qc: Optional[Qc] = None
         self.latest_committed_view: View = 0
         self.safe_blocks: Set[Id] = set()
-        self.last_timeout_view_qc: Option[TimeoutQc] = Empty()
-        self.last_timeout_view: Option[View] = Empty()
+        self.last_timeout_view_qc: Optional[TimeoutQc] = None
+        self.last_timeout_view: Optional[View] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
 
     def block_is_safe(self, block: Block) -> bool:
@@ -174,14 +172,14 @@ class Carnot:
 
     def update_high_qc(self, qc: Qc):
         match (self.local_high_qc, qc):
-            case (Empty(), StandardQc() as new_qc):
-                self.local_high_qc = Some(new_qc)
-            case (Empty(), AggregateQc() as new_qc):
-                self.local_high_qc = Some(new_qc.high_qc())
-            case (Some(old_qc), StandardQc() as new_qc) if new_qc.view > old_qc.view:
-                self.local_high_qc = Some(new_qc)
-            case (Some(old_qc), AggregateQc() as new_qc) if new_qc.high_qc().view != old_qc.view:
-                self.local_high_qc = Some(new_qc.high_qc())
+            case (None, StandardQc() as new_qc):
+                self.local_high_qc = new_qc
+            case (None, AggregateQc() as new_qc):
+                self.local_high_qc = new_qc.high_qc()
+            case (old_qc, StandardQc() as new_qc) if new_qc.view > old_qc.view:
+                self.local_high_qc = new_qc
+            case (old_qc, AggregateQc() as new_qc) if new_qc.high_qc().view != old_qc.view:
+                self.local_high_qc = new_qc.high_qc()
 
     def receive_block(self, block: Block):
         assert block.parent() in self.safe_blocks
@@ -202,7 +200,7 @@ class Carnot:
                 block=block.id(),
                 voter=self.id,
                 view=self.current_view,
-                qc=Some(self.build_qc(votes))
+                qc=self.build_qc(votes)
             )
             self.send(vote, self.overlay.leader(self.current_view + 1))
         else:
@@ -210,7 +208,7 @@ class Carnot:
                 block=block.id(),
                 voter=self.id,
                 view=self.current_view,
-                qc=Empty()
+                qc=None
             )
         self.send(vote, *self.overlay.parent_committee(self.id))
 
