@@ -322,7 +322,8 @@ def timeout(view: View, msgs: Set[TimeoutMsg]):
     if view > LOCAL_HIGH_QC.view:
         LOCAL_HIGH_QC = timeout_Msg.high_qc
 
-    timeout_qc = create_timeout_qc(msgs)increment_view_timeout_qc(timeout_qc.view)
+    timeout_qc = create_timeout_qc(msgs)
+    increment_view_timeout_qc(timeout_qc.view)
     LAST_VIEW_TIMEOUT_QC = timeout_qc
     send(timeout_qc, own_committee()) ####helps nodes to sync quicker but not required
     if member_of_root():
