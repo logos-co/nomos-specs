@@ -158,12 +158,13 @@ def test_receive_block_has_an_old_qc(self):
 
 
      # Test cases for  vote:
-        #1: If a node votes for a safe block
-        #2: If a nodes votes for same block twice
-        #3: If a node votes for two different blocks in the same view.
-        #4: If a node in parent committee votes before it receives threshold of children's votes
-        #5: If a node counts a single vote twice
-        #6: If a node votes only for block that are safe
+        #1: If a nodes votes for same block twice
+        #2: If a node votes for two different blocks in the same view.
+        #3: If a node in parent committee votes before it receives threshold of children's votes
+        #4: If a node counts duplicate votes
+        #6: If a node counts votes of nodes other than it's child committees.
+        #7: If a node counts distinct votes for a safe block from its child committees.
+
  def test_vote_for_received_block(self):
      carnot = Carnot(int_to_id(0))
      genesis_block = self.add_genesis_block(carnot)
