@@ -158,6 +158,7 @@ class Carnot:
     def __init__(self, _id: Id):
         self.id: Id = _id
         self.current_view: View = 0
+        self.highest_voted_view:View=0
         self.local_high_qc: Optional[Qc] = None
         self.latest_committed_view: View = 0
         self.safe_blocks: Dict[Id, Block] = dict()
@@ -175,7 +176,8 @@ class Carnot:
             case AggregateQc() as aggregated:
                 if aggregated.high_qc().view < self.latest_committed_view:
                     return False
-                return block.view >= self.current_view
+                return block.view >= self.current_view and block.view == aggregated.view+1 # AggregatedQC must be
+        #formed from previous round.
 
     def update_high_qc(self, qc: Qc):
         match (self.local_high_qc, qc):
@@ -190,9 +192,11 @@ class Carnot:
 
     def receive_block(self, block: Block):
         assert block.parent() in self.safe_blocks
+        # This condition is not needed because it will be true as qc of a block will hve lower view than
+        #the block.
+       # if block.qc.view < self.current_view:
+        #    return
 
-        if block.qc.view < self.current_view:
-            return
         if block.id() in self.safe_blocks or block.view <= self.latest_committed_view:
             return
 
@@ -200,14 +204,13 @@ class Carnot:
             self.safe_blocks[block.id()] = block
             self.update_high_qc(block.qc)
             self.try_commit_grand_parent(block)
-            self.increment_view_qc(block.qc)
 
     def vote(self, block: Block, votes: Set[Vote]):
         assert block.id() in self.safe_blocks
         assert len(votes) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.child_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
-
+        assert (block.view>highest_voted_view)
         if self.overlay.member_of_root_com(self.id):
             vote: Vote = Vote(
                 block=block.id(),
@@ -224,6 +227,8 @@ class Carnot:
                 qc=None
             )
         self.send(vote, *self.overlay.parent_committee(self.id))
+        self.increment_voted_view(block.view) # to avoid voting again for this view.
+        self.increment_view_qc(block.qc)
 
     def forward_vote(self, vote: Vote):
         assert vote.block in self.safe_blocks
@@ -245,6 +250,7 @@ class Carnot:
 
     def local_timeout(self, new_overlay: Overlay):
         self.last_timeout_view = self.current_view
+        increment_voted_view(self.current_view) # to avoid voting again for this view.
         self.overlay = new_overlay
         if self.overlay.member_of_leaf_committee(self.id):
             raise NotImplementedError()
@@ -272,6 +278,8 @@ class Carnot:
         )
         if can_commit:
             self.committed_blocks[block.id()] = block
+    def increment_voted_view(self,view: View):
+        self.highest_voted_view = max(view,self.highest_voted_view)
 
     def increment_view_qc(self, qc: Qc) -> bool:
         if qc.view < self.current_view:
