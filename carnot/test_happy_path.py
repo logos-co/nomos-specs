@@ -164,7 +164,7 @@ def test_receive_block_has_an_old_qc(self):
         #4: If a node counts duplicate votes
         #6: If a node counts votes of nodes other than it's child committees.
         #7: If a node counts distinct votes for a safe block from its child committees.
-        #8: If #7 is true, if node will vote for the mentioned safe block
+        #8: If #7 is true, will the node vote for the mentioned safe block
 
  def test_vote_for_received_block(self):
      carnot = Carnot(int_to_id(0))
