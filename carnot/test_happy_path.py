@@ -72,7 +72,7 @@ class TestCarnotHappyPath(TestCase):
 
 
 
- def test_receive_block_qc_view_is_higher_than_block_view_number(self):
+ def test_receive_block_has_an_old_qc(self):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
@@ -94,5 +94,5 @@ class TestCarnotHappyPath(TestCase):
         # This block should be rejected based on the condition  below in block_is_safe().
         #  block.view >= self.latest_committed_view and block.view == (standard.view + 1)
         # block_is_safe() should return false.
-        block5 = Block(view=3, qc=StandardQc(block=block4.id(), view=4))
+        block5 = Block(view=5, qc=StandardQc(block=block3.id(), view=3))
         carnot.receive_block(block5)
