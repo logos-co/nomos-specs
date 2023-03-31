@@ -227,7 +227,7 @@ class Carnot:
                 qc=None
             )
         self.send(vote, *self.overlay.parent_committee(self.id))
-        self.increment_voted_view(block.view)
+        self.increment_voted_view(block.view) # to avoid voting again for this view.
         self.increment_view_qc(block.qc)
 
     def forward_vote(self, vote: Vote):
@@ -279,7 +279,7 @@ class Carnot:
         if can_commit:
             self.committed_blocks[block.id()] = block
     def increment_voted_view(self,view: View):
-        highest_voted_view =max(view,highest_voted_view)
+        self.highest_voted_view = max(view,self.highest_voted_view)
 
     def increment_view_qc(self, qc: Qc) -> bool:
         if qc.view < self.current_view:
