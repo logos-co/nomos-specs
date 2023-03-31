@@ -16,15 +16,6 @@ class TestCarnotHappyPath(TestCase):
         block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
         carnot.receive_block(block)
 
-    # def test_prepare_vote_for_a_block(self, block:Block, carnot: Carnot) -> Vote:
-    #      vote: Vote = Vote(
-    #         block = block.id(),
-    #         voter = carnot.id,
-    #         view = carnot.current_view,
-    #         qc = carnot.build_qc(votes)
-    #     )
-    #      return vote
-
     def test_receive_multiple_blocks_for_the_same_view(self):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
@@ -155,7 +146,40 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(len(carnot.safe_blocks), 5)
 
         # Test cases for  vote:
-        # 1: If a nodes votes for same block twice
+        # 1: If a node votes for same block twice
+    def test_vote_for_received_block(self):
+
+        class MockOverlay(Overlay):
+            def member_of_root_com(self, _id: Id) -> bool:
+                return False
+
+            def child_committee(self, parent: Id, child: Id) -> bool:
+                return True
+
+            def super_majority_threshold(self, _id: Id) -> int:
+                return 10
+
+            def parent_committee(self, _id: Id) -> Optional[Committee]:
+                return set()
+
+        carnot = Carnot(int_to_id(0))
+        carnot.overlay = MockOverlay()
+        genesis_block = self.add_genesis_block(carnot)
+        # 1
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
+        carnot.receive_block(block1)
+        votes = set(
+            Vote(
+                voter=int_to_id(i),
+                view=1,
+                block=block1.id(),
+                qc=StandardQc(block=block1.id(), view=1)
+            ) for i in range(10)
+        )
+        carnot.vote(block1, votes)
+        self.assertEqual(carnot.highest_voted_view, 1)
+        self.assertEqual(carnot.current_view, 1)
+
         # 2: If a node votes for two different blocks in the same view.
         # 3: If a node in parent committee votes before it receives threshold of children's votes
         # 4: If a node counts duplicate votes
@@ -163,12 +187,7 @@ class TestCarnotHappyPath(TestCase):
         # 7: If a node counts distinct votes for a safe block from its child committees.
         # 8: If 7 is true, will the node vote for the mentioned safe block
 
-    def test_vote_for_received_block(self):
-        carnot = Carnot(int_to_id(0))
-        genesis_block = self.add_genesis_block(carnot)
-        blocklist = []
-        for i in range(1, 5):
-            blocklist.append(Block(view=i, qc=StandardQc(block=int_to_id(i - 1), view=i - 1)))
+
 
 
 

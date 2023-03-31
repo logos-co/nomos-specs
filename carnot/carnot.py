@@ -11,7 +11,7 @@ def int_to_id(i: int) -> Id:
     return bytes(str(i), encoding="utf8")
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class StandardQc:
     block: Id
     view: View
@@ -53,7 +53,7 @@ class Block:
         return int_to_id(hash((self.view, self.qc.view, self.qc.block)))
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Vote:
     block: Id
     view: View
@@ -99,6 +99,10 @@ class Overlay:
 
     @abstractmethod
     def member_of_root_committee(self, _id: Id) -> bool:
+        """
+        :param _id:
+        :return: true if the participant with Id _id is member of the root committee withing the tree overlay
+        """
         pass
 
     @abstractmethod
@@ -204,7 +208,7 @@ class Carnot:
         assert len(votes) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.child_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
-        assert (block.view > self.highest_voted_view)
+        assert block.view > self.highest_voted_view
 
         if self.overlay.member_of_root_com(self.id):
             vote: Vote = Vote(
@@ -222,7 +226,7 @@ class Carnot:
                 qc=None
             )
         self.send(vote, *self.overlay.parent_committee(self.id))
-        self.increment_voted_view(block.view) # to avoid voting again for this view.
+        self.increment_voted_view(block.view)  # to avoid voting again for this view.
         self.increment_view_qc(block.qc)
 
     def forward_vote(self, vote: Vote):
