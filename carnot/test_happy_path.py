@@ -16,6 +16,14 @@ class TestCarnotHappyPath(TestCase):
         block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
         carnot.receive_block(block)
 
+    def test_prepare_vote_for_a_block(self,block:Block, carnot: Carnot) -> Vote:
+         vote: Vote = Vote(
+            block=block.id(),
+            voter=self.id,
+            view=self.current_view,
+            qc=self.build_qc(votes)
+        )
+         return vote
 
     def test_receive_multiple_blocks_for_the_same_view(self):
         carnot = Carnot(int_to_id(0))
@@ -146,6 +154,24 @@ def test_receive_block_has_an_old_qc(self):
         # block_is_safe() should return false.
         block5 = Block(view=5, qc=StandardQc(block=block2.id(), view=2))
         carnot.receive_block(block5)
+
+
+
+     # Test cases for  vote:
+        #1: If a nodes votes for same block twice
+        #2: If a node votes for two different blocks in the same view.
+        #3: If a node in parent committee votes before it receives threshold of children's votes
+        #4: If a node counts a single vote twice
+        #5: If a node votes only for block that are safe
+ def test_vote_for_received_block(self):
+     carnot = Carnot(int_to_id(0))
+     genesis_block = self.add_genesis_block(carnot)
+     blocklist=[]
+     for i in range(1,5):
+        blocklist.append(Block(view=i, qc=StandardQc(block=i - 1, view=i - 1)))
+
+
+
 
 
 
