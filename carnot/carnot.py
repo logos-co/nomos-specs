@@ -34,6 +34,7 @@ class AggregateQc:
 
 Qc: TypeAlias = StandardQc | AggregateQc
 
+
 @dataclass
 class Block:
     view: View
@@ -74,6 +75,7 @@ class Overlay:
     """
     Overlay structure for a View
     """
+
     @abstractmethod
     def is_leader(self, _id: Id):
         """
@@ -272,14 +274,18 @@ class Carnot:
             return
         can_commit = (
                 parent.view == (grand_parent.view + 1) and
-                isinstance(block.qc, (StandardQc, )) and
-                isinstance(parent.qc, (StandardQc, ))
+                isinstance(block.qc, (StandardQc,)) and
+                isinstance(parent.qc, (StandardQc,))
         )
         if can_commit:
             self.committed_blocks[grand_parent.id()] = grand_parent
+            self.increment_latest_committed_view(grand_parent.view)
 
     def increment_voted_view(self, view: View):
         self.highest_voted_view = max(view, self.highest_voted_view)
+
+    def increment_latest_committed_view(self, view: View):
+        self.latest_committed_view = max(view, self.latest_committed_view)
 
     def increment_view_qc(self, qc: Qc) -> bool:
         if qc.view < self.current_view:

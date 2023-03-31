@@ -35,6 +35,10 @@ class TestCarnotHappyPath(TestCase):
         carnot.receive_block(block4)
         self.assertEqual(len(carnot.safe_blocks), 5)
         # next block is duplicated and as it is already processed should be skipped
+
+        # In my opinion duplicated block is rejected because both blocks have the same ID.
+        # In reality the IDs of blocks for the same view can be different if we compute ID based on
+        # the hash of the block content. What do you think?
         block5 = Block(view=4, qc=StandardQc(block=block3.id(), view=3))
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
@@ -145,10 +149,56 @@ class TestCarnotHappyPath(TestCase):
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
 
+    def test_receive_block_and_verify_if_latest_committed_view_is_incremented(self):
+        carnot = Carnot(int_to_id(0))
+        genesis_block = self.add_genesis_block(carnot)
+        # 1
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
+        carnot.receive_block(block1)
+
+        # 2
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1))
+        carnot.receive_block(block2)
+
+        # 3
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2))
+        carnot.receive_block(block3)
+        # 4
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3))
+        carnot.receive_block(block4)
+
+        self.assertEqual(len(carnot.safe_blocks), 5)
+        block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4))
+        carnot.receive_block(block5)
+        self.assertEqual(carnot.latest_committed_view, 3)
+
+    def test_receive_block_and_verify_if_high_qc_is_updated(self):
+        carnot = Carnot(int_to_id(0))
+        genesis_block = self.add_genesis_block(carnot)
+        # 1
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
+        carnot.receive_block(block1)
+
+        # 2
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1))
+        carnot.receive_block(block2)
+
+        # 3
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2))
+        carnot.receive_block(block3)
+        # 4
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3))
+        carnot.receive_block(block4)
+
+        self.assertEqual(len(carnot.safe_blocks), 5)
+        block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4))
+        carnot.receive_block(block5)
+        self.assertEqual(carnot.local_high_qc.view, 4)
+
         # Test cases for  vote:
         # 1: If a node votes for same block twice
-    def test_vote_for_received_block(self):
 
+    def test_vote_for_received_block(self):
         class MockOverlay(Overlay):
             def member_of_root_com(self, _id: Id) -> bool:
                 return False
@@ -186,12 +236,3 @@ class TestCarnotHappyPath(TestCase):
         # 6: If a node counts votes of nodes other than it's child committees.
         # 7: If a node counts distinct votes for a safe block from its child committees.
         # 8: If 7 is true, will the node vote for the mentioned safe block
-
-
-
-
-
-
-
-
-
