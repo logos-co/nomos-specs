@@ -149,7 +149,7 @@ class TestCarnotHappyPath(TestCase):
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
 
-    def test_receive_block_and_verify_if_latest_committed_view_is_incremented(self):
+    def test_receive_block_and_verify_if_latest_committed_block_and_high_qc_is_updated(self):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
@@ -171,32 +171,10 @@ class TestCarnotHappyPath(TestCase):
         block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4))
         carnot.receive_block(block5)
         self.assertEqual(carnot.latest_committed_view, 3)
-
-    def test_receive_block_and_verify_if_high_qc_is_updated(self):
-        carnot = Carnot(int_to_id(0))
-        genesis_block = self.add_genesis_block(carnot)
-        # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
-        carnot.receive_block(block1)
-
-        # 2
-        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1))
-        carnot.receive_block(block2)
-
-        # 3
-        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2))
-        carnot.receive_block(block3)
-        # 4
-        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3))
-        carnot.receive_block(block4)
-
-        self.assertEqual(len(carnot.safe_blocks), 5)
-        block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4))
-        carnot.receive_block(block5)
         self.assertEqual(carnot.local_high_qc.view, 4)
 
         # Test cases for  vote:
-        # 1: If a node votes for same block twice
+        # 1: If a node votes
 
     def test_vote_for_received_block(self):
         class MockOverlay(Overlay):
@@ -230,9 +208,42 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(carnot.highest_voted_view, 1)
         self.assertEqual(carnot.current_view, 1)
 
-        # 2: If a node votes for two different blocks in the same view.
-        # 3: If a node in parent committee votes before it receives threshold of children's votes
-        # 4: If a node counts duplicate votes
-        # 6: If a node counts votes of nodes other than it's child committees.
-        # 7: If a node counts distinct votes for a safe block from its child committees.
-        # 8: If 7 is true, will the node vote for the mentioned safe block
+        #2 If last_voted_view is incremented after calling vote.
+
+    def test_vote_for_received_block_if_threshold_votes_has_not_reached(self):
+        class MockOverlay(Overlay):
+            def member_of_root_com(self, _id: Id) -> bool:
+                return False
+
+            def child_committee(self, parent: Id, child: Id) -> bool:
+                return True
+
+            def super_majority_threshold(self, _id: Id) -> int:
+                return 10
+
+            def parent_committee(self, _id: Id) -> Optional[Committee]:
+                return set()
+
+        carnot = Carnot(int_to_id(0))
+        carnot.overlay = MockOverlay()
+        genesis_block = self.add_genesis_block(carnot)
+        # 1
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0))
+        carnot.receive_block(block1)
+        votes = set(
+            Vote(
+                voter=int_to_id(i),
+                view=1,
+                block=block1.id(),
+                qc=StandardQc(block=block1.id(), view=1)
+            ) for i in range(9)
+        )
+        carnot.vote(block1, votes)
+        self.assertEqual(carnot.highest_voted_view, 0)
+        self.assertEqual(carnot.current_view, 0)
+
+
+
+
+
+
