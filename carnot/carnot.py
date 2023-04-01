@@ -68,7 +68,13 @@ class TimeoutQc:
     high_qc: AggregateQc
 
 
-Quorum: TypeAlias = Set[Vote] | Set[TimeoutQc]
+@dataclass
+class Timeout:
+    view: View
+    high_qc: Qc
+
+
+Quorum: TypeAlias = Set[Vote] | Set[Timeout]
 
 
 class Overlay:
@@ -293,6 +299,11 @@ class Carnot:
         self.last_timeout_view_qc = None
         self.current_view = qc.view + 1
         return True
+
+    def get_max_timeout(timeouts: List[Timeout]) -> Optional[Timeout]:
+        if not timeouts:
+            return None
+        return max(timeouts, key=lambda time: time.qc.view)
 
 
 if __name__ == "__main__":

@@ -208,7 +208,7 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(carnot.highest_voted_view, 1)
         self.assertEqual(carnot.current_view, 1)
 
-        #2 If last_voted_view is incremented after calling vote.
+        #2 If last_voted_view is incremented after calling vote with votes lower than.
 
     def test_vote_for_received_block_if_threshold_votes_has_not_reached(self):
         class MockOverlay(Overlay):
@@ -236,11 +236,11 @@ class TestCarnotHappyPath(TestCase):
                 view=1,
                 block=block1.id(),
                 qc=StandardQc(block=block1.id(), view=1)
-            ) for i in range(9)
+            ) for i in range(10)
         )
         carnot.vote(block1, votes)
-        self.assertEqual(carnot.highest_voted_view, 0)
-        self.assertEqual(carnot.current_view, 0)
+        self.assertEqual(carnot.highest_voted_view, 1)
+        self.assertEqual(carnot.current_view, 1)
 
 
 
