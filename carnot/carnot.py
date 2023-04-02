@@ -65,13 +65,22 @@ class Vote:
 @dataclass
 class TimeoutQc:
     view: View
-    high_qc: AggregateQc
+    high_qc: Qc
+    qc_views: list[View]
+    SenderIds: Set[Id]
+    Sender: Id
 
 
+# local timeout field is only used by the root committee and its children when they timeout. The timeout_qc is built
+# from local_timeouts. Leaf nodes when receive timeout_qc build their timeout msg and includes the timeout_qc in it.
+# The timeout_qc is indicator that the root committee and its child committees (if exist) have failed to collect votes.
 @dataclass
 class Timeout:
     view: View
     high_qc: Qc
+    sender: Id
+    timeout_qc: TimeoutQc
+    local_timeout: bool
 
 
 Quorum: TypeAlias = Set[Vote] | Set[Timeout]
@@ -87,6 +96,20 @@ class Overlay:
         """
         :param _id:  Node id to be checked
         :return: true if node is the leader of the current view
+        """
+        pass
+
+    def is_child_of_root(self, _id: Id):
+        """
+         :param _id:  Node id to be checked
+         :return: true if node is the member of child of the root committee
+         """
+        pass
+
+    def number_of_committees(self, _ids: set[Id]) -> int:
+        """
+        :param _ids:  Set of Node id to be checked
+        :return: Number of committees in the overlay
         """
         pass
 
@@ -166,6 +189,10 @@ def download(view) -> Block:
     raise NotImplementedError
 
 
+def build_timeoutqc(msgs) -> TimeoutQc:
+    pass
+
+
 class Carnot:
     def __init__(self, _id: Id):
         self.id: Id = _id
@@ -190,6 +217,7 @@ class Carnot:
                     return False
                 return block.view >= self.current_view and block.view == (aggregated.view + 1)
 
+    # Ask Dani
     def update_high_qc(self, qc: Qc):
         match (self.local_high_qc, qc):
             case (None, StandardQc() as new_qc):
@@ -200,6 +228,13 @@ class Carnot:
                 self.local_high_qc = new_qc
             case (old_qc, AggregateQc() as new_qc) if new_qc.high_qc().view != old_qc.view:
                 self.local_high_qc = new_qc.high_qc()
+
+    def update_timeout_qc(self, timeout_qc: TimeoutQc):
+        match (self.last_timeout_view_qc, timeout_qc):
+            case (None, timeout_qc):
+                self.local_high_qc = timeout_qc
+            case (self.last_timeout_view_qc, timeout_qc) if timeout_qc.view > self.last_timeout_view_qc.view:
+                self.last_timeout_view_qc = timeout_qc
 
     def receive_block(self, block: Block):
         assert block.parent() in self.safe_blocks
@@ -258,12 +293,32 @@ class Carnot:
     def local_timeout(self, new_overlay: Overlay):
         self.last_timeout_view = self.current_view
         self.increment_voted_view(self.current_view)
-        self.overlay = new_overlay
-        if self.overlay.member_of_leaf_committee(self.id):
-            raise NotImplementedError()
+        if self.overlay.member_of_leaf_committee(self.id) or self.overlay.is_child_of_root():
+            timeout_Msg: Timeout = Timeout(
+                view=self.current_view,
+                high_qc=self.local_high_qc,
+                local_timeout=True,
+                # local_timeout is only true for the root committee or members of its children
+                # root committee or its children can trigger the timeout.
+                timeout_qc=self.last_timeout_view_qc,
+                sender=self.id()
+            )
 
-    def timeout(self, view: View, msgs: Set["TimeoutMsg"]):
-        raise NotImplementedError()
+            self.broadcast(timeout_Msg)
+
+    def timeout(self, view: View, msgs: Set["Timeout"]):
+        assert len(msgs) == self.overlay.super_majority_threshold(self.id)
+        assert all(msg.view == msgs.pop().view for msg in msgs)
+        assert msgs.pop().view > self.current_view
+        max_msg = self.get_max_timeout(msgs)
+        if self.local_high_qc.view < max_msg.high_qc.view:
+            self.update_high_qc(max_msg.high_qc)
+        if self.overlay.member_of_root_committee(self.id) and self.overlay.member_of_leaf_committee(self.id):
+            timeout_qc = build_timeoutqc(msgs)
+            self.update_timeout_qc(timeout_qc)
+        else:
+            self.update_timeout_qc(msgs.pop().timeout_qc)
+            raise NotImplementedError()
 
     def send(self, vote: Vote, *ids: Id):
         pass
@@ -300,7 +355,14 @@ class Carnot:
         self.current_view = qc.view + 1
         return True
 
-    def get_max_timeout(timeouts: List[Timeout]) -> Optional[Timeout]:
+    def increment_view_timeout_qc(self, timeoutqc: TimeoutQc):
+        if timeoutqc == None or timeoutqc.view < self.current_view:
+            return
+        self.last_timeout_view_qc = timeoutqc
+        self.current_view = self.last_timeout_view_qc.view + 1
+        return True
+
+    def get_max_timeout(self, timeouts: Set[Timeout]) -> Optional[Timeout]:
         if not timeouts:
             return None
         return max(timeouts, key=lambda time: time.qc.view)
