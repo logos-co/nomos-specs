@@ -22,14 +22,16 @@ class StandardQc:
 
 @dataclass
 class AggregateQc:
-    qcs: List[StandardQc]
+    qcs: List[View]
+    highest_qc: StandardQc
     view: View
 
     def view(self) -> View:
         return self.view
 
     def high_qc(self) -> StandardQc:
-        return max(self.qcs, key=lambda qc: qc.view)
+        assert self.highest_qc.view == max(self.qcs)
+        return self.highest_qc
 
 
 Qc: TypeAlias = StandardQc | AggregateQc
