@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypeAlias, List, Set, Self, Optional, Dict
+from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
 from abc import abstractmethod
 
 Id: TypeAlias = bytes
@@ -39,6 +39,7 @@ Qc: TypeAlias = StandardQc | AggregateQc
 class Block:
     view: View
     qc: Qc
+    content: FrozenSet[Id]
 
     def extends(self, ancestor: Self) -> bool:
         """
@@ -51,7 +52,7 @@ class Block:
         return self.qc.block
 
     def id(self) -> Id:
-        return int_to_id(hash((self.view, self.qc.view, self.qc.block)))
+        return int_to_id(hash(self.content))
 
 
 @dataclass(unsafe_hash=True)
@@ -201,10 +202,6 @@ def download(view) -> Block:
     raise NotImplementedError
 
 
-def build_timeout_qc(msgs) -> TimeoutQc:
-    pass
-
-
 class Carnot:
     def __init__(self, _id: Id):
         self.id: Id = _id
@@ -318,7 +315,7 @@ class Carnot:
             for child_committee in self.overlay.child_of_root_committee():
                 self.send(timeout_msg, child_committee)
 
-    def timeout(self, msgs: Set["Timeout"]):
+    def timeout(self, msgs: Set[Timeout]):
         assert len(msgs) == self.overlay.super_majority_threshold(self.id)
         assert all(msg.view == msgs.pop().view for msg in msgs)
         assert msgs.pop().view > self.current_view
@@ -326,12 +323,12 @@ class Carnot:
         if self.local_high_qc.view < max_msg.high_qc.view:
             self.update_high_qc(max_msg.high_qc)
         if self.overlay.member_of_root_committee(self.id) and self.overlay.member_of_leaf_committee(self.id):
-            timeout_qc = build_timeout_qc(msgs)
+            timeout_qc = self.build_timeout_qc(msgs)
             self.update_timeout_qc(timeout_qc)
         else:
             self.update_timeout_qc(msgs.pop().timeout_qc)
 
-    def timeout_qc(self,timeout_qc: TimeoutQc):
+    def build_timeout_qc(self, msgs: Set[Timeout]) -> TimeoutQc:
         pass
 
     def send(self, vote: Vote | Timeout, *ids: Id):
