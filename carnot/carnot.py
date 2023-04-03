@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypeAlias, List, Set, Self, Optional, Dict
+from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
 from abc import abstractmethod
 
 Id: TypeAlias = bytes
@@ -39,6 +39,7 @@ Qc: TypeAlias = StandardQc | AggregateQc
 class Block:
     view: View
     qc: Qc
+    content: FrozenSet[Id]
 
     def extends(self, ancestor: Self) -> bool:
         """
@@ -51,7 +52,7 @@ class Block:
         return self.qc.block
 
     def id(self) -> Id:
-        return int_to_id(hash((self.view, self.qc.view, self.qc.block)))
+        return int_to_id(hash(self.content))
 
 
 @dataclass(unsafe_hash=True)
