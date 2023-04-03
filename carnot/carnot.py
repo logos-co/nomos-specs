@@ -210,6 +210,7 @@ class Carnot:
         self.local_high_qc: Optional[Qc] = None
         self.latest_committed_view: View = 0
         self.safe_blocks: Dict[Id, Block] = dict()
+        self.seen_view_blocks: Dict[View, bool] = dict()
         self.last_timeout_view_qc: Optional[TimeoutQc] = None
         self.last_timeout_view: Optional[View] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
@@ -247,11 +248,16 @@ class Carnot:
 
     def receive_block(self, block: Block):
         assert block.parent() in self.safe_blocks
-        if block.id() in self.safe_blocks or block.view <= self.latest_committed_view:
+
+        if block.id() in self.safe_blocks:
+            return
+        if self.seen_view_blocks.get(block.view) is not None or block.view <= self.latest_committed_view:
+            # TODO: Report malicious leader
             return
 
         if self.block_is_safe(block):
             self.safe_blocks[block.id()] = block
+            self.seen_view_blocks[block.view] = True
             self.update_high_qc(block.qc)
             self.try_commit_grand_parent(block)
 
