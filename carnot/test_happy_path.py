@@ -173,11 +173,12 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(carnot.latest_committed_view, 3)
         self.assertEqual(carnot.local_high_qc.view, 4)
 
-        # Test cases for  vote:
-        # 1: Votes received should increment highest_voted_view and current_view but should not change
-        # latest_committed_view and last_timeout_view
-
+    # Test cases for  vote:
     def test_vote_for_received_block(self):
+        """
+        1: Votes received should increment highest_voted_view and current_view but should not change
+        latest_committed_view and last_timeout_view
+        """
         class MockOverlay(Overlay):
             def member_of_root_com(self, _id: Id) -> bool:
                 return False
@@ -211,9 +212,10 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(carnot.latest_committed_view, 0)
         self.assertEqual(carnot.last_timeout_view, None)
 
-        # 2 If last_voted_view is incremented after calling vote with votes lower than.
-
     def test_vote_for_received_block_if_threshold_votes_has_not_reached(self):
+        """
+        2 If last_voted_view is incremented after calling vote with votes lower than.
+        """
         class MockOverlay(Overlay):
             def member_of_root_com(self, _id: Id) -> bool:
                 return False
@@ -243,7 +245,7 @@ class TestCarnotHappyPath(TestCase):
         )
         carnot.vote(block1, votes)
 
-        #### The test passes as the assert fails in len(votes) == self.overlay.super_majority_threshold(self.id)
-        #### when number of votes are < 9
-        # self.assertEqual(carnot.highest_voted_view, 1)
-        # self.assertEqual(carnot.current_view, 1)
+        # The test passes as asserting fails in len(votes) == self.overlay.super_majority_threshold(self.id)
+        # when number of votes are < 9
+        self.assertEqual(carnot.highest_voted_view, 1)
+        self.assertEqual(carnot.current_view, 1)
