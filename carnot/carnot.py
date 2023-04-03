@@ -170,6 +170,18 @@ class Overlay:
         """
         pass
 
+    def root_committee(self) -> Committee:
+        """
+        :return: returns root committee
+        """
+        pass
+
+    def child_of_root_committee(self) -> Optional[Set[Committee]]:
+        """
+        :return: returns child committee/s of root committee if present
+        """
+        pass
+
     @abstractmethod
     def super_majority_threshold(self, _id: Id) -> int:
         """
@@ -291,7 +303,6 @@ class Carnot:
         self.broadcast(block)
 
     def local_timeout(self, new_overlay: Overlay):
-        self.last_timeout_view = self.current_view
         self.increment_voted_view(self.current_view)
         if self.overlay.member_of_leaf_committee(self.id) or self.overlay.is_child_of_root():
             timeout_Msg: Timeout = Timeout(
@@ -303,10 +314,11 @@ class Carnot:
                 timeout_qc=self.last_timeout_view_qc,
                 sender=self.id()
             )
+            self.send(timeout_Msg, *self.overlay.root_committee(self.id))
+            for child_committee in self.overlay.child_of_root_committee():
+                self.send(timeout_Msg, child_committee)
 
-            self.broadcast(timeout_Msg)
-
-    def timeout(self, view: View, msgs: Set["Timeout"]):
+    def timeout(self, msgs: Set["Timeout"]):
         assert len(msgs) == self.overlay.super_majority_threshold(self.id)
         assert all(msg.view == msgs.pop().view for msg in msgs)
         assert msgs.pop().view > self.current_view
@@ -318,7 +330,9 @@ class Carnot:
             self.update_timeout_qc(timeout_qc)
         else:
             self.update_timeout_qc(msgs.pop().timeout_qc)
-            raise NotImplementedError()
+
+    def timeout_qc(self,timeout_qc: TimeoutQc):
+        pass
 
     def send(self, vote: Vote, *ids: Id):
         pass
