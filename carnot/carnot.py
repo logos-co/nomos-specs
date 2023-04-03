@@ -317,7 +317,7 @@ class Carnot:
 
     def timeout(self, msgs: Set[Timeout]):
         assert len(msgs) == self.overlay.super_majority_threshold(self.id)
-        assert all(msg.view == msgs.pop().view for msg in msgs)
+        assert len(set(msg.view for msg in msgs)) == 1
         assert msgs.pop().view > self.current_view
         max_msg = self.get_max_timeout(msgs)
         if self.local_high_qc.view < max_msg.high_qc.view:
