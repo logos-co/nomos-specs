@@ -347,9 +347,6 @@ class TestCarnotHappyPath(TestCase):
                 super(MockCarnot, self).__init__(id)
                 self.proposed_block = None
 
-            def broadcast(self, block):
-                self.proposed_block = block
-
         # Create a MockCarnot object and add a genesis block
         carnot = MockCarnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
@@ -368,20 +365,21 @@ class TestCarnotHappyPath(TestCase):
         )
         # carnot.propose_block(view=1, quorum=votes)
         proposed_block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
-    
+
         with mock.patch.object(carnot.overlay, 'member_of_leaf_committee', return_value=True):
             # Assert that the proposed block has the correct view and parent block
-            assert proposed_block.view == 1
             #            assert proposed_block.parent_block == genesis_block.id()
 
             # Receive the proposed block as a member of the leaf committee
             carnot.receive_block(proposed_block)
-
+            proposed_block = Block(view=2, qc=StandardQc(block=genesis_block.id(), view=1), content=frozenset(b"2"))
+            carnot.receive_block(proposed_block)
             # Assert that the current view, highest voted view, and local high QC have all been updated correctly
-            assert carnot.current_view == 1
-            assert carnot.highest_voted_view == 1
-            assert carnot.local_high_qc.view == 0
+            assert carnot.current_view == 2
+            assert carnot.highest_voted_view == 2
+            assert carnot.local_high_qc.view == 1
 
             # Assert that the proposed block has been added to the set of safe blocks
             assert proposed_block.id() in carnot.safe_blocks
+
     ##### Unhappy path tests

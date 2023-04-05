@@ -1,3 +1,24 @@
+# Carnot has elastic scalability, optimistic responsiveness and fast finality. Elastic scalability is the property
+# of a consensus protocol to be able to operate with very small and very large networks. Optimistic responsiveness
+# means the protocol operate at the speed of wire during the period of synchrony and when the leader is honest.
+# Responsiveness allow the protocol to achieve fast finality. Carnot, avoids chain reorg  problem. Hence, it is
+# very compatible with the PoS scheme.
+# This is the specification for Carnot protocol. The protocol operates in two modes happy and unhappy paths.
+# Nodes in Carnot are arranged in a binary tree overlay committee structure. During normal mode a leader proposes
+# a block containing a quorum certificate which is collection of votes of more than two thirds of the root committee and
+# its children. Voting process for the proposal begins at the leaf committee. Leaf committee nodes verify the poposal
+# and send their votes to the parent committee. Upon receipt of more than two-third of votes from child committee
+# members, a node in the parent committee (of the leaf committee) sends its votes to its parent. In this way, each
+# honest node from parent committee is the attestation of more than two third of votes of its child committee. This
+# process continues recursively until, root committee members collect votes of members of its children committee/s. A
+# root committee member builds a QC from votes of its child committee and sends it to the leader of the next view.
+# A root committee member will also forward any additional votes it receives from its child committee to the next
+# leader. Upon receipt of more than two thirds of votes from root and its children committees the leader builds a QC
+# and proposes the next block.
+
+
+
+
 from dataclasses import dataclass
 from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
 from abc import abstractmethod
@@ -74,7 +95,9 @@ class TimeoutQc:
     sender: Id
 
 
-# Timeout in the root or direct children committees
+# local timeout field is only used by the root committee and its children when they timeout. The timeout_qc is built
+# from local_timeouts. Leaf nodes when receive timeout_qc build their timeout msg and includes the timeout_qc in it.
+# The timeout_qc is indicator that the root committee and its child committees (if exist) have failed to collect votes.
 @dataclass
 class Timeout:
     view: View
@@ -302,6 +325,7 @@ class Carnot:
                 voter=self.id,
                 view=self.current_view,
             )
+            # if there is only one committee then send vote to the leader.
             if self.overlay.member_of_root_com(self.id):
                 self.send(vote, self.overlay.leader(self.current_view + 1))
             else:
@@ -422,6 +446,18 @@ class Carnot:
         )
         self.broadcast(block)
 
+    # Local timeout is different for the root and its child committees. If other committees timeout, they only
+    # stop taking part in consensus. If a member of root or its child committees timeout it sends its timeout message
+    # to all members of root to build the timeout qc. Using this qc we assume that the new
+    # overlay can be built. Hence, by building the new overlay members of root committee can send the timeout qc
+    # to the leaf committee of the new overlay. Upon receipt of the timeout qc the leaf committee members update
+    # their local_high_qc, last_timeout_view_qc and last_voted_view if the view of qcs
+    # (local_high_qc, last_timeout_view_qc) received is higher than their local view. Similalry last_voted_view is
+    # updated if it is greater than the current last_voted_view. When parent committee member receives more than two
+    # third of timeout messages from its children it also updates its local_high_qc, last_timeout_view_qc and
+    # last_voted_view if needed and then send its timeout message upward. In this way the latest qcs move upward
+    # that makes it possible for the next leader to propose a block with the latest local_high_qcs in aggregated qc
+    # from more than two third members of root committee and its children.
     def local_timeout(self):
         # This condition makes sure a node waits for timeout_qc from root committee to change increment its view with
         # a view change.
