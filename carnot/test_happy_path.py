@@ -324,5 +324,7 @@ class TestCarnotHappyPath(TestCase):
         carnot.vote(proposed_block, child_votes)
         # check carnot state advanced
         self.assertTrue(carnot.current_view, 1)
+        self.assertEqual(carnot.highest_voted_view, 1)
+        self.assertEqual(carnot.local_high_qc.view, 0)
         self.assertIn(proposed_block.id(), carnot.safe_blocks)
 

@@ -230,12 +230,16 @@ class Carnot:
         self.local_high_qc: Optional[Qc] = None
         # The latest view committed by a node.
         self.latest_committed_view: View = 0
-        #
+        # Validated blocks with their validated QCs are included here. If commit conditions is satisfied for
+        # each one of these blocks it will be committed.
         self.safe_blocks: Dict[Id, Block] = dict()
+        # Block received for a specific view. Make sure the node doesn't receive duplicate blocks.
         self.seen_view_blocks: Dict[View, bool] = dict()
+        # Last timeout QC and its view
         self.last_timeout_view_qc: Optional[TimeoutQc] = None
         self.last_timeout_view: Optional[View] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
+        # Committed blocks are kept here.
         self.committed_blocks: Dict[Id, Block] = dict()
 
     def block_is_safe(self, block: Block) -> bool:
@@ -288,6 +292,20 @@ class Carnot:
             self.seen_view_blocks[block.view] = True
             self.update_high_qc(block.qc)
             self.try_commit_grand_parent(block)
+        # A member of leaf committee will vote upon receipt of a block, it cannot wait for child votes because
+        # it doesn't have one.
+        # If member there is only one committee then leaf and root is the same committee. In that case the vote
+        # should be sent to the leader.
+        if self.overlay.member_of_leaf_committee(self.id):
+            vote: Vote = Vote(
+                block=block.id(),
+                voter=self.id,
+                view=self.current_view,
+            )
+            if self.overlay.member_of_root_com(self.id):
+                self.send(vote, self.overlay.leader(self.current_view + 1))
+            else:
+                self.send(vote, *self.overlay.parent_committee(self.id))
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
         # TODO: we should be more strict with views in the sense that we should not
@@ -362,7 +380,7 @@ class Carnot:
         # do it now to avoid voting in this view.
         self.increment_voted_view(timeout_qc.view)
 
-    def forward_vote(self, msg: Vote):
+    def forward_vote(self, vote: Vote):
         assert vote.block in self.safe_blocks
         assert self.overlay.child_committee(self.id, vote.voter)
 
@@ -371,10 +389,10 @@ class Carnot:
 
     def forward_new_view(self, msg: NewView):
         assert msg.view == self.current_view
-        assert self.overlay.child_committee(self.id, vote.voter)
+        assert self.overlay.child_committee(self.id, msg.voter)
 
         if self.overlay.member_of_root_com(self.id):
-            self.send(vote, self.overlay.leader(self.current_view + 1))
+            self.send(msg, self.overlay.leader(self.current_view + 1))
 
     def build_qc(self, quorum: Quorum) -> Qc:
         # TODO: implement unhappy path
@@ -408,6 +426,11 @@ class Carnot:
         # from previous view.
         assert (is_sequential_ascending(self.current_view, self.local_high_qc.view) or
                 is_sequential_ascending(self.current_view, self.last_timeout_view_qc.view))
+        # Make sure the node doesn't time out continuously without finishing the step to increment the current view.
+        # Make sure current view is always higher than the local_high_qc so that the node won't timeout unnecessary
+        # for a previous view.
+        # todo this check should also be used by other nodes as well.
+        assert (self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view))
         self.increment_voted_view(self.current_view)
 
         if self.overlay.member_of_root_committee(self.id) or self.overlay.child_of_root_committee(self.id):
@@ -436,9 +459,76 @@ class Carnot:
         self.update_timeout_qc(timeout_qc)
         self.update_high_qc(timeout_qc.high_qc)
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
-        self.broadcast(timeout_qc)  # can be sent only to the leafs
+        self.send(timeout_qc, *self.overlay.leaf_committees())  # should be sent only to the leafs
+
+    def gather_timeouts(self, timeouts: Set[Timeout]):
+        assert not self.overlay.member_of_leaf_committee(self.id)
+        assert len(set(timeout.view for timeout in timeouts)) == 1
+        assert all(timeout.view >= self.current_view for timeout in timeouts)
+        assert all(timeout.view == timeout.timeout_qc.view for timeout in timeouts)
+        assert len(timeouts) == self.overlay.super_majority_threshold(self.id)
+        assert all(self.overlay.child_committee(self.id, timeout.sender) for timeout in timeouts)
+
+        timeouts = list(timeouts)
+        timeout_qc = timeouts[0].timeout_qc
+        new_high_qc = timeout_qc.high_qc
+
+        self.rebuild_overlay_from_timeout_qc(timeout_qc)
+
+        if new_high_qc.view >= self.local_high_qc.view:
+            self.update_high_qc(new_high_qc)
+            self.update_timeout_qc(timeout_qc)
+            self.increment_view_timeout_qc(timeout_qc)
+
+        if self.overlay.member_of_root_com(self.id):
+            timeout_msg = Timeout(
+                view=self.current_view,
+                high_qc=self.local_high_qc,
+                sender=self.id,
+                timeout_qc=timeout_qc,
+                local_timeout=False,
+            )
+            self.send(timeout_msg, self.overlay.leader(self.current_view + 1))
+        else:
+            timeout_msg = Timeout(
+                view=self.current_view,
+                high_qc=self.local_high_qc,
+                sender=self.id,
+                timeout_qc=timeout_qc,
+                local_timeout=False,
+            )
+            self.send(timeout_msg, *self.overlay.parent_committee(self.id))
+        self.increment_view_timeout_qc(timeout_qc)
+        # This checks if a node has already incremented its voted view by local_timeout. If not then it should
+        # do it now to avoid voting in this view.
+        if self.highest_voted_view < self.current_view:
+            self.increment_voted_view(timeout_qc.view)
+
+    def received_timeout_qc(self, timeout_qc: TimeoutQc):
+        assert timeout_qc.view >= self.current_view
+        self.rebuild_overlay_from_timeout_qc(timeout_qc)
+
+        if self.overlay.member_of_leaf_committee(self.id):
+            new_high_qc = timeout_qc.high_qc
+            if new_high_qc.view >= self.local_high_qc.view:
+                self.update_high_qc(new_high_qc)
+                self.update_timeout_qc(timeout_qc)
+                self.increment_view_timeout_qc(timeout_qc)
+            timeout_msg = Timeout(
+                view=self.current_view,
+                high_qc=self.local_high_qc,
+                sender=self.id,
+                timeout_qc=timeout_qc,
+                local_timeout=False,
+            )
+            self.send(timeout_msg, *self.overlay.parent_committee(self.id))
+            # This checks if a node has already incremented its voted view by local_timeout. If not then it should
+            # do it now to avoid voting in this view.
+            if self.highest_voted_view < self.current_view:
+                self.increment_voted_view(timeout_qc.view)
 
     def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
+        assert timeout_qc.view >= self.current_view
         self.overlay = Overlay()
 
     def build_timeout_qc(self, msgs: Set[Timeout]) -> TimeoutQc:
@@ -450,6 +540,7 @@ class Carnot:
     def broadcast(self, block):
         pass
 
+    # todo blocks from latest_committed_block to grand_parent must be committed.
     def try_commit_grand_parent(self, block: Block):
         parent = self.safe_blocks.get(block.parent())
         grand_parent = self.safe_blocks.get(parent.parent())
