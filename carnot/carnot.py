@@ -213,16 +213,24 @@ def download(view) -> Block:
 class Carnot:
     def __init__(self, _id: Id):
         self.id: Id = _id
+        # Current View counter
         self.current_view: View = 0
+        # Highest voted view counter. This is used to prevent a node from voting twice or vote after timeout.
         self.highest_voted_view: View = 0
+        # This is the qc from  the highest view a node has
         self.local_high_qc: Optional[Qc] = None
+        # The latest view committed by a node.
         self.latest_committed_view: View = 0
+        #
         self.safe_blocks: Dict[Id, Block] = dict()
         self.seen_view_blocks: Dict[View, bool] = dict()
         self.last_timeout_view_qc: Optional[TimeoutQc] = None
         self.last_timeout_view: Optional[View] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
         self.committed_blocks: Dict[Id, Block] = dict()
+
+    def is_sequential_ascending(self, view1: View, view2: View):
+        return view1 == view2 + 1
 
     def block_is_safe(self, block: Block) -> bool:
         match block.qc:
@@ -336,7 +344,6 @@ class Carnot:
         if self.local_high_qc.view < max_msg.high_qc.view:
             self.update_high_qc(max_msg.high_qc)
 
-
         if self.overlay.member_of_root_committee(self.id) or self.overlay.child_of_root_committee(self.id):
             timeout_qc = self.build_timeout_qc(msgs)
             self.update_timeout_qc(timeout_qc)
@@ -394,7 +401,8 @@ class Carnot:
             )
             self.send(timeout_msg, *self.overlay.parent_committee(self.id))
         self.increment_view_timeout_qc(timeout_qc)
-        # TODO: Add comment explaining this
+        # This checks if a not has already incremented its voted view by local_timeout. If not then it should
+        # do it now to avoid voting in this view.
         if self.highest_voted_view < self.current_view:
             self.increment_voted_view(timeout_qc.view)
 
@@ -416,11 +424,14 @@ class Carnot:
                 local_timeout=False,
             )
             self.send(timeout_msg, *self.overlay.parent_committee(self.id))
+            # This checks if a not has already incremented its voted view by local_timeout. If not then it should
+            # do it now to avoid voting in this view.
+            if self.highest_voted_view < self.current_view:
+                self.increment_voted_view(timeout_qc.view)
 
     def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
         assert timeout_qc.view >= self.current_view
         self.overlay = Overlay()
-
 
     def build_timeout_qc(self, msgs: Set[Timeout]) -> TimeoutQc:
         pass
