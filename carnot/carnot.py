@@ -325,7 +325,10 @@ class Carnot:
         self.broadcast(block)
 
     def local_timeout(self, new_overlay: Overlay):
-        # This condition makes sure a node waits for timeout_qc from root committee to change it's view.
+        # This condition makes sure a node waits for timeout_qc from root committee to change increment its view with
+        # a view change.
+        # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
+        # from previous view.
         assert (is_sequential_ascending(self.current_view, self.local_high_qc.view) or
                 is_sequential_ascending(self.current_view, self.last_timeout_view_qc.view))
         self.increment_voted_view(self.current_view)
