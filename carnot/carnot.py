@@ -210,6 +210,10 @@ def download(view) -> Block:
     raise NotImplementedError
 
 
+def is_sequential_ascending(view1: View, view2: View):
+    return view1 == view2 + 1
+
+
 class Carnot:
     def __init__(self, _id: Id):
         self.id: Id = _id
@@ -229,19 +233,18 @@ class Carnot:
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
         self.committed_blocks: Dict[Id, Block] = dict()
 
-    def is_sequential_ascending(self, view1: View, view2: View):
-        return view1 == view2 + 1
-
     def block_is_safe(self, block: Block) -> bool:
         match block.qc:
             case StandardQc() as standard:
                 if standard.view < self.latest_committed_view:
                     return False
-                return block.view >= self.latest_committed_view and block.view == (standard.view + 1)
+                return block.view >= self.latest_committed_view and \
+                    self.is_sequential_ascending(block.view, standard.view)
             case AggregateQc() as aggregated:
                 if aggregated.high_qc().view < self.latest_committed_view:
                     return False
-                return block.view >= self.current_view and block.view == (aggregated.view + 1)
+                return block.view >= self.current_view and \
+                    self.is_sequential_ascending(block.view, aggregated.view)
 
     # Ask Dani
     def update_high_qc(self, qc: Qc):
@@ -323,6 +326,9 @@ class Carnot:
 
     def local_timeout(self, new_overlay: Overlay):
         self.increment_voted_view(self.current_view)
+        assert (is_sequential_ascending(self.current_view,self.local_high_qc.view) or
+                is_sequential_ascending(self.current_view,self.last_timeout_view_qc.view))
+
         if self.overlay.member_of_root_committee(self.id) or self.overlay.child_of_root_committee(self.id):
             timeout_msg: Timeout = Timeout(
                 view=self.current_view,
