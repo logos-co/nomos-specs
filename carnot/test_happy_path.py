@@ -186,6 +186,7 @@ class TestCarnotHappyPath(TestCase):
         1: Votes received should increment highest_voted_view and current_view but should not change
         latest_committed_view and last_timeout_view
         """
+
         class MockOverlay(Overlay):
             def member_of_root_com(self, _id: Id) -> bool:
                 return False
@@ -223,6 +224,7 @@ class TestCarnotHappyPath(TestCase):
         """
         2 If last_voted_view is incremented after calling vote with votes lower than.
         """
+
         class MockOverlay(Overlay):
             def member_of_root_com(self, _id: Id) -> bool:
                 return False
@@ -252,7 +254,7 @@ class TestCarnotHappyPath(TestCase):
             ) for i in range(3)
         )
 
-        with self.assertRaises((AssertionError, )):
+        with self.assertRaises((AssertionError,)):
             carnot.vote(block1, votes)
 
         # The test passes as asserting fails in len(votes) == self.overlay.super_majority_threshold(self.id)
@@ -263,6 +265,12 @@ class TestCarnotHappyPath(TestCase):
     def test_initial_leader_proposes_and_advance(self):
         class MockOverlay(Overlay):
             def is_leader(self, _id: Id):
+                return True
+
+            def is_member_root(self, _id: Id):
+                return True
+
+            def is_member_leaf(self, _id: Id):
                 return True
 
             def leader(self, view: View) -> Id:
@@ -327,4 +335,44 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(carnot.highest_voted_view, 1)
         self.assertEqual(carnot.local_high_qc.view, 0)
         self.assertIn(proposed_block.id(), carnot.safe_blocks)
+
+        # Leaf committees do not collect votes as they don't have any child. Therefore, leaf committees in happy
+        # path votes and updates state after receipt of a block
+        class MockCarnot_leaf_committee_test(Carnot):
+            def __init__(self, id):
+                super(MockCarnot, self).__init__(id)
+                self.proposed_block = None
+
+            def broadcast(self, block):
+                self.proposed_block = block
+
+        carnot = MockCarnot(int_to_id(0))
+        carnot.overlay = MockOverlay()
+        genesis_block = self.add_genesis_block(carnot)
+
+        # votes for genesis block
+        votes = set(
+            Vote(
+                block=genesis_block.id(),
+                view=0,
+                voter=int_to_id(i),
+                qc=StandardQc(
+                    block=genesis_block.id(),
+                    view=0
+                ),
+            ) for i in range(10)
+        )
+        # propose a new block
+        carnot.propose_block(view=1, quorum=votes)
+        proposed_block = carnot.proposed_block
+        # process the proposed block as member of a committee
+        carnot.receive_block(proposed_block)
+
+        # As a leaf committee only vote when block is safe. Don't wait for child vote as there is no child committee
+        if carnot.overlay.member_of_leaf_committee(self.id()):
+            self.assertTrue(carnot.current_view, 1)
+            self.assertEqual(carnot.highest_voted_view, 1)
+            self.assertEqual(carnot.local_high_qc.view, 0)
+            self.assertIn(proposed_block.id(), carnot.safe_blocks)
+
 

@@ -306,6 +306,8 @@ class Carnot:
                 self.send(vote, self.overlay.leader(self.current_view + 1))
             else:
                 self.send(vote, *self.overlay.parent_committee(self.id))
+            self.increment_voted_view(block.view)  # to avoid voting again for this view.
+            self.increment_view_qc(block.qc)
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
         # TODO: we should be more strict with views in the sense that we should not
@@ -396,6 +398,7 @@ class Carnot:
 
     def build_qc(self, quorum: Quorum) -> Qc:
         # TODO: implement unhappy path
+        # Maybe better do build aggregatedQC for unhappy path?
         quorum = list(quorum)
         return StandardQc(
             view=quorum[0].view,
