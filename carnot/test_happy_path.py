@@ -259,3 +259,70 @@ class TestCarnotHappyPath(TestCase):
         # when number of votes are < 9
         self.assertEqual(carnot.highest_voted_view, 0)
         self.assertEqual(carnot.current_view, 0)
+
+    def test_initial_leader_proposes_and_advance(self):
+        class MockOverlay(Overlay):
+            def is_leader(self, _id: Id):
+                return True
+
+            def leader(self, view: View) -> Id:
+                return int_to_id(0)
+
+            def child_committee(self, parent: Id, child: Id) -> bool:
+                return True
+
+            def leader_super_majority_threshold(self, _id: Id) -> int:
+                return 10
+
+            def super_majority_threshold(self, _id: Id) -> int:
+                return 10
+
+            def parent_committee(self, _id: Id) -> Optional[Committee]:
+                return set()
+
+        class MockCarnot(Carnot):
+            def __init__(self, id):
+                super(MockCarnot, self).__init__(id)
+                self.proposed_block = None
+
+            def broadcast(self, block):
+                self.proposed_block = block
+
+        carnot = MockCarnot(int_to_id(0))
+        carnot.overlay = MockOverlay()
+        genesis_block = self.add_genesis_block(carnot)
+
+        # votes for genesis block
+        votes = set(
+            Vote(
+                block=genesis_block.id(),
+                view=0,
+                voter=int_to_id(i),
+                qc=StandardQc(
+                    block=genesis_block.id(),
+                    view=0
+                ),
+            ) for i in range(10)
+        )
+        # propose a new block
+        carnot.propose_block(view=1, quorum=votes)
+        proposed_block = carnot.proposed_block
+        # process the proposed block as member of a committee
+        carnot.receive_block(proposed_block)
+        child_votes = set(
+            Vote(
+                block=proposed_block.id(),
+                view=1,
+                voter=int_to_id(i),
+                qc=StandardQc(
+                    block=genesis_block.id(),
+                    view=0
+                ),
+            ) for i in range(10)
+        )
+        # vote with votes from child committee
+        carnot.vote(proposed_block, child_votes)
+        # check carnot state advanced
+        self.assertTrue(carnot.current_view, 1)
+        self.assertIn(proposed_block.id(), carnot.safe_blocks)
+

@@ -377,14 +377,28 @@ class Carnot:
             self.send(vote, self.overlay.leader(self.current_view + 1))
 
     def build_qc(self, quorum: Quorum) -> Qc:
-        pass
+        # TODO: implement unhappy path
+        quorum = list(quorum)
+        return StandardQc(
+            view=quorum[0].view,
+            block=quorum[0].block
+        )
 
     def propose_block(self, view: View, quorum: Quorum):
         assert self.overlay.is_leader(self.id)
         assert len(quorum) == self.overlay.leader_super_majority_threshold(self.id)
-
         qc = self.build_qc(quorum)
-        block = Block(view=view, qc=qc)
+        block = Block(
+            view=view,
+            qc=qc,
+            # Dummy content for proposing next block
+            content=frozenset(
+                (
+                    bytes(f"{view}".encode(encoding="utf8")),
+                    bytes(f"{qc.view}".encode(encoding="utf8"))
+                )
+            )
+        )
         self.broadcast(block)
 
     def local_timeout(self):
