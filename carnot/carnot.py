@@ -238,13 +238,17 @@ class Carnot:
             case StandardQc() as standard:
                 if standard.view < self.latest_committed_view:
                     return False
-                return block.view >= self.latest_committed_view and \
-                    self.is_sequential_ascending(block.view, standard.view)
+                return (
+                        block.view >= self.latest_committed_view and
+                        is_sequential_ascending(block.view, standard.view)
+                )
             case AggregateQc() as aggregated:
                 if aggregated.high_qc().view < self.latest_committed_view:
                     return False
-                return block.view >= self.current_view and \
-                    self.is_sequential_ascending(block.view, aggregated.view)
+                return (
+                        block.view >= self.current_view and
+                        is_sequential_ascending(block.view, aggregated.view)
+                )
 
     # Ask Dani
     def update_high_qc(self, qc: Qc):
@@ -358,7 +362,7 @@ class Carnot:
             timeout_qc = self.build_timeout_qc(msgs)
             self.update_timeout_qc(timeout_qc)
         else:
-            self.update_timeout_qc(msgs.pop().timeout_qc)
+            self.update_timeout_qc(max_msg.timeout_qc)
 
     def detected_timeout(self, msgs: Set[Timeout]):
         assert len(msgs) == self.overlay.leader_super_majority_threshold(self.id)
@@ -489,9 +493,8 @@ class Carnot:
         return True
 
     @staticmethod
-    def get_max_timeout(timeouts: Set[Timeout]) -> Optional[Timeout]:
-        if not timeouts:
-            return None
+    def get_max_timeout(timeouts: Set[Timeout]) -> Timeout:
+        assert len(timeouts) > 0
         return max(timeouts, key=lambda time: time.qc.view)
 
 
