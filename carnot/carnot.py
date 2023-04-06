@@ -311,8 +311,7 @@ class Carnot:
             self.try_commit_grand_parent(block)
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
-        # TODO: we should be more strict with views in the sense that we should not
-        # accept 'future' events
+        # TODO: we should be more strict with views in the sense that we should not accept 'future' events
         assert timeout_qc.view >= self.current_view
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
@@ -349,7 +348,7 @@ class Carnot:
         self.increment_view_qc(block.qc)
 
 
-# This step is very similar to approving a block in the happy path
+    # This step is very similar to approving a block in the happy path
     # A goal of this process is to guarantee that the high_qc gathered at the top
     # (or a more recent one) has been seen by the supermajority of nodes in the network
     # TODO: Check comment
@@ -460,7 +459,6 @@ class Carnot:
             timeout_msg: Timeout = Timeout(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
-                local_timeout=True,
                 # local_timeout is only true for the root committee or members of its children
                 # root committee or its children can trigger the timeout.
                 timeout_qc=self.last_timeout_view_qc,
@@ -504,21 +502,19 @@ class Carnot:
             self.increment_view_timeout_qc(timeout_qc)
 
         if self.overlay.is_member_of_root_committee(self.id):
-            timeout_msg = Timeout(
+            timeout_msg = NewView(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
                 sender=self.id,
                 timeout_qc=timeout_qc,
-                local_timeout=False,
             )
             self.send(timeout_msg, self.overlay.leader(self.current_view + 1))
         else:
-            timeout_msg = Timeout(
+            timeout_msg = NewView(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
                 sender=self.id,
                 timeout_qc=timeout_qc,
-                local_timeout=False,
             )
             self.send(timeout_msg, *self.overlay.parent_committee(self.id))
         self.increment_view_timeout_qc(timeout_qc)
@@ -537,12 +533,11 @@ class Carnot:
                 self.update_high_qc(new_high_qc)
                 self.update_timeout_qc(timeout_qc)
                 self.increment_view_timeout_qc(timeout_qc)
-            timeout_msg = Timeout(
+            timeout_msg = NewView(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
                 sender=self.id,
                 timeout_qc=timeout_qc,
-                local_timeout=False,
             )
             self.send(timeout_msg, *self.overlay.parent_committee(self.id))
             # This checks if a node has already incremented its voted view by local_timeout. If not then it should
@@ -557,7 +552,7 @@ class Carnot:
     def build_timeout_qc(self, msgs: Set[Timeout]) -> TimeoutQc:
         pass
 
-    def send(self, vote: Vote | Timeout | TimeoutQc, *ids: Id):
+    def send(self, vote: Vote | Timeout | NewView | TimeoutQc, *ids: Id):
         pass
 
     def broadcast(self, block):
