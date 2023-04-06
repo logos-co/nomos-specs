@@ -255,7 +255,7 @@ class TestCarnotHappyPath(TestCase):
             ) for i in range(3)
         )
 
-        with self.assertRaises((AssertionError,)):
+        with self.assertRaises((AssertionError, )):
             carnot.approve_block(block1, votes)
 
         # The test passes as asserting fails in len(votes) == self.overlay.super_majority_threshold(self.id)
@@ -346,12 +346,6 @@ class TestCarnotHappyPath(TestCase):
             def is_leader(self, _id: Id):
                 return False
 
-            def is_member_root(self, _id: Id):
-                return False
-
-            def is_member_leaf(self, _id: Id):
-                return True
-
             def leader(self, view: View) -> Id:
                 return int_to_id(0)
 
@@ -386,14 +380,27 @@ class TestCarnotHappyPath(TestCase):
         """
         Test that having a single committee (both root and leaf) and a leader is able to advance
         """
-        nodes = [Carnot(int_to_id(i)) for i in range(4)]
+        class MockCarnot(Carnot):
+            def __init__(self, id):
+                super(MockCarnot, self).__init__(id)
+                self.proposed_block = None
+                self.latest_vote = None
+
+            def broadcast(self, block):
+                self.proposed_block = block
+
+            def send(self, vote: Vote | Timeout | TimeoutQc, *ids: Id):
+                self.latest_vote = vote
+
+        nodes = [MockCarnot(int_to_id(i)) for i in range(4)]
+        leader = nodes[0]
 
         class MockOverlay(Overlay):
             def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
-                pass
+                return False
 
             def leader_super_majority_threshold(self, _id: Id) -> int:
-                pass
+                return 3
 
             def is_leader(self, _id: Id):
                 # Leader is the node with id 0, otherwise not
@@ -416,4 +423,44 @@ class TestCarnotHappyPath(TestCase):
             def super_majority_threshold(self, _id: Id) -> int:
                 return 0
 
+        overlay = MockOverlay()
 
+        # inject overlay
+        genesis_block = None
+        for node in nodes:
+            node.overlay = overlay
+            genesis_block = self.add_genesis_block(node)
+
+        # votes for genesis block
+        votes = set(
+            Vote(
+                block=genesis_block.id(),
+                view=0,
+                voter=int_to_id(i),
+                qc=StandardQc(
+                    block=genesis_block.id(),
+                    view=0
+                ),
+            ) for i in range(3)
+        )
+        leader.propose_block(1, votes)
+        proposed_block = leader.proposed_block
+        votes = []
+        for node in nodes:
+            node.receive_block(proposed_block)
+            node.approve_block(proposed_block, set())
+            votes.append(node.latest_vote)
+        leader.propose_block(2, set(votes))
+        next_proposed_block = leader.proposed_block
+        for node in nodes:
+            # A node receives the second proposed block
+            node.receive_block(next_proposed_block)
+            # it hasn't voted for the view 2, so its state is linked to view 1 still
+            self.assertEqual(node.highest_voted_view, 1)
+            self.assertEqual(node.current_view, 1)
+            # when the node approves the vote we update the current view
+            # and the local high qc, so they need to be increased
+            node.approve_block(next_proposed_block, set())
+            self.assertEqual(node.current_view, 2)
+            self.assertEqual(node.local_high_qc.view, 1)
+            self.assertEqual(node.highest_voted_view, 2)

@@ -322,26 +322,33 @@ class Carnot:
         assert all(vote.block == block.id() for vote in votes)
         assert block.view > self.highest_voted_view
 
-        if self.overlay.is_member_of_root_committee(self.id):
+        if (
+                self.overlay.is_member_of_root_committee(self.id) and
+                not self.overlay.is_member_of_leaf_committee(self.id)
+        ):
             vote: Vote = Vote(
                 block=block.id(),
                 voter=self.id,
-                view=self.current_view,
-                qc=self.build_qc(votes)
+                view=block.view,
+                qc=self.build_qc(block.view, block)
             )
             self.send(vote, self.overlay.leader(self.current_view + 1))
         else:
             vote: Vote = Vote(
                 block=block.id(),
                 voter=self.id,
-                view=self.current_view,
+                view=block.view,
                 qc=None
             )
-            self.send(vote, *self.overlay.parent_committee(self.id))
+            if self.overlay.is_member_of_root_committee(self.id):
+                self.send(vote, self.overlay.leader(block.view + 1))
+            else:
+                self.send(vote, *self.overlay.parent_committee(self.id))
         self.increment_voted_view(block.view)  # to avoid voting again for this view.
         self.increment_view_qc(block.qc)
 
-     # This step is very similar to approving a block in the happy path
+
+# This step is very similar to approving a block in the happy path
     # A goal of this process is to guarantee that the high_qc gathered at the top
     # (or a more recent one) has been seen by the supermajority of nodes in the network
     # TODO: Check comment
@@ -396,19 +403,19 @@ class Carnot:
         if self.overlay.is_member_of_root_committee(self.id):
             self.send(msg, self.overlay.leader(self.current_view + 1))
 
-    def build_qc(self, quorum: Quorum) -> Qc:
+    def build_qc(self, view: View, block: Block) -> Qc:
         # TODO: implement unhappy path
         # Maybe better do build aggregatedQC for unhappy path?
-        quorum = list(quorum)
         return StandardQc(
-            view=quorum[0].view,
-            block=quorum[0].block
+            view=view,
+            block=block.id()
         )
 
     def propose_block(self, view: View, quorum: Quorum):
         assert self.overlay.is_leader(self.id)
-        assert len(quorum) == self.overlay.leader_super_majority_threshold(self.id)
-        qc = self.build_qc(quorum)
+        assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id)
+        vote = list(quorum)[0]
+        qc = self.build_qc(vote.view, self.safe_blocks[vote.block])
         block = Block(
             view=view,
             qc=qc,
@@ -578,12 +585,11 @@ class Carnot:
     def increment_latest_committed_view(self, view: View):
         self.latest_committed_view = max(view, self.latest_committed_view)
 
-    def increment_view_qc(self, qc: Qc) -> bool:
+    def increment_view_qc(self, qc: Qc):
         if qc.view < self.current_view:
-            return False
+            return
         self.last_timeout_view_qc = None
         self.current_view = qc.view + 1
-        return True
 
     def increment_view_timeout_qc(self, timeout_qc: TimeoutQc):
         if timeout_qc is None or timeout_qc.view < self.current_view:
