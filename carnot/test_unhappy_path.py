@@ -3,8 +3,9 @@ from unittest import TestCase, mock
 from unittest.mock import patch
 
 
-class TestCarnotHappyPath(TestCase):
+class TestCarnotUnHappyPath(TestCase):
     @staticmethod
+
     def add_genesis_block(carnot: Carnot) -> Block:
         genesis_block = Block(view=0, qc=StandardQc(block=b"", view=0), content=frozenset(b""))
         carnot.safe_blocks[genesis_block.id()] = genesis_block
