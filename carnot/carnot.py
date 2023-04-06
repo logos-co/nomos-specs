@@ -9,14 +9,15 @@
 
 #  The protocol in Carnot operates in two modes: the happy path and the unhappy path.
 #
-# In the happy path, the nodes in Carnot are arranged in a binary tree overlay committee structure. The leader proposes
-# a block that contains a quorum certificate (QC) with votes from more than two-thirds of the root committee and its
-# child committee/ committees. The voting process begins at the leaf committee where nodes verify the proposal and send
-# their votes to the parent committee. Once a node in the parent committee receives more than two-thirds of the votes
-# from its child committee members, it sends its votes to its parent. This process continues recursively until the root
-# committee members collect votes from its child committee/ committees. The root committee member builds a QC from the
-# votes and sends it to the next leader. The leader builds a QC and proposes the next block upon receiving more than
-# two-thirds of votes.
+# In Carnot, nodes are arranged in a binary tree overlay committee structure. Moreover, Carnot is a
+# pipelined consensus protocol where a block contains the proof of attestation of its parent. In happy path the
+# leader proposes a block that contains a quorum certificate (QC) with votes from more than two-thirds of the root
+# committee and its child committee/ committees. The voting process begins at the leaf committee where nodes verify
+# the proposal and send their votes to the parent committee. Once a node in the parent committee receives more than
+# two-thirds of the votes from its child committee members, it sends its votes to its parent. This process continues
+# recursively until the root committee members collect votes from its child committee/ committees. The root committee
+# member builds a QC from the votes and sends it to the next leader. The leader builds a QC and proposes the next block
+# upon receiving more than two-thirds of votes.
 
 
 # In the unhappy path, if a node does not receive a message within a timeout interval, it will timeout. Only nodes at
@@ -24,12 +25,12 @@
 # committee builds a timeout QC from more than two-thirds of messages, recalculates the new overlay, and broadcasts it
 # to the network. Similar to the happy path, the timeout message moves from leaves to the root. Each parent waits for
 # more than two-thirds of timeout messages from its child committees and sends its timeout to the parent committee once
-# the threshold is reached. The root node builds a QC from timeout messages received from its child committee/committees
-# and forwards it to the next leader. Upon receiving more than two-thirds of timeout messages, the next leader builds an
-# aggregated QC and proposes the next block containing the aggregated QC. It should be noted that while receiving
-# timeout messages, each node also updates its high_qc (the most recent QC) and passes it to its parent through the
-# timeout message. In this way, the aggregated QC will include the high_qc seen by the majority of honest nodes. Hence,
-# after the view change, the protocol safety is preserved.
+# the threshold is reached. A node in the root committee builds a QC from timeout messages received from its
+# child committee/committees and forwards it to the next leader. Upon receiving more than two-thirds of timeout
+# messages, the next leader builds an aggregated QC and proposes the next block containing the aggregated QC.
+# It should be noted that while receiving timeout messages, each node also updates its high_qc (the most recent QC)
+# and passes it to its parent through the timeout message. In this way, the aggregated QC will include the high_qc seen
+# by the majority of honest nodes. Hence, after the view change, the protocol safety is preserved.
 
 
 from dataclasses import dataclass
