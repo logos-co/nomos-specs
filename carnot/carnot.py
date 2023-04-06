@@ -328,28 +328,6 @@ class Carnot:
             self.seen_view_blocks[block.view] = True
             self.update_high_qc(block.qc)
             self.try_commit_grand_parent(block)
-        # A member of leaf committee will vote upon receipt of a block, it cannot wait for child votes because
-        # it doesn't have one.
-        # If member there is only one committee then leaf and root is the same committee. In that case the vote
-        # should be sent to the leader.
-        if self.overlay.member_of_leaf_committee(self.id):
-            self.leaf_vote_block(block)
-
-    def leaf_vote_block(self, block: Block):
-        assert self.overlay.member_of_leaf_committee(self.id)
-        vote: Vote = Vote(
-            block=block.id(),
-            voter=self.id,
-            view=self.current_view,
-            qc=None
-        )
-        # if there is only one committee then send vote to the leader.
-        if self.overlay.member_of_root_com(self.id):
-            self.send(vote, self.overlay.leader(self.current_view + 1))
-        else:
-            self.send(vote, *self.overlay.parent_committee(self.id))
-        self.increment_voted_view(block.view)  # to avoid voting again for this view.
-        self.increment_view_qc(block.qc)
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
         # TODO: we should be more strict with views in the sense that we should not

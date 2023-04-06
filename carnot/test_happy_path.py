@@ -358,39 +358,28 @@ class TestCarnotHappyPath(TestCase):
             def parent_committee(self, _id: Id) -> Optional[Committee]:
                 return set()
 
+            def member_of_leaf_committee(self, _id: Id) -> bool:
+                return True
+
+            def super_majority_threshold(self, _id: Id) -> int:
+                return 0
+
         carnot = Carnot(int_to_id(0))
         carnot.overlay = MockOverlay()
         genesis_block = self.add_genesis_block(carnot)
-
-        # Create 10 votes for the genesis block
-        votes = set(
-            Vote(
-                block=genesis_block.id(),
-                view=0,
-                voter=int_to_id(i),
-                qc=StandardQc(
-                    block=genesis_block.id(),
-                    view=0
-                ),
-            ) for i in range(10)
-        )
-        # carnot.propose_block(view=1, quorum=votes)
         proposed_block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        # Receive the proposed block as a member of the leaf committee
+        carnot.receive_block(proposed_block)
+        carnot.approve_block(proposed_block, set())
+        proposed_block = Block(view=2, qc=StandardQc(block=genesis_block.id(), view=1), content=frozenset(b"2"))
+        carnot.receive_block(proposed_block)
+        carnot.approve_block(proposed_block, set())
+        # Assert that the current view, highest voted view, and local high QC have all been updated correctly
+        self.assertEqual(carnot.current_view, 2)
+        self.assertEqual(carnot.highest_voted_view, 2)
+        self.assertEqual(carnot.local_high_qc.view, 1)
 
-        with mock.patch.object(carnot.overlay, 'member_of_leaf_committee', return_value=True):
-            # Assert that the proposed block has the correct view and parent block
-            #            assert proposed_block.parent_block == genesis_block.id()
-
-            # Receive the proposed block as a member of the leaf committee
-            carnot.receive_block(proposed_block)
-            proposed_block = Block(view=2, qc=StandardQc(block=genesis_block.id(), view=1), content=frozenset(b"2"))
-            carnot.receive_block(proposed_block)
-            # Assert that the current view, highest voted view, and local high QC have all been updated correctly
-            self.assertEqual(carnot.current_view, 2)
-            self.assertEqual(carnot.highest_voted_view, 2)
-            self.assertEqual(carnot.local_high_qc.view, 1)
-
-            # Assert that the proposed block has been added to the set of safe blocks
-            self.assertIn(proposed_block.id(), carnot.safe_blocks)
+        # Assert that the proposed block has been added to the set of safe blocks
+        self.assertIn(proposed_block.id(), carnot.safe_blocks)
 
 
