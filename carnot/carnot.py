@@ -165,7 +165,7 @@ class Overlay:
         pass
 
     @abstractmethod
-    def member_of_leaf_committee(self, _id: Id) -> bool:
+    def is_member_of_leaf_committee(self, _id: Id) -> bool:
         """
         :param _id: Node id to be checked
         :return: true if the participant with Id _id is in the leaf committee of the committee overlay
@@ -173,7 +173,7 @@ class Overlay:
         pass
 
     @abstractmethod
-    def member_of_root_committee(self, _id: Id) -> bool:
+    def is_member_of_root_committee(self, _id: Id) -> bool:
         """
         :param _id:
         :return: true if the participant with Id _id is member of the root committee withing the tree overlay
@@ -181,23 +181,7 @@ class Overlay:
         pass
 
     @abstractmethod
-    def member_of_root_com(self, _id: Id) -> bool:
-        """
-        :param _id:
-        :return: true if the participant with Id _id is member of the root committee withing the tree overlay
-        """
-        pass
-
-    @abstractmethod
-    def member_of_internal_com(self, _id: Id) -> bool:
-        """
-        :param _id:
-        :return:  True if the participant with Id _id is member of internal committees within the committee tree overlay
-        """
-        pass
-
-    @abstractmethod
-    def child_committee(self, parent: Id, child: Id) -> bool:
+    def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
         """
         :param parent:
         :param child:
@@ -223,7 +207,7 @@ class Overlay:
         """
         pass
 
-    def child_of_root_committee(self, _id: Id) -> Optional[Set[Committee]]:
+    def is_child_of_root_committee(self, _id: Id) -> bool:
         """
         :return: returns child committee/s of root committee if present
         """
@@ -236,10 +220,6 @@ class Overlay:
         The return value may change depending on which committee the node is member of, including the leader
         :return:
         """
-        pass
-
-    @abstractmethod
-    def root_super_majority_threshold(self, _id: Id) -> int:
         pass
 
     @abstractmethod
@@ -338,11 +318,11 @@ class Carnot:
     def approve_block(self, block: Block, votes: Set[Vote]):
         assert block.id() in self.safe_blocks
         assert len(votes) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.child_committee(self.id, vote.voter) for vote in votes)
+        assert all(self.overlay.is_member_of_child_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
         assert block.view > self.highest_voted_view
 
-        if self.overlay.member_of_root_com(self.id):
+        if self.overlay.is_member_of_root_committee(self.id):
             vote: Vote = Vote(
                 block=block.id(),
                 voter=self.id,
@@ -370,7 +350,7 @@ class Carnot:
         assert all(timeout.view >= self.current_view for timeout in timeouts)
         assert all(timeout.view == timeout.timeout_qc.view for timeout in timeouts)
         assert len(timeouts) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.child_committee(self.id, timeout.sender) for timeout in timeouts)
+        assert all(self.overlay.is_member_of_child_committee(self.id, timeout.sender) for timeout in timeouts)
 
         timeouts = list(timeouts)
         timeout_qc = timeouts[0].timeout_qc
@@ -381,7 +361,7 @@ class Carnot:
             self.update_timeout_qc(timeout_qc)
             self.increment_view_timeout_qc(timeout_qc)
 
-        if self.overlay.member_of_root_com(self.id):
+        if self.overlay.is_member_of_root_committee(self.id):
             new_view_msg = NewView(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
@@ -404,16 +384,16 @@ class Carnot:
 
     def forward_vote(self, vote: Vote):
         assert vote.block in self.safe_blocks
-        assert self.overlay.child_committee(self.id, vote.voter)
+        assert self.overlay.is_member_of_child_committee(self.id, vote.voter)
 
-        if self.overlay.member_of_root_com(self.id):
+        if self.overlay.is_member_of_root_committee(self.id):
             self.send(vote, self.overlay.leader(self.current_view + 1))
 
     def forward_new_view(self, msg: NewView):
         assert msg.view == self.current_view
-        assert self.overlay.child_committee(self.id, msg.voter)
+        assert self.overlay.is_member_of_child_committee(self.id, msg.voter)
 
-        if self.overlay.member_of_root_com(self.id):
+        if self.overlay.is_member_of_root_committee(self.id):
             self.send(msg, self.overlay.leader(self.current_view + 1))
 
     def build_qc(self, quorum: Quorum) -> Qc:
@@ -468,7 +448,7 @@ class Carnot:
         assert (self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view))
         self.increment_voted_view(self.current_view)
 
-        if self.overlay.member_of_root_committee(self.id) or self.overlay.child_of_root_committee(self.id):
+        if self.overlay.is_member_of_root_committee(self.id) or self.overlay.is_child_of_root_committee(self.id):
             timeout_msg: Timeout = Timeout(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
@@ -488,7 +468,7 @@ class Carnot:
         assert all(msg.view >= self.current_view for msg in msgs)
         assert len(set(msg.view for msg in msgs)) == 1
         assert all(msg.local_timeout for msg in msgs)
-        assert self.overlay.member_of_root_committee(self.id)
+        assert self.overlay.is_member_of_root_committee(self.id)
 
         timeout_qc = self.build_timeout_qc(msgs)
         self.update_timeout_qc(timeout_qc)
@@ -497,12 +477,12 @@ class Carnot:
         self.send(timeout_qc, *self.overlay.leaf_committees())  # should be sent only to the leafs
 
     def gather_timeouts(self, timeouts: Set[Timeout]):
-        assert not self.overlay.member_of_leaf_committee(self.id)
+        assert not self.overlay.is_member_of_leaf_committee(self.id)
         assert len(set(timeout.view for timeout in timeouts)) == 1
         assert all(timeout.view >= self.current_view for timeout in timeouts)
         assert all(timeout.view == timeout.timeout_qc.view for timeout in timeouts)
         assert len(timeouts) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.child_committee(self.id, timeout.sender) for timeout in timeouts)
+        assert all(self.overlay.is_member_of_child_committee(self.id, timeout.sender) for timeout in timeouts)
 
         timeouts = list(timeouts)
         timeout_qc = timeouts[0].timeout_qc
@@ -515,7 +495,7 @@ class Carnot:
             self.update_timeout_qc(timeout_qc)
             self.increment_view_timeout_qc(timeout_qc)
 
-        if self.overlay.member_of_root_com(self.id):
+        if self.overlay.is_member_of_root_committee(self.id):
             timeout_msg = Timeout(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
@@ -543,7 +523,7 @@ class Carnot:
         assert timeout_qc.view >= self.current_view
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
-        if self.overlay.member_of_leaf_committee(self.id):
+        if self.overlay.is_member_of_leaf_committee(self.id):
             new_high_qc = timeout_qc.high_qc
             if new_high_qc.view >= self.local_high_qc.view:
                 self.update_high_qc(new_high_qc)

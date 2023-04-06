@@ -189,10 +189,10 @@ class TestCarnotHappyPath(TestCase):
         """
 
         class MockOverlay(Overlay):
-            def member_of_root_com(self, _id: Id) -> bool:
+            def is_member_of_root_committee(self, _id: Id) -> bool:
                 return False
 
-            def child_committee(self, parent: Id, child: Id) -> bool:
+            def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
                 return True
 
             def super_majority_threshold(self, _id: Id) -> int:
@@ -227,10 +227,10 @@ class TestCarnotHappyPath(TestCase):
         """
 
         class MockOverlay(Overlay):
-            def member_of_root_com(self, _id: Id) -> bool:
+            def is_member_of_root_committee(self, _id: Id) -> bool:
                 return False
 
-            def child_committee(self, parent: Id, child: Id) -> bool:
+            def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
                 return True
 
             def super_majority_threshold(self, _id: Id) -> int:
@@ -277,7 +277,7 @@ class TestCarnotHappyPath(TestCase):
             def leader(self, view: View) -> Id:
                 return int_to_id(0)
 
-            def child_committee(self, parent: Id, child: Id) -> bool:
+            def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
                 return True
 
             def leader_super_majority_threshold(self, _id: Id) -> int:
@@ -358,7 +358,7 @@ class TestCarnotHappyPath(TestCase):
             def parent_committee(self, _id: Id) -> Optional[Committee]:
                 return set()
 
-            def member_of_leaf_committee(self, _id: Id) -> bool:
+            def is_member_of_leaf_committee(self, _id: Id) -> bool:
                 return True
 
             def super_majority_threshold(self, _id: Id) -> int:
@@ -381,5 +381,39 @@ class TestCarnotHappyPath(TestCase):
 
         # Assert that the proposed block has been added to the set of safe blocks
         self.assertIn(proposed_block.id(), carnot.safe_blocks)
+
+    def test_single_committee_advance(self):
+        """
+        Test that having a single committee (both root and leaf) and a leader is able to advance
+        """
+        nodes = [Carnot(int_to_id(i)) for i in range(4)]
+
+        class MockOverlay(Overlay):
+            def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
+                pass
+
+            def leader_super_majority_threshold(self, _id: Id) -> int:
+                pass
+
+            def is_leader(self, _id: Id):
+                # Leader is the node with id 0, otherwise not
+                return {
+                    int_to_id(0): True
+                }.get(_id, False)
+
+            def is_member_of_root_committee(self, _id: Id):
+                return True
+
+            def leader(self, view: View) -> Id:
+                return int_to_id(0)
+
+            def parent_committee(self, _id: Id) -> Optional[Committee]:
+                return None
+
+            def is_member_of_leaf_committee(self, _id: Id) -> bool:
+                return True
+
+            def super_majority_threshold(self, _id: Id) -> int:
+                return 0
 
 

@@ -189,10 +189,10 @@ class TestCarnotUnHappyPath(TestCase):
         """
 
         class MockOverlay(Overlay):
-            def member_of_root_com(self, _id: Id) -> bool:
+            def is_member_of_root_committee(self, _id: Id) -> bool:
                 return False
 
-            def child_committee(self, parent: Id, child: Id) -> bool:
+            def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
                 return True
 
             def super_majority_threshold(self, _id: Id) -> int:
@@ -227,10 +227,10 @@ class TestCarnotUnHappyPath(TestCase):
         """
 
         class MockOverlay(Overlay):
-            def member_of_root_com(self, _id: Id) -> bool:
+            def is_member_of_root_committee(self, _id: Id) -> bool:
                 return False
 
-            def child_committee(self, parent: Id, child: Id) -> bool:
+            def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
                 return True
 
             def super_majority_threshold(self, _id: Id) -> int:
@@ -277,7 +277,7 @@ class TestCarnotUnHappyPath(TestCase):
             def leader(self, view: View) -> Id:
                 return int_to_id(0)
 
-            def child_committee(self, parent: Id, child: Id) -> bool:
+            def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
                 return True
 
             def leader_super_majority_threshold(self, _id: Id) -> int:
