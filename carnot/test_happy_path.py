@@ -215,7 +215,7 @@ class TestCarnotHappyPath(TestCase):
                 qc=StandardQc(block=block1.id(), view=1)
             ) for i in range(10)
         )
-        carnot.vote(block1, votes)
+        carnot.approve_block(block1, votes)
         self.assertEqual(carnot.highest_voted_view, 1)
         self.assertEqual(carnot.current_view, 1)
         self.assertEqual(carnot.latest_committed_view, 0)
@@ -256,7 +256,7 @@ class TestCarnotHappyPath(TestCase):
         )
 
         with self.assertRaises((AssertionError,)):
-            carnot.vote(block1, votes)
+            carnot.approve_block(block1, votes)
 
         # The test passes as asserting fails in len(votes) == self.overlay.super_majority_threshold(self.id)
         # when number of votes are < 9
@@ -330,25 +330,36 @@ class TestCarnotHappyPath(TestCase):
             ) for i in range(10)
         )
         # vote with votes from child committee
-        carnot.vote(proposed_block, child_votes)
+        carnot.approve_block(proposed_block, child_votes)
         # check carnot state advanced
         self.assertTrue(carnot.current_view, 1)
         self.assertEqual(carnot.highest_voted_view, 1)
         self.assertEqual(carnot.local_high_qc.view, 0)
         self.assertIn(proposed_block.id(), carnot.safe_blocks)
 
-        # Leaf committees do not collect votes as they don't have any child. Therefore, leaf committees in happy
-        # path votes and updates state after receipt of a block
-
     def test_leaf_member_advance(self):
-        # Define a MockCarnot class that overrides the `broadcast` method
-        class MockCarnot(Carnot):
-            def __init__(self, id):
-                super(MockCarnot, self).__init__(id)
-                self.proposed_block = None
+        """
+        Leaf committees do not collect votes as they don't have any child. Therefore, leaf committees in happy
+        path votes and updates state after receipt of a block
+        """
+        class MockOverlay(Overlay):
+            def is_leader(self, _id: Id):
+                return False
 
-        # Create a MockCarnot object and add a genesis block
-        carnot = MockCarnot(int_to_id(0))
+            def is_member_root(self, _id: Id):
+                return False
+
+            def is_member_leaf(self, _id: Id):
+                return True
+
+            def leader(self, view: View) -> Id:
+                return int_to_id(0)
+
+            def parent_committee(self, _id: Id) -> Optional[Committee]:
+                return set()
+
+        carnot = Carnot(int_to_id(0))
+        carnot.overlay = MockOverlay()
         genesis_block = self.add_genesis_block(carnot)
 
         # Create 10 votes for the genesis block
@@ -375,10 +386,11 @@ class TestCarnotHappyPath(TestCase):
             proposed_block = Block(view=2, qc=StandardQc(block=genesis_block.id(), view=1), content=frozenset(b"2"))
             carnot.receive_block(proposed_block)
             # Assert that the current view, highest voted view, and local high QC have all been updated correctly
-            assert carnot.current_view == 2
-            assert carnot.highest_voted_view == 2
-            assert carnot.local_high_qc.view == 1
+            self.assertEqual(carnot.current_view, 2)
+            self.assertEqual(carnot.highest_voted_view, 2)
+            self.assertEqual(carnot.local_high_qc.view, 1)
 
             # Assert that the proposed block has been added to the set of safe blocks
-            assert proposed_block.id() in carnot.safe_blocks
+            self.assertIn(proposed_block.id(), carnot.safe_blocks)
+
 
