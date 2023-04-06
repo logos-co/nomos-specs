@@ -119,6 +119,7 @@ class Timeout:
     sender: Id
     timeout_qc: TimeoutQc
 
+
 # Timeout has been detected, nodes agree on it and gather high qc
 @dataclass
 class NewView:
@@ -451,8 +452,8 @@ class Carnot:
         # Make sure the node doesn't time out continuously without finishing the step to increment the current view.
         # Make sure current view is always higher than the local_high_qc so that the node won't timeout unnecessary
         # for a previous view.
-        # todo this check should also be used by other nodes as well.
-        assert (self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view))
+        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
+
         self.increment_voted_view(self.current_view)
 
         if self.overlay.is_member_of_root_committee(self.id) or self.overlay.is_child_of_root_committee(self.id):
@@ -473,16 +474,16 @@ class Carnot:
         assert len(msgs) == self.overlay.leader_super_majority_threshold(self.id)
         assert all(msg.view >= self.current_view for msg in msgs)
         assert len(set(msg.view for msg in msgs)) == 1
-        assert all(msg.local_timeout for msg in msgs)
+        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
         assert self.overlay.is_member_of_root_committee(self.id)
 
         timeout_qc = self.build_timeout_qc(msgs)
         self.update_timeout_qc(timeout_qc)
         self.update_high_qc(timeout_qc.high_qc)
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
-        self.send(timeout_qc, *self.overlay.leaf_committees())  # should be sent only to the leafs
+        self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
 
-    def gather_timeouts(self, timeouts: Set[Timeout]):
+    def gather_new_view(self, timeouts: Set[NewView]):
         assert not self.overlay.is_member_of_leaf_committee(self.id)
         assert len(set(timeout.view for timeout in timeouts)) == 1
         assert all(timeout.view >= self.current_view for timeout in timeouts)
