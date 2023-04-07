@@ -348,7 +348,6 @@ class Carnot:
         self.increment_voted_view(block.view)  # to avoid voting again for this view.
         self.increment_view_qc(block.qc)
 
-
     # This step is very similar to approving a block in the happy path
     # A goal of this process is to guarantee that the high_qc gathered at the top
     # (or a more recent one) has been seen by the supermajority of nodes in the network
@@ -374,7 +373,7 @@ class Carnot:
                 view=self.current_view,
                 high_qc=self.local_high_qc,
                 sender=self.id,
-                timeout_qc=timeout_qc, # should we do some aggregation here?
+                timeout_qc=timeout_qc,  # should we do some aggregation here?
             )
             self.send(new_view_msg, self.overlay.leader(self.current_view + 1))
         else:
@@ -383,7 +382,7 @@ class Carnot:
                 high_qc=self.local_high_qc,
                 sender=self.id,
                 timeout_qc=timeout_qc
-                )
+            )
             self.send(new_view_msg, *self.overlay.parent_committee(self.id))
         self.increment_view_timeout_qc(timeout_qc)
         # This checks if a not has already incremented its voted view by local_timeout. If not then it should
@@ -442,18 +441,24 @@ class Carnot:
     # last_voted_view if needed and then send its timeout message upward. In this way the latest qcs move upward
     # that makes it possible for the next leader to propose a block with the latest local_high_qcs in aggregated qc
     # from more than two third members of root committee and its children.
-    def local_timeout(self):
+
+    def is_safe_to_timeout(self, highest_voted_view: View, local_high_qc: Qc, last_timeout_view_qc: TimeoutQc,
+                           current_view: View):
+        # Make sure the node doesn't time out continuously without finishing the step to increment the current view.
+        # Make sure current view is always higher than the local_high_qc so that the node won't timeout unnecessary
+        # for a previous view.
+        assert current_view > max(highest_voted_view - 1, local_high_qc.view)
         # This condition makes sure a node waits for timeout_qc from root committee to change increment its view with
         # a view change.
         # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
         # from previous view.
-        assert (is_sequential_ascending(self.current_view, self.local_high_qc.view) or
-                is_sequential_ascending(self.current_view, self.last_timeout_view_qc.view))
-        # Make sure the node doesn't time out continuously without finishing the step to increment the current view.
-        # Make sure current view is always higher than the local_high_qc so that the node won't timeout unnecessary
-        # for a previous view.
-        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
+        return (is_sequential_ascending(current_view, local_high_qc.view) or
+                is_sequential_ascending(current_view, last_timeout_view_qc.view) or
+                (current_view == last_timeout_view_qc.view))
 
+    def local_timeout(self):
+        assert (self.is_safe_to_timeout(self.highest_voted_view, self.local_high_qc, self.last_timeout_view_qc,
+                                        self.current_view))
         self.increment_voted_view(self.current_view)
 
         if self.overlay.is_member_of_root_committee(self.id) or self.overlay.is_child_of_root_committee(self.id):
@@ -603,3 +608,5 @@ class Carnot:
 
 if __name__ == "__main__":
     pass
+
+
