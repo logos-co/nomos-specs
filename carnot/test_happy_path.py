@@ -280,10 +280,10 @@ class TestCarnotHappyPath(TestCase):
             def is_leader(self, _id: Id):
                 return True
 
-            def is_member_root(self, _id: Id):
+            def is_member_of_root_committee(self, _id: Id):
                 return True
 
-            def is_member_leaf(self, _id: Id):
+            def is_member_of_leaf_committee(self, _id: Id):
                 return True
 
             def leader(self, view: View) -> Id:
