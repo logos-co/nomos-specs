@@ -109,11 +109,13 @@ class TimeoutQc:
     sender: Id
 
 
-# local timeout field is only used by the root committee and its children when they timeout. The timeout_qc is built
-# from local_timeouts. Leaf nodes when receive timeout_qc build their timeout msg and includes the timeout_qc in it.
-# The timeout_qc is indicator that the root committee and its child committees (if exist) have failed to collect votes.
 @dataclass
 class Timeout:
+    """
+    Local timeout field is only used by the root committee and its children when they timeout. The timeout_qc is built
+    from local_timeouts. Leaf nodes when receive timeout_qc build their timeout msg and includes the timeout_qc in it.
+    The timeout_qc is indicator that the root committee and its child committees (if exist) have failed to collect votes.
+    """
     view: View
     high_qc: Qc
     sender: Id
@@ -348,11 +350,13 @@ class Carnot:
         self.increment_voted_view(block.view)  # to avoid voting again for this view.
         self.increment_view_qc(block.qc)
 
-    # This step is very similar to approving a block in the happy path
-    # A goal of this process is to guarantee that the high_qc gathered at the top
-    # (or a more recent one) has been seen by the supermajority of nodes in the network
-    # TODO: Check comment
     def approve_new_view(self, timeouts: Set[NewView]):
+        """
+        This step is very similar to approving a block in the happy path
+        A goal of this process is to guarantee that the high_qc gathered at the top
+        (or a more recent one) has been seen by the supermajority of nodes in the network
+        # TODO: Check comment
+        """
         assert len(set(timeout.view for timeout in timeouts)) == 1
         assert all(timeout.view >= self.current_view for timeout in timeouts)
         assert all(timeout.view == timeout.timeout_qc.view for timeout in timeouts)
@@ -429,36 +433,50 @@ class Carnot:
         )
         self.broadcast(block)
 
-    # Local timeout is different for the root and its child committees. If other committees timeout, they only
-    # stop taking part in consensus. If a member of root or its child committees timeout it sends its timeout message
-    # to all members of root to build the timeout qc. Using this qc we assume that the new
-    # overlay can be built. Hence, by building the new overlay members of root committee can send the timeout qc
-    # to the leaf committee of the new overlay. Upon receipt of the timeout qc the leaf committee members update
-    # their local_high_qc, last_timeout_view_qc and last_voted_view if the view of qcs
-    # (local_high_qc, last_timeout_view_qc) received is higher than their local view. Similalry last_voted_view is
-    # updated if it is greater than the current last_voted_view. When parent committee member receives more than two
-    # third of timeout messages from its children it also updates its local_high_qc, last_timeout_view_qc and
-    # last_voted_view if needed and then send its timeout message upward. In this way the latest qcs move upward
-    # that makes it possible for the next leader to propose a block with the latest local_high_qcs in aggregated qc
-    # from more than two third members of root committee and its children.
+    def is_safe_to_timeout(
+            self,
+            highest_voted_view: View,
+            local_high_qc: Qc,
+            last_timeout_view_qc: TimeoutQc,
+            current_view: View
+    ):
+        """
+        Local timeout is different for the root and its child committees. If other committees timeout, they only
+        stop taking part in consensus. If a member of root or its child committees timeout it sends its timeout message
+        to all members of root to build the timeout qc. Using this qc we assume that the new
+        overlay can be built. Hence, by building the new overlay members of root committee can send the timeout qc
+        to the leaf committee of the new overlay. Upon receipt of the timeout qc the leaf committee members update
+        their local_high_qc, last_timeout_view_qc and last_voted_view if the view of qcs
+        (local_high_qc, last_timeout_view_qc) received is higher than their local view. Similalry last_voted_view is
+        updated if it is greater than the current last_voted_view. When parent committee member receives more than two
+        third of timeout messages from its children it also updates its local_high_qc, last_timeout_view_qc and
+        last_voted_view if needed and then send its timeout message upward. In this way the latest qcs move upward
+        that makes it possible for the next leader to propose a block with the latest local_high_qcs in aggregated qc
+        from more than two third members of root committee and its children.
+        """
 
-    def is_safe_to_timeout(self, highest_voted_view: View, local_high_qc: Qc, last_timeout_view_qc: TimeoutQc,
-                           current_view: View):
         # Make sure the node doesn't time out continuously without finishing the step to increment the current view.
         # Make sure current view is always higher than the local_high_qc so that the node won't timeout unnecessary
         # for a previous view.
-        assert current_view > max(highest_voted_view - 1, local_high_qc.view)
+        assert self.current_view > max(highest_voted_view - 1, local_high_qc.view)
         # This condition makes sure a node waits for timeout_qc from root committee to change increment its view with
         # a view change.
         # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
         # from previous view.
-        return (is_sequential_ascending(current_view, local_high_qc.view) or
+        return (
+                is_sequential_ascending(current_view, local_high_qc.view) or
                 is_sequential_ascending(current_view, last_timeout_view_qc.view) or
-                (current_view == last_timeout_view_qc.view))
+                (current_view == last_timeout_view_qc.view)
+        )
 
     def local_timeout(self):
-        assert (self.is_safe_to_timeout(self.highest_voted_view, self.local_high_qc, self.last_timeout_view_qc,
-                                        self.current_view))
+        assert self.is_safe_to_timeout(
+            self.highest_voted_view,
+            self.local_high_qc,
+            self.last_timeout_view_qc,
+            self.current_view
+        )
+
         self.increment_voted_view(self.current_view)
 
         if self.overlay.is_member_of_root_committee(self.id) or self.overlay.is_child_of_root_committee(self.id):
@@ -472,10 +490,14 @@ class Carnot:
             )
             self.send(timeout_msg, *self.overlay.root_committee())
 
-    # Root committee detected that supermajority of root + its children has timed out
-    # The view has failed and this information is sent to all participants along with the information
-    # necessary to reconstruct the new overlay
     def timeout_detected(self, msgs: Set[Timeout]):
+        """
+        Root committee detected that supermajority of root + its children has timed out
+        The view has failed and this information is sent to all participants along with the information
+        necessary to reconstruct the new overlay
+        :param msgs:
+        :return:
+        """
         assert len(msgs) == self.overlay.leader_super_majority_threshold(self.id)
         assert all(msg.view >= self.current_view for msg in msgs)
         assert len(set(msg.view for msg in msgs)) == 1
