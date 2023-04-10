@@ -284,7 +284,7 @@ class Carnot:
     def update_timeout_qc(self, timeout_qc: TimeoutQc):
         match (self.last_timeout_view_qc, timeout_qc):
             case (None, timeout_qc):
-                self.local_high_qc = timeout_qc
+                self.last_timeout_view_qc = timeout_qc
             case (self.last_timeout_view_qc, timeout_qc) if timeout_qc.view > self.last_timeout_view_qc.view:
                 self.last_timeout_view_qc = timeout_qc
 
@@ -302,11 +302,6 @@ class Carnot:
             self.seen_view_blocks[block.view] = True
             self.update_high_qc(block.qc)
             self.try_commit_grand_parent(block)
-
-    def receive_timeout_qc(self, timeout_qc: TimeoutQc):
-        # TODO: we should be more strict with views in the sense that we should not accept 'future' events
-        assert timeout_qc.view >= self.current_view
-        self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
     def approve_block(self, block: Block, votes: Set[Vote]):
         assert block.id() in self.safe_blocks
@@ -354,9 +349,16 @@ class Carnot:
         if self.overlay.is_member_of_root_committee(self.id):
             self.send(msg, self.overlay.leader(self.current_view + 1))
 
-    def build_qc(self, view: View, block: Block) -> Qc:
-        # TODO: implement unhappy path
-        # Maybe better do build aggregatedQC for unhappy path?
+    def build_qc(self, view: View, block: Optional[Block], new_views: Optional[Set[NewView]]) -> Qc:
+        # unhappy path
+        if new_views:
+            new_views = list(new_views)
+            return AggregateQc(
+                qcs=[msg.high_qc.view for msg in new_views],
+                highest_qc=max(new_views, key=lambda x: x.high_qc.view).high_qc,
+                view=new_views[0].view
+            )
+        # happy path
         return StandardQc(
             view=view,
             block=block.id()
@@ -364,9 +366,20 @@ class Carnot:
 
     def propose_block(self, view: View, quorum: Quorum):
         assert self.overlay.is_leader(self.id)
-        assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id)
-        vote = list(quorum)[0]
-        qc = self.build_qc(vote.view, self.safe_blocks[vote.block])
+
+        qc = None
+        quorum = list(quorum)
+        # happy path
+        if isinstance(quorum[0], Vote):
+            assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id)
+            vote = quorum[0]
+            qc = self.build_qc(vote.view, self.safe_blocks[vote.block], None)
+        # unhappy path
+        elif isinstance(quorum[0], NewView):
+            assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id)
+            new_view = quorum[0]
+            qc = self.build_qc(new_view.view, None, quorum)
+
         block = Block(
             view=view,
             qc=qc,
@@ -440,7 +453,7 @@ class Carnot:
         assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
         assert self.overlay.is_member_of_root_committee(self.id)
 
-        timeout_qc = self.build_timeout_qc(msgs)
+        timeout_qc = self.build_timeout_qc(msgs, self.id)
         self.update_timeout_qc(timeout_qc)
         self.update_high_qc(timeout_qc.high_qc)
         # The view failed and the node timeout. The node cannot timeout itself again until it gets updated
@@ -471,7 +484,6 @@ class Carnot:
 
         self.update_high_qc(new_high_qc)
         self.update_timeout_qc(timeout_qc)
-        self.increment_view_timeout_qc(timeout_qc)
         # The view failed and the node timeout. The node cannot timeout itself again until it gets updated
         # from a higher qc, either from a TimeoutQc or from a Qc coming from a newer proposed block.
         # In case the node do not get updated because the received qc is not new enough we need to skip
@@ -510,7 +522,7 @@ class Carnot:
             if new_high_qc.view >= self.local_high_qc.view:
                 self.update_high_qc(new_high_qc)
                 self.update_timeout_qc(timeout_qc)
-                self.increment_view_timeout_qc(timeout_qc)
+
             timeout_msg = NewView(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
@@ -527,8 +539,15 @@ class Carnot:
         assert timeout_qc.view >= self.current_view
         self.overlay = Overlay()
 
-    def build_timeout_qc(self, msgs: Set[Timeout]) -> TimeoutQc:
-        pass
+    def build_timeout_qc(self, msgs: Set[Timeout], sender: Id) -> TimeoutQc:
+        msgs = list(msgs)
+        return TimeoutQc(
+            view=msgs[0].view,
+            high_qc=max(msgs, key=lambda x: x.high_qc.view).high_qc,
+            qc_views=[msg.view for msg in msgs],
+            sender_ids={msg.sender for msg in msgs},
+            sender=sender,
+        )
 
     def send(self, vote: Vote | Timeout | NewView | TimeoutQc, *ids: Id):
         pass
