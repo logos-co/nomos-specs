@@ -1,6 +1,18 @@
 from .carnot import *
-from unittest import TestCase, mock
-from unittest.mock import patch
+from unittest import TestCase
+
+
+class MockCarnot(Carnot):
+    def __init__(self, id):
+        super(MockCarnot, self).__init__(id)
+        self.proposed_block = None
+        self.latest_vote = None
+
+    def broadcast(self, block):
+        self.proposed_block = block
+
+    def send(self, vote: Vote | Timeout | TimeoutQc, *ids: Id):
+        self.latest_vote = vote
 
 
 class TestCarnotHappyPath(TestCase):
@@ -289,14 +301,6 @@ class TestCarnotHappyPath(TestCase):
             def parent_committee(self, _id: Id) -> Optional[Committee]:
                 return set()
 
-        class MockCarnot(Carnot):
-            def __init__(self, _id):
-                super(MockCarnot, self).__init__(_id)
-                self.proposed_block = None
-
-            def broadcast(self, block):
-                self.proposed_block = block
-
         carnot = MockCarnot(int_to_id(0))
         carnot.overlay = MockOverlay()
         genesis_block = self.add_genesis_block(carnot)
@@ -380,18 +384,6 @@ class TestCarnotHappyPath(TestCase):
         """
         Test that having a single committee (both root and leaf) and a leader is able to advance
         """
-        class MockCarnot(Carnot):
-            def __init__(self, id):
-                super(MockCarnot, self).__init__(id)
-                self.proposed_block = None
-                self.latest_vote = None
-
-            def broadcast(self, block):
-                self.proposed_block = block
-
-            def send(self, vote: Vote | Timeout | TimeoutQc, *ids: Id):
-                self.latest_vote = vote
-
         nodes = [MockCarnot(int_to_id(i)) for i in range(4)]
         leader = nodes[0]
 
