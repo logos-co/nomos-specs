@@ -76,7 +76,7 @@ Qc: TypeAlias = StandardQc | AggregateQc
 class Block:
     view: View
     qc: Qc
-    content: FrozenSet[Id]
+    _id: Id  # this is an abstration over the block id, which should be the hash of the contents
 
     def extends(self, ancestor: Self) -> bool:
         """
@@ -89,7 +89,7 @@ class Block:
         return self.qc.block
 
     def id(self) -> Id:
-        return int_to_id(hash(self.content))
+        return self._id
 
 
 @dataclass(unsafe_hash=True)
@@ -402,7 +402,7 @@ class Carnot:
 
     def forward_new_view(self, msg: NewView):
         assert msg.view == self.current_view
-        assert self.overlay.is_member_of_child_committee(self.id, msg.voter)
+        assert self.overlay.is_member_of_child_committee(self.id, msg.sender)
 
         if self.overlay.is_member_of_root_committee(self.id):
             self.send(msg, self.overlay.leader(self.current_view + 1))
@@ -423,13 +423,13 @@ class Carnot:
         block = Block(
             view=view,
             qc=qc,
-            # Dummy content for proposing next block
-            content=frozenset(
+            # Dummy id for proposing next block
+            _id=int_to_id(hash(
                 (
                     bytes(f"{view}".encode(encoding="utf8")),
                     bytes(f"{qc.view}".encode(encoding="utf8"))
                 )
-            )
+            ))
         )
         self.broadcast(block)
 

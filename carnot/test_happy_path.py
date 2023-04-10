@@ -6,7 +6,7 @@ from unittest.mock import patch
 class TestCarnotHappyPath(TestCase):
     @staticmethod
     def add_genesis_block(carnot: Carnot) -> Block:
-        genesis_block = Block(view=0, qc=StandardQc(block=b"", view=0), content=frozenset(b""))
+        genesis_block = Block(view=0, qc=StandardQc(block=b"", view=0), _id=b"")
         carnot.safe_blocks[genesis_block.id()] = genesis_block
         carnot.committed_blocks[genesis_block.id()] = genesis_block
         return genesis_block
@@ -14,33 +14,33 @@ class TestCarnotHappyPath(TestCase):
     def test_receive_block(self):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
-        block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block)
 
     def test_receive_multiple_blocks_for_the_same_view(self):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
 
         # 2
-        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), content=frozenset(b"2"))
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), _id=b"2")
         carnot.receive_block(block2)
 
         # 3
-        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), content=frozenset(b"3"))
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), _id=b"3")
         carnot.receive_block(block3)
         # 4
-        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"4"))
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), _id=b"4")
         carnot.receive_block(block4)
         self.assertEqual(len(carnot.safe_blocks), 5)
         # next block is duplicated and as it is already processed should be skipped
-        block5 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"4"))
+        block5 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), _id=b"4")
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
         # next block has a different view but is duplicated and as it is already processed should be skipped
-        block5 = Block(view=5, qc=StandardQc(block=block3.id(), view=4), content=frozenset(b"4"))
+        block5 = Block(view=5, qc=StandardQc(block=block3.id(), view=4), _id=b"4")
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
 
@@ -48,25 +48,25 @@ class TestCarnotHappyPath(TestCase):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
 
         # 2
-        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), content=frozenset(b"2"))
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), _id=b"2")
         carnot.receive_block(block2)
 
         # 3
-        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), content=frozenset(b"3"))
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), _id=b"3")
         carnot.receive_block(block3)
         # 4
-        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"4"))
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), _id=b"4")
         carnot.receive_block(block4)
 
         self.assertEqual(len(carnot.safe_blocks), 5)
         # This block should be rejected based on the condition below in block_is_safe().
         # block.view >= self.latest_committed_view and block.view == (standard.view + 1)
         # block_is_safe() should return false.
-        block5 = Block(view=3, qc=StandardQc(block=block4.id(), view=4), content=frozenset(b"5"))
+        block5 = Block(view=3, qc=StandardQc(block=block4.id(), view=4), _id=b"5")
         self.assertFalse(carnot.block_is_safe(block5))
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
@@ -75,18 +75,18 @@ class TestCarnotHappyPath(TestCase):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
 
         # 2
-        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), content=frozenset(b"2"))
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), _id=b"2")
         carnot.receive_block(block2)
 
         # 3
-        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), content=frozenset(b"3"))
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), _id=b"3")
         carnot.receive_block(block3)
         # 4
-        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"4"))
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), _id=b"4")
         carnot.receive_block(block4)
 
         self.assertEqual(len(carnot.safe_blocks), 5)
@@ -94,7 +94,7 @@ class TestCarnotHappyPath(TestCase):
         # This block should be rejected based on the condition  below in block_is_safe().
         # block.view >= self.latest_committed_view and block.view == (standard.view + 1)
         # block_is_safe() should return false.
-        block5 = Block(view=5, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"5"))
+        block5 = Block(view=5, qc=StandardQc(block=block3.id(), view=3), _id=b"5")
         self.assertFalse(carnot.block_is_safe(block5))
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
@@ -106,21 +106,21 @@ class TestCarnotHappyPath(TestCase):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
 
         # 2
-        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), content=frozenset(b"2"))
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), _id=b"2")
         carnot.receive_block(block2)
 
         # 3
-        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), content=frozenset(b"3"))
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), _id=b"3")
         carnot.receive_block(block3)
         # 4
-        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"4"))
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), _id=b"4")
         carnot.receive_block(block4)
 
-        block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4), content=frozenset(b"5"))
+        block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4), _id=b"5")
         carnot.receive_block(block5)
 
         for block in (block1, block2, block3):
@@ -134,25 +134,25 @@ class TestCarnotHappyPath(TestCase):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
 
         # 2
-        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), content=frozenset(b"2"))
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), _id=b"2")
         carnot.receive_block(block2)
 
         # 3
-        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), content=frozenset(b"3"))
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), _id=b"3")
         carnot.receive_block(block3)
         # 4
-        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"4"))
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), _id=b"4")
         carnot.receive_block(block4)
 
         self.assertEqual(len(carnot.safe_blocks), 5)
         # 5 This is the old standard qc of block number 2. By using the QC for block2, block5 tries to form a fork
         # to avert block3 and block b4. Block3 is a committed block
         # block_is_safe() should return false.
-        block5 = Block(view=5, qc=StandardQc(block=block2.id(), view=2), content=frozenset(b"5"))
+        block5 = Block(view=5, qc=StandardQc(block=block2.id(), view=2), _id=b"5")
         self.assertFalse(carnot.block_is_safe(block5))
         carnot.receive_block(block5)
         self.assertEqual(len(carnot.safe_blocks), 5)
@@ -161,22 +161,22 @@ class TestCarnotHappyPath(TestCase):
         carnot = Carnot(int_to_id(0))
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
 
         # 2
-        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), content=frozenset(b"2"))
+        block2 = Block(view=2, qc=StandardQc(block=block1.id(), view=1), _id=b"2")
         carnot.receive_block(block2)
 
         # 3
-        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), content=frozenset(b"3"))
+        block3 = Block(view=3, qc=StandardQc(block=block2.id(), view=2), _id=b"3")
         carnot.receive_block(block3)
         # 4
-        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), content=frozenset(b"4"))
+        block4 = Block(view=4, qc=StandardQc(block=block3.id(), view=3), _id=b"4")
         carnot.receive_block(block4)
 
         self.assertEqual(len(carnot.safe_blocks), 5)
-        block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4), content=frozenset(b"5"))
+        block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4), _id=b"5")
         carnot.receive_block(block5)
         self.assertEqual(carnot.latest_committed_view, 3)
         self.assertEqual(carnot.local_high_qc.view, 4)
@@ -205,7 +205,7 @@ class TestCarnotHappyPath(TestCase):
         carnot.overlay = MockOverlay()
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
         votes = set(
             Vote(
@@ -243,7 +243,7 @@ class TestCarnotHappyPath(TestCase):
         carnot.overlay = MockOverlay()
         genesis_block = self.add_genesis_block(carnot)
         # 1
-        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        block1 = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         carnot.receive_block(block1)
 
         votes = set(
@@ -290,8 +290,8 @@ class TestCarnotHappyPath(TestCase):
                 return set()
 
         class MockCarnot(Carnot):
-            def __init__(self, id):
-                super(MockCarnot, self).__init__(id)
+            def __init__(self, _id):
+                super(MockCarnot, self).__init__(_id)
                 self.proposed_block = None
 
             def broadcast(self, block):
@@ -361,11 +361,11 @@ class TestCarnotHappyPath(TestCase):
         carnot = Carnot(int_to_id(0))
         carnot.overlay = MockOverlay()
         genesis_block = self.add_genesis_block(carnot)
-        proposed_block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), content=frozenset(b"1"))
+        proposed_block = Block(view=1, qc=StandardQc(block=genesis_block.id(), view=0), _id=b"1")
         # Receive the proposed block as a member of the leaf committee
         carnot.receive_block(proposed_block)
         carnot.approve_block(proposed_block, set())
-        proposed_block = Block(view=2, qc=StandardQc(block=genesis_block.id(), view=1), content=frozenset(b"2"))
+        proposed_block = Block(view=2, qc=StandardQc(block=genesis_block.id(), view=1), _id=b"2")
         carnot.receive_block(proposed_block)
         carnot.approve_block(proposed_block, set())
         # Assert that the current view, highest voted view, and local high QC have all been updated correctly
