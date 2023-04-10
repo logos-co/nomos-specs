@@ -147,20 +147,7 @@ class Overlay:
         """
         pass
 
-    def is_child_of_root(self, _id: Id):
-        """
-         :param _id:  Node id to be checked
-         :return: true if node is the member of child of the root committee
-         """
-        pass
-
-    def number_of_committees(self, _ids: set[Id]) -> int:
-        """
-        :param _ids:  Set of Node id to be checked
-        :return: Number of committees in the overlay
-        """
-        pass
-
+    @abstractmethod
     def leader(self, view: View) -> Id:
         """
         :param view:
@@ -202,15 +189,18 @@ class Overlay:
         """
         pass
 
+    @abstractmethod
     def leaf_committees(self) -> Set[Committee]:
         pass
 
+    @abstractmethod
     def root_committee(self) -> Committee:
         """
         :return: returns root committee
         """
         pass
 
+    @abstractmethod
     def is_child_of_root_committee(self, _id: Id) -> bool:
         """
         :return: returns child committee/s of root committee if present
@@ -350,49 +340,6 @@ class Carnot:
         self.increment_voted_view(block.view)  # to avoid voting again for this view.
         self.increment_view_qc(block.qc)
 
-    def approve_new_view(self, timeouts: Set[NewView]):
-        """
-        This step is very similar to approving a block in the happy path
-        A goal of this process is to guarantee that the high_qc gathered at the top
-        (or a more recent one) has been seen by the supermajority of nodes in the network
-        # TODO: Check comment
-        """
-        assert len(set(timeout.view for timeout in timeouts)) == 1
-        assert all(timeout.view >= self.current_view for timeout in timeouts)
-        assert all(timeout.view == timeout.timeout_qc.view for timeout in timeouts)
-        assert len(timeouts) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.is_member_of_child_committee(self.id, timeout.sender) for timeout in timeouts)
-
-        timeouts = list(timeouts)
-        timeout_qc = timeouts[0].timeout_qc
-        new_high_qc = timeout_qc.high_qc
-
-        if new_high_qc.view >= self.local_high_qc.view:
-            self.update_high_qc(new_high_qc)
-            self.update_timeout_qc(timeout_qc)
-            self.increment_view_timeout_qc(timeout_qc)
-
-        if self.overlay.is_member_of_root_committee(self.id):
-            new_view_msg = NewView(
-                view=self.current_view,
-                high_qc=self.local_high_qc,
-                sender=self.id,
-                timeout_qc=timeout_qc,  # should we do some aggregation here?
-            )
-            self.send(new_view_msg, self.overlay.leader(self.current_view + 1))
-        else:
-            new_view_msg = NewView(
-                view=self.current_view,
-                high_qc=self.local_high_qc,
-                sender=self.id,
-                timeout_qc=timeout_qc
-            )
-            self.send(new_view_msg, *self.overlay.parent_committee(self.id))
-        self.increment_view_timeout_qc(timeout_qc)
-        # This checks if a not has already incremented its voted view by local_timeout. If not then it should
-        # do it now to avoid voting in this view.
-        self.increment_voted_view(timeout_qc.view)
-
     def forward_vote(self, vote: Vote):
         assert vote.block in self.safe_blocks
         assert self.overlay.is_member_of_child_committee(self.id, vote.voter)
@@ -435,10 +382,6 @@ class Carnot:
 
     def is_safe_to_timeout(
             self,
-            highest_voted_view: View,
-            local_high_qc: Qc,
-            last_timeout_view_qc: TimeoutQc,
-            current_view: View
     ):
         """
         Local timeout is different for the root and its child committees. If other committees timeout, they only
@@ -458,24 +401,19 @@ class Carnot:
         # Make sure the node doesn't time out continuously without finishing the step to increment the current view.
         # Make sure current view is always higher than the local_high_qc so that the node won't timeout unnecessary
         # for a previous view.
-        assert self.current_view > max(highest_voted_view - 1, local_high_qc.view)
+        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
         # This condition makes sure a node waits for timeout_qc from root committee to change increment its view with
         # a view change.
         # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
         # from previous view.
         return (
-                is_sequential_ascending(current_view, local_high_qc.view) or
-                is_sequential_ascending(current_view, last_timeout_view_qc.view) or
-                (current_view == last_timeout_view_qc.view)
+                is_sequential_ascending(self.current_view, self.local_high_qc.view) or
+                is_sequential_ascending(self.current_view, self.last_timeout_view_qc.view) or
+                (self.current_view == self.last_timeout_view_qc.view)
         )
 
     def local_timeout(self):
-        assert self.is_safe_to_timeout(
-            self.highest_voted_view,
-            self.local_high_qc,
-            self.last_timeout_view_qc,
-            self.current_view
-        )
+        assert self.is_safe_to_timeout()
 
         self.increment_voted_view(self.current_view)
 
@@ -495,8 +433,6 @@ class Carnot:
         Root committee detected that supermajority of root + its children has timed out
         The view has failed and this information is sent to all participants along with the information
         necessary to reconstruct the new overlay
-        :param msgs:
-        :return:
         """
         assert len(msgs) == self.overlay.leader_super_majority_threshold(self.id)
         assert all(msg.view >= self.current_view for msg in msgs)
@@ -507,10 +443,16 @@ class Carnot:
         timeout_qc = self.build_timeout_qc(msgs)
         self.update_timeout_qc(timeout_qc)
         self.update_high_qc(timeout_qc.high_qc)
+        # The view failed and the node timeout. The node cannot timeout itself again until it gets updated
+        # from a higher qc, either from a TimeoutQc or from a Qc coming from a newer proposed block.
+        # In case the node do not get updated because the received qc is not new enough we need to skip
+        # rebuilding the overlay and broadcasting our own qc
+        if not self.is_safe_to_timeout():
+            return
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
         self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
 
-    def gather_new_view(self, timeouts: Set[NewView]):
+    def approve_new_view(self, timeouts: Set[NewView]):
         assert not self.overlay.is_member_of_leaf_committee(self.id)
         assert len(set(timeout.view for timeout in timeouts)) == 1
         assert all(timeout.view >= self.current_view for timeout in timeouts)
@@ -524,10 +466,18 @@ class Carnot:
 
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
-        if new_high_qc.view >= self.local_high_qc.view:
-            self.update_high_qc(new_high_qc)
-            self.update_timeout_qc(timeout_qc)
-            self.increment_view_timeout_qc(timeout_qc)
+        if new_high_qc.view < self.local_high_qc.view:
+            return
+
+        self.update_high_qc(new_high_qc)
+        self.update_timeout_qc(timeout_qc)
+        self.increment_view_timeout_qc(timeout_qc)
+        # The view failed and the node timeout. The node cannot timeout itself again until it gets updated
+        # from a higher qc, either from a TimeoutQc or from a Qc coming from a newer proposed block.
+        # In case the node do not get updated because the received qc is not new enough we need to skip
+        # rebuilding the overlay and broadcasting our own qc
+        if not self.is_safe_to_timeout():
+            return
 
         if self.overlay.is_member_of_root_committee(self.id):
             timeout_msg = NewView(
