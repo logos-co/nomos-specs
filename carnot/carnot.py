@@ -468,9 +468,13 @@ class Carnot:
 
     def approve_new_view(self, NewViews: Set[NewView]):
         assert not self.overlay.is_member_of_leaf_committee(self.id)
+        #  print(f"NewViews: {NewViews}")
+        # print(f"Views: {[newView.view for newView in NewViews]}")
         assert len(set(newView.view for newView in NewViews)) == 1
-        # This check is done in self.is_safe_to_timeout()
-        #  assert all(timeout.view >= self.current_view for timeout in timeouts)
+        # newView.view == self.last_timeout_view_qc.view for member of root committee and its children because
+        # they have already created the timeout_qc. For other nodes newView.view > self.last_timeout_view_qc.view.
+        if not self.last_timeout_view_qc is None:
+            assert all(newView.view >= self.last_timeout_view_qc.view for newView in NewViews)
         assert all(newView.view == newView.timeout_qc.view for newView in NewViews)
         assert len(NewViews) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.is_member_of_child_committee(self.id, newView.sender) for newView in NewViews)
@@ -515,11 +519,11 @@ class Carnot:
         if self.highest_voted_view < self.current_view:
             self.increment_voted_view(timeout_qc.view)
 
-# Just a suggestion that received_timeout_qc can be reused by each node when the process timeout_qc of the NewView msg.
+    # Just a suggestion that received_timeout_qc can be reused by each node when the process timeout_qc of the NewView msg.
     def received_timeout_qc(self, timeout_qc: TimeoutQc):
         # assert timeout_qc.view >= self.current_view
         new_high_qc = timeout_qc.high_qc
-        if new_high_qc.view >= self.local_high_qc.view:
+        if new_high_qc.view > self.local_high_qc.view:
             self.update_high_qc(new_high_qc)
             self.update_timeout_qc(timeout_qc)
         if not self.is_safe_to_timeout():

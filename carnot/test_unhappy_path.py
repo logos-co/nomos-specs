@@ -1,5 +1,6 @@
-from unittest import TestCase
 from .carnot import *
+from unittest import TestCase
+
 
 # Unhappy path tests
 
@@ -67,6 +68,7 @@ class TestCarnotHappyPath(TestCase):
                 │
              3◄─┴─►4
             """
+
             def __init__(self):
                 self.parents = {
                     int_to_id(1): int_to_id(0),
@@ -126,7 +128,6 @@ class TestCarnotHappyPath(TestCase):
                 }
                 return thresholds.get(_id, 0)
 
-
         nodes = {int_to_id(i): MockCarnot(int_to_id(i)) for i in range(5)}
         overlay = MockOverlay()
         # add overlay
@@ -184,8 +185,13 @@ class TestCarnotHappyPath(TestCase):
 
         # Add final assertions on nodes
 
+        new_block_1 = node_1.latest_event
+        # Gives an error that AttributeError: 'NewView' object has no attribute 'qc' somehow it returns newView
+        # instead of a block
+        self.assertEqual(new_block_1.qc.view, 0)
 
-
-
-
-
+# Assertion should be:
+#    last_timeout_view_qc.view should be 1
+#    high_qc.view  should be 0
+#    current_view  should be 2 (after voting for block)
+#    last_voted_view should be 1 before voting and 2 after voting for the block
