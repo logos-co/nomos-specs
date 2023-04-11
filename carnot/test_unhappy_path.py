@@ -190,6 +190,7 @@ class TestCarnotHappyPath(TestCase):
         new_block_1 = leader.latest_event
         self.assertEqual(new_block_1.view, 2)
         self.assertEqual(new_block_1.qc.view, 1)
+        self.assertEqual(new_block_1.qc.high_qc().view, 0)
         self.assertEqual(leader.last_timeout_view_qc.view, 1)
         self.assertEqual(leader.local_high_qc.view, 0)
         self.assertEqual(leader.highest_voted_view, 1)
