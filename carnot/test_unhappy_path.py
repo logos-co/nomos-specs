@@ -1,5 +1,6 @@
-from unittest import TestCase
 from .carnot import *
+from unittest import TestCase
+
 
 # Unhappy path tests
 
@@ -67,6 +68,7 @@ class TestCarnotHappyPath(TestCase):
                 │
              3◄─┴─►4
             """
+
             def __init__(self):
                 self.parents = {
                     int_to_id(1): int_to_id(0),
@@ -126,7 +128,6 @@ class TestCarnotHappyPath(TestCase):
                 }
                 return thresholds.get(_id, 0)
 
-
         nodes = {int_to_id(i): MockCarnot(int_to_id(i)) for i in range(5)}
         overlay = MockOverlay()
         # add overlay
@@ -183,9 +184,9 @@ class TestCarnotHappyPath(TestCase):
         leader.propose_block(2, [root_new_view, new_view_1, new_view_leaf_2])
 
         # Add final assertions on nodes
-
-
-
-
-
-
+        new_block_1 = leader.latest_event
+        self.assertEqual(new_block_1.view, 2)
+        self.assertEqual(new_block_1.qc.view, 1)
+        self.assertEqual(leader.last_timeout_view_qc.view, 1)
+        self.assertEqual(leader.local_high_qc.view, 0)
+        self.assertEqual(leader.highest_voted_view, 1)

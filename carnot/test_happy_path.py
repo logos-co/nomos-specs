@@ -1,4 +1,4 @@
-from .carnot import *
+from carnot import *
 from unittest import TestCase
 
 

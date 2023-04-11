@@ -448,9 +448,10 @@ class Carnot:
         necessary to reconstruct the new overlay
         """
         assert len(msgs) == self.overlay.leader_super_majority_threshold(self.id)
-        assert all(msg.view >= self.current_view for msg in msgs)
+        # The checks below  are performed in is_safe_to_timeout().
+        # assert all(msg.view >= self.current_view for msg in msgs)
+        # assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
         assert len(set(msg.view for msg in msgs)) == 1
-        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
         assert self.overlay.is_member_of_root_committee(self.id)
 
         timeout_qc = self.build_timeout_qc(msgs, self.id)
@@ -465,16 +466,19 @@ class Carnot:
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
         self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
 
-    def approve_new_view(self, timeouts: Set[NewView]):
+    def approve_new_view(self, new_views: Set[NewView]):
         assert not self.overlay.is_member_of_leaf_committee(self.id)
-        assert len(set(timeout.view for timeout in timeouts)) == 1
-        assert all(timeout.view >= self.current_view for timeout in timeouts)
-        assert all(timeout.view == timeout.timeout_qc.view for timeout in timeouts)
-        assert len(timeouts) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.is_member_of_child_committee(self.id, timeout.sender) for timeout in timeouts)
+        assert len(set(new_view.view for new_view in new_views)) == 1
+        # newView.view == self.last_timeout_view_qc.view for member of root committee and its children because
+        # they have already created the timeout_qc. For other nodes newView.view > self.last_timeout_view_qc.view.
+        if self.last_timeout_view_qc is not None:
+            assert all(new_view.view >= self.last_timeout_view_qc.view for new_view in new_views)
+        assert all(new_view.view == new_view.timeout_qc.view for new_view in new_views)
+        assert len(new_views) == self.overlay.super_majority_threshold(self.id)
+        assert all(self.overlay.is_member_of_child_committee(self.id, new_view.sender) for new_view in new_views)
 
-        timeouts = list(timeouts)
-        timeout_qc = timeouts[0].timeout_qc
+        new_views = list(new_views)
+        timeout_qc = new_views[0].timeout_qc
         new_high_qc = timeout_qc.high_qc
 
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
@@ -513,16 +517,17 @@ class Carnot:
         if self.highest_voted_view < self.current_view:
             self.increment_voted_view(timeout_qc.view)
 
+    # Just a suggestion that received_timeout_qc can be reused by each node when the process timeout_qc of the NewView msg.
     def received_timeout_qc(self, timeout_qc: TimeoutQc):
-        assert timeout_qc.view >= self.current_view
+        # assert timeout_qc.view >= self.current_view
+        new_high_qc = timeout_qc.high_qc
+        if new_high_qc.view > self.local_high_qc.view:
+            self.update_high_qc(new_high_qc)
+            self.update_timeout_qc(timeout_qc)
+        if not self.is_safe_to_timeout():
+            return
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
-
         if self.overlay.is_member_of_leaf_committee(self.id):
-            new_high_qc = timeout_qc.high_qc
-            if new_high_qc.view >= self.local_high_qc.view:
-                self.update_high_qc(new_high_qc)
-                self.update_timeout_qc(timeout_qc)
-
             timeout_msg = NewView(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
@@ -539,7 +544,8 @@ class Carnot:
         assert timeout_qc.view >= self.current_view
         self.overlay = Overlay()
 
-    def build_timeout_qc(self, msgs: Set[Timeout], sender: Id) -> TimeoutQc:
+    @staticmethod
+    def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
         msgs = list(msgs)
         return TimeoutQc(
             view=msgs[0].view,
@@ -602,5 +608,3 @@ class Carnot:
 
 if __name__ == "__main__":
     pass
-
-
