@@ -184,14 +184,9 @@ class TestCarnotHappyPath(TestCase):
         leader.propose_block(2, [root_new_view, new_view_1, new_view_leaf_2])
 
         # Add final assertions on nodes
-
-        new_block_1 = node_1.latest_event
-        # Gives an error that AttributeError: 'NewView' object has no attribute 'qc' somehow it returns newView
-        # instead of a block
-        self.assertEqual(new_block_1.qc.view, 0)
-
-# Assertion should be:
-#    last_timeout_view_qc.view should be 1
-#    high_qc.view  should be 0
-#    current_view  should be 2 (after voting for block)
-#    last_voted_view should be 1 before voting and 2 after voting for the block
+        new_block_1 = leader.latest_event
+        self.assertEqual(new_block_1.view, 2)
+        self.assertEqual(new_block_1.qc.view, 1)
+        self.assertEqual(leader.last_timeout_view_qc.view, 1)
+        self.assertEqual(leader.local_high_qc.view, 0)
+        self.assertEqual(leader.highest_voted_view, 1)
