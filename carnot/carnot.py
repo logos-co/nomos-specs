@@ -87,7 +87,11 @@ class Block:
         return self.view > ancestor.view
 
     def parent(self) -> Id:
-        return self.qc.block
+        match self.qc:
+            case StandardQc(block):
+                return block
+            case AggregateQc() as aqc:
+                return aqc.high_qc().block
 
     def id(self) -> Id:
         return self._id
@@ -472,12 +476,12 @@ class Carnot:
         assert all(self.overlay.is_member_of_child_committee(self.id, new_view.sender) for new_view in new_views)
 
         # get the highest qc from the new views
-        messages_timeout_qc = (new_view.timeout_qc for new_view in new_views)
-        timeout_qc = max(
-            [timeout_qc.high_qc, *messages_timeout_qc],
+        messages_high_qc = (new_view.high_qc for new_view in new_views)
+        high_qc = max(
+            [timeout_qc.high_qc, *messages_high_qc],
             key=lambda qc: qc.view
         )
-
+        self.update_high_qc(high_qc)
         timeout_msg = NewView(
             view=self.current_view,
             high_qc=self.local_high_qc,
