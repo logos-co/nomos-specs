@@ -532,19 +532,20 @@ class Carnot:
 
         parent = self.safe_blocks.get(block.parent())
         grand_parent = self.safe_blocks.get(parent.parent())
-        while grand_parent and grand_parent.view > self.latest_committed_view:
-            # this case should just trigger on genesis_case,
-            # as the preconditions on outer calls should check on block validity
-            if not parent or not grand_parent:
-                return
-            can_commit = (
-                    parent.view == (grand_parent.view + 1) and
-                    isinstance(block.qc, (StandardQc,)) and
-                    isinstance(parent.qc, (StandardQc,))
-            )
-            if can_commit:
-                self.committed_blocks[grand_parent.id()] = grand_parent
-                self.increment_latest_committed_view(grand_parent.view)
+        # this case should just trigger on genesis_case,
+        # as the preconditions on outer calls should check on block validity
+        if not parent or not grand_parent:
+            return
+        can_commit = (
+            parent.view == (grand_parent.view + 1) and
+            isinstance(block.qc, (StandardQc,)) and
+            isinstance(parent.qc, (StandardQc,))
+        )
+        # Manually commit all the chain between a newly committed block and the previous highest
+        # committed block.
+        while can_commit and grand_parent and grand_parent.view > self.latest_committed_view:
+            self.committed_blocks[grand_parent.id()] = grand_parent
+            self.increment_latest_committed_view(grand_parent.view)
             grand_parent = self.safe_blocks.get(grand_parent.parent())
 
     def increment_voted_view(self, view: View):
