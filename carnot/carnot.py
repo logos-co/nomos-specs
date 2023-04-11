@@ -467,7 +467,6 @@ class Carnot:
         self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
 
     def approve_new_view(self, new_views: Set[NewView]):
-        assert not self.overlay.is_member_of_leaf_committee(self.id)
         assert len(set(new_view.view for new_view in new_views)) == 1
         # newView.view == self.last_timeout_view_qc.view for member of root committee and its children because
         # they have already created the timeout_qc. For other nodes newView.view > self.last_timeout_view_qc.view.
@@ -527,18 +526,6 @@ class Carnot:
         if not self.is_safe_to_timeout():
             return
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
-        if self.overlay.is_member_of_leaf_committee(self.id):
-            timeout_msg = NewView(
-                view=self.current_view,
-                high_qc=self.local_high_qc,
-                sender=self.id,
-                timeout_qc=timeout_qc,
-            )
-            self.send(timeout_msg, *self.overlay.parent_committee(self.id))
-            # This checks if a node has already incremented its voted view by local_timeout. If not then it should
-            # do it now to avoid voting in this view.
-            if self.highest_voted_view < self.current_view:
-                self.increment_voted_view(timeout_qc.view)
 
     def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
         assert timeout_qc.view >= self.current_view
@@ -566,19 +553,19 @@ class Carnot:
 
         parent = self.safe_blocks.get(block.parent())
         grand_parent = self.safe_blocks.get(parent.parent())
-        while grand_parent and grand_parent.view > self.latest_committed_view:
-            # this case should just trigger on genesis_case,
-            # as the preconditions on outer calls should check on block validity
-            if not parent or not grand_parent:
-                return
-            can_commit = (
-                    parent.view == (grand_parent.view + 1) and
-                    isinstance(block.qc, (StandardQc,)) and
-                    isinstance(parent.qc, (StandardQc,))
-            )
-            if can_commit:
-                self.committed_blocks[grand_parent.id()] = grand_parent
-                self.increment_latest_committed_view(grand_parent.view)
+        # this case should just trigger on genesis_case,
+        # as the preconditions on outer calls should check on block validity
+        if not parent or not grand_parent:
+            return
+        can_commit = (
+            parent.view == (grand_parent.view + 1) and
+            isinstance(block.qc, (StandardQc,)) and
+            isinstance(parent.qc, (StandardQc,))
+        )
+
+        while can_commit and grand_parent and grand_parent.id() not in self.committed_blocks:
+            self.committed_blocks[grand_parent.id()] = grand_parent
+            self.increment_latest_committed_view(grand_parent.view)
             grand_parent = self.safe_blocks.get(grand_parent.parent())
 
     def increment_voted_view(self, view: View):
