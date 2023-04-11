@@ -466,21 +466,19 @@ class Carnot:
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
         self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
 
-    def approve_new_view(self, NewViews: Set[NewView]):
+    def approve_new_view(self, new_views: Set[NewView]):
         assert not self.overlay.is_member_of_leaf_committee(self.id)
-        #  print(f"NewViews: {NewViews}")
-        # print(f"Views: {[newView.view for newView in NewViews]}")
-        assert len(set(newView.view for newView in NewViews)) == 1
+        assert len(set(new_view.view for new_view in new_views)) == 1
         # newView.view == self.last_timeout_view_qc.view for member of root committee and its children because
         # they have already created the timeout_qc. For other nodes newView.view > self.last_timeout_view_qc.view.
-        if not self.last_timeout_view_qc is None:
-            assert all(newView.view >= self.last_timeout_view_qc.view for newView in NewViews)
-        assert all(newView.view == newView.timeout_qc.view for newView in NewViews)
-        assert len(NewViews) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.is_member_of_child_committee(self.id, newView.sender) for newView in NewViews)
+        if self.last_timeout_view_qc is not None:
+            assert all(new_view.view >= self.last_timeout_view_qc.view for new_view in new_views)
+        assert all(new_view.view == new_view.timeout_qc.view for new_view in new_views)
+        assert len(new_views) == self.overlay.super_majority_threshold(self.id)
+        assert all(self.overlay.is_member_of_child_committee(self.id, new_view.sender) for new_view in new_views)
 
-        newViews = list(NewViews)
-        timeout_qc = newViews[0].timeout_qc
+        new_views = list(new_views)
+        timeout_qc = new_views[0].timeout_qc
         new_high_qc = timeout_qc.high_qc
 
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
@@ -530,7 +528,6 @@ class Carnot:
             return
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
         if self.overlay.is_member_of_leaf_committee(self.id):
-
             timeout_msg = NewView(
                 view=self.current_view,
                 high_qc=self.local_high_qc,
@@ -547,7 +544,8 @@ class Carnot:
         assert timeout_qc.view >= self.current_view
         self.overlay = Overlay()
 
-    def build_timeout_qc(self, msgs: Set[Timeout], sender: Id) -> TimeoutQc:
+    @staticmethod
+    def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
         msgs = list(msgs)
         return TimeoutQc(
             view=msgs[0].view,
