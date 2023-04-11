@@ -466,19 +466,17 @@ class Carnot:
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
         self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
 
-    def approve_new_view(self, new_views: Set[NewView]):
-        assert len(set(new_view.view for new_view in new_views)) == 1
+    def approve_new_view(self, timeout_qc: TimeoutQc, new_views: Set[NewView]):
         # newView.view == self.last_timeout_view_qc.view for member of root committee and its children because
         # they have already created the timeout_qc. For other nodes newView.view > self.last_timeout_view_qc.view.
         if self.last_timeout_view_qc is not None:
             assert all(new_view.view >= self.last_timeout_view_qc.view for new_view in new_views)
-        assert all(new_view.view == new_view.timeout_qc.view for new_view in new_views)
+        assert all(new_view.view == timeout_qc.view for new_view in new_views)
         assert len(new_views) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.is_member_of_child_committee(self.id, new_view.sender) for new_view in new_views)
 
-        new_views = list(new_views)
-        timeout_qc = new_views[0].timeout_qc
-        new_high_qc = timeout_qc.high_qc
+        # get the highest qc from the new views
+        new_high_qc = max([new_view.timeout_qc for new_view in new_views] + [timeout_qc.high_qc], key=lambda qc: qc.view)
 
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
