@@ -7,7 +7,7 @@
 # This enhances the robustness of the protocol, making it a valuable addition to the ecosystem of consensus protocols
 
 
-#  The protocol in Carnot operates in two modes: the happy path and the unhappy path.
+# The protocol in Carnot operates in two modes: the happy path and the unhappy path.
 #
 # In Carnot, nodes are arranged in a binary tree overlay committee structure. Moreover, Carnot is a
 # pipelined consensus protocol where a block contains the proof of attestation of its parent. In happy path the
@@ -36,6 +36,7 @@
 from dataclasses import dataclass
 from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
 from abc import abstractmethod
+
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
@@ -466,7 +467,12 @@ class Carnot:
         self.rebuild_overlay_from_timeout_qc(timeout_qc)
         self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
 
+    # noinspection PyTypeChecker
     def approve_new_view(self, timeout_qc: TimeoutQc, new_views: Set[NewView]):
+        """
+        We will always need for timeout_qc to have been preprocessed by the received_timeout_qc method when the event
+        happens.
+        """
         # newView.view == self.last_timeout_view_qc.view for member of root committee and its children because
         # they have already created the timeout_qc. For other nodes newView.view > self.last_timeout_view_qc.view.
         if self.last_timeout_view_qc is not None:
@@ -476,38 +482,24 @@ class Carnot:
         assert all(self.overlay.is_member_of_child_committee(self.id, new_view.sender) for new_view in new_views)
 
         # get the highest qc from the new views
-        new_high_qc = max([new_view.timeout_qc for new_view in new_views] + [timeout_qc.high_qc], key=lambda qc: qc.view)
+        messages_timeout_qc = (new_view.timeout_qc for new_view in new_views)
+        timeout_qc = max(
+            [timeout_qc.high_qc, *messages_timeout_qc],
+            key=lambda qc: qc.view
+        )
 
-        self.rebuild_overlay_from_timeout_qc(timeout_qc)
-
-        if new_high_qc.view < self.local_high_qc.view:
-            return
-
-        self.update_high_qc(new_high_qc)
-        self.update_timeout_qc(timeout_qc)
-        # The view failed and the node timeout. The node cannot timeout itself again until it gets updated
-        # from a higher qc, either from a TimeoutQc or from a Qc coming from a newer proposed block.
-        # In case the node do not get updated because the received qc is not new enough we need to skip
-        # rebuilding the overlay and broadcasting our own qc
-        if not self.is_safe_to_timeout():
-            return
+        timeout_msg = NewView(
+            view=self.current_view,
+            high_qc=self.local_high_qc,
+            sender=self.id,
+            timeout_qc=timeout_qc,
+        )
 
         if self.overlay.is_member_of_root_committee(self.id):
-            timeout_msg = NewView(
-                view=self.current_view,
-                high_qc=self.local_high_qc,
-                sender=self.id,
-                timeout_qc=timeout_qc,
-            )
             self.send(timeout_msg, self.overlay.leader(self.current_view + 1))
         else:
-            timeout_msg = NewView(
-                view=self.current_view,
-                high_qc=self.local_high_qc,
-                sender=self.id,
-                timeout_qc=timeout_qc,
-            )
             self.send(timeout_msg, *self.overlay.parent_committee(self.id))
+
         self.increment_view_timeout_qc(timeout_qc)
         # This checks if a node has already incremented its voted view by local_timeout. If not then it should
         # do it now to avoid voting in this view.
