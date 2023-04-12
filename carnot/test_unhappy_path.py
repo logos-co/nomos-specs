@@ -268,3 +268,8 @@ class TestCarnotUnhappyPath(TestCase):
             root_votes = succeed(self, overlay, nodes, proposed_block)
             leader.propose_block(view, root_votes)
             proposed_block = leader.latest_event
+
+        committed_blocks = [view for view in range(1, 11) if view not in (4, 7)]
+        for node in nodes.values():
+            for view in committed_blocks:
+                self.assertIn(view, [block.view for block in node.committed_blocks.values()])
