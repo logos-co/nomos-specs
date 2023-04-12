@@ -285,6 +285,9 @@ class Carnot:
                 self.local_high_qc = new_qc
             case (old_qc, AggregateQc() as new_qc) if new_qc.high_qc().view != old_qc.view:
                 self.local_high_qc = new_qc.high_qc()
+        # if my view is not updated I update it when I see a qc for that view
+        if qc.view == self.current_view:
+            self.current_view = self.current_view + 1
 
     def update_timeout_qc(self, timeout_qc: TimeoutQc):
         match (self.last_timeout_view_qc, timeout_qc):
@@ -323,7 +326,7 @@ class Carnot:
                 block=block.id(),
                 voter=self.id,
                 view=block.view,
-                qc=self.build_qc(block.view, block)
+                qc=self.build_qc(block.view, block, None)
             )
             self.send(vote, self.overlay.leader(self.current_view + 1))
         else:
@@ -338,7 +341,7 @@ class Carnot:
             else:
                 self.send(vote, *self.overlay.parent_committee(self.id))
         self.increment_voted_view(block.view)  # to avoid voting again for this view.
-        self.increment_view_qc(block.qc)
+        self.reset_last_timeout_view_qc(block.qc)
 
     def forward_vote(self, vote: Vote):
         assert vote.block in self.safe_blocks
@@ -556,11 +559,10 @@ class Carnot:
     def increment_latest_committed_view(self, view: View):
         self.latest_committed_view = max(view, self.latest_committed_view)
 
-    def increment_view_qc(self, qc: Qc):
+    def reset_last_timeout_view_qc(self, qc: Qc):
         if qc.view < self.current_view:
             return
         self.last_timeout_view_qc = None
-        self.current_view = qc.view + 1
 
     def increment_view_timeout_qc(self, timeout_qc: TimeoutQc):
         if timeout_qc is None or timeout_qc.view < self.current_view:
