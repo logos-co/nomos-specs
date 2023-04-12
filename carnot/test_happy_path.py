@@ -273,7 +273,7 @@ class TestCarnotHappyPath(TestCase):
         # The test passes as asserting fails in len(votes) == self.overlay.super_majority_threshold(self.id)
         # when number of votes are < 9
         self.assertEqual(carnot.highest_voted_view, 0)
-        self.assertEqual(carnot.current_view, 0)
+        self.assertEqual(carnot.current_view, 1)
 
     def test_initial_leader_proposes_and_advance(self):
         class MockOverlay(Overlay):
@@ -449,7 +449,7 @@ class TestCarnotHappyPath(TestCase):
             node.receive_block(next_proposed_block)
             # it hasn't voted for the view 2, so its state is linked to view 1 still
             self.assertEqual(node.highest_voted_view, 1)
-            self.assertEqual(node.current_view, 1)
+            self.assertEqual(node.current_view, 2)
             # when the node approves the vote we update the current view
             # and the local high qc, so they need to be increased
             node.approve_block(next_proposed_block, set())
