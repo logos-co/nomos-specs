@@ -221,38 +221,8 @@ class TestCarnotUnhappyPath(TestCase):
         nodes, leader, proposed_block = setup_initial_setup(self, overlay, 5)
 
         for view in range(1, 4):
-            node: MockCarnot
-            timeouts = []
-            for node in (nodes[int_to_id(_id)] for _id in range(3)):
-                node.local_timeout()
-                timeouts.append(node.latest_event)
-
-            leader.timeout_detected(timeouts)
-            timeout_qc = leader.latest_event
-
-            for node in nodes.values():
-                node.received_timeout_qc(timeout_qc)
-
-            # new view votes from leafs
-            for node in (nodes[int_to_id(_id)] for _id in (2, 3, 4)):
-                node.approve_new_view(timeout_qc, set())
-
-            new_views_leafs_3_4 = [nodes[int_to_id(_id)].latest_event for _id in (3, 4)]
-            new_view_leaf_2 = nodes[int_to_id(2)].latest_event
-
-            # new view votes from committee 1 ()
-            node_1: MockCarnot = nodes[int_to_id(1)]
-            node_1.approve_new_view(timeout_qc, new_views_leafs_3_4)
-            new_view_1 = node_1.latest_event
-
-            # committee 1 and committee 2 new view votes
-            new_views = [new_view_1, new_view_leaf_2]
-
-            # forward root childs votes to root committee (compound of just the leader in this case)
-            leader.approve_new_view(timeout_qc, new_views)
-            root_new_view = leader.latest_event
-
-            leader.propose_block(view+1, [root_new_view, new_view_1, new_view_leaf_2])
+            root_votes = fail(self, overlay, nodes, proposed_block)
+            leader.propose_block(view+1, root_votes)
 
             # Add final assertions on nodes
             proposed_block = leader.latest_event
@@ -262,8 +232,7 @@ class TestCarnotUnhappyPath(TestCase):
             self.assertEqual(leader.last_timeout_view_qc.view, view)
             self.assertEqual(leader.local_high_qc.view, 0)
             self.assertEqual(leader.highest_voted_view, view)
-            for node in nodes.values():
-                node.receive_block(proposed_block)
+
         for node in nodes.values():
             self.assertEqual(node.latest_committed_view, 0)
 
