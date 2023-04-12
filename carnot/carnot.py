@@ -322,24 +322,20 @@ class Carnot:
                 self.overlay.is_member_of_root_committee(self.id) and
                 not self.overlay.is_member_of_leaf_committee(self.id)
         ):
-            vote: Vote = Vote(
-                block=block.id(),
-                voter=self.id,
-                view=block.view,
-                qc=self.build_qc(block.view, block, None)
-            )
-            self.send(vote, self.overlay.leader(self.current_view + 1))
+            qc = self.build_qc(block.view, block, None)
         else:
-            vote: Vote = Vote(
-                block=block.id(),
-                voter=self.id,
-                view=block.view,
-                qc=None
-            )
-            if self.overlay.is_member_of_root_committee(self.id):
-                self.send(vote, self.overlay.leader(block.view + 1))
-            else:
-                self.send(vote, *self.overlay.parent_committee(self.id))
+            qc = None
+
+        vote: Vote = Vote(
+            block=block.id(),
+            voter=self.id,
+            view=block.view,
+            qc=qc
+        )
+        if self.overlay.is_member_of_root_committee(self.id):
+            self.send(vote, self.overlay.leader(block.view + 1))
+        else:
+            self.send(vote, *self.overlay.parent_committee(self.id))
         self.increment_voted_view(block.view)  # to avoid voting again for this view.
         self.reset_last_timeout_view_qc(block.qc)
 
