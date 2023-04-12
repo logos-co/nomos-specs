@@ -230,10 +230,6 @@ def download(view) -> Block:
     raise NotImplementedError
 
 
-def is_sequential_ascending(view1: View, view2: View):
-    return view1 == view2 + 1
-
-
 class Carnot:
     def __init__(self, _id: Id):
         self.id: Id = _id
@@ -241,37 +237,78 @@ class Carnot:
         self.current_view: View = 0
         # Highest voted view counter. This is used to prevent a node from voting twice or vote after timeout.
         self.highest_voted_view: View = 0
-        # This is the qc from  the highest view a node has
+        # This is most recent (in terms of view) Standard QC that has been received by the node
         self.local_high_qc: Optional[Qc] = None
-        # The latest view committed by a node.
-        self.latest_committed_view: View = 0
-        # Validated blocks with their validated QCs are included here. If commit conditions is satisfied for
+        # Validated blocks with their validated QCs are included here. If commit conditions are satisfied for
         # each one of these blocks it will be committed.
         self.safe_blocks: Dict[Id, Block] = dict()
-        # Block received for a specific view. Make sure the node doesn't receive duplicate blocks.
-        self.seen_view_blocks: Dict[View, bool] = dict()
-        # Last timeout QC and its view
+        # Whether the node timeed out in the last view and corresponding qc
         self.last_timeout_view_qc: Optional[TimeoutQc] = None
-        self.last_timeout_view: Optional[View] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
-        # Committed blocks are kept here.
-        self.committed_blocks: Dict[Id, Block] = dict()
+
+
+    # Committing conditions for a block 
+    # TODO: explain the conditions in comment
+    def can_commit_grandparent(self, block) -> bool:
+        parent = self.safe_blocks.get(block.parent())
+        grand_parent = self.safe_blocks.get(parent.parent())
+        # this case should just trigger on genesis_case,
+        # as the preconditions on outer calls should check on block validity
+        if not parent or not grand_parent:
+            return False
+        return (
+            parent.view == (grand_parent.view + 1) and
+            isinstance(block.qc, (StandardQc,)) and
+            isinstance(parent.qc, (StandardQc,))
+        )
+
+
+    # The latest committed view is implicit in the safe blocks tree given
+    # the committing conditions. 
+    # For convenience, this is an helper method to retrieve that value.
+    def latest_committed_view(self) -> View:
+        return self.latest_committed_block().view
+
+    # Return the list of blocks received by a node for a specific view.
+    # It will return more than one block only in case of a malicious leader
+    def blocks_in_view(self, view: View) -> List[Block]:
+        return [block for block in self.safe_blocks.values() if block.view == view]
+
+    def genesis_block(self) -> Block:
+        return self.blocks_in_view(0)[0]
+
+    def latest_committed_block(self) -> Block:
+        for view in range(self.current_view, 0, -1):
+            for block in self.blocks_in_view(view):
+                if self.can_commit_grandparent(block):
+                    return self.safe_blocks.get(self.safe_blocks.get(block.parent()).parent())
+        # genesis blocks is always considered committed
+        return self.genesis_block()
+
+    # Given committing conditions, the set of committed blocks is implicit
+    # in the safe blocks tree. For convenience, this is an helper method to
+    # retrieve that set.
+    def committed_blocks(self) -> Dict[Id, Block]:
+        tip = self.latest_committed_block()
+        committed_blocks = {tip.id(): tip, self.genesis_block().id: self.genesis_block()}
+        while tip.view > 0:
+            committed_blocks[tip.id()] = tip
+            tip = self.safe_blocks.get(tip.parent())
+        return committed_blocks
 
     def block_is_safe(self, block: Block) -> bool:
         match block.qc:
             case StandardQc() as standard:
-                if standard.view < self.latest_committed_view:
-                    return False
                 return (
-                        block.view >= self.latest_committed_view and
-                        is_sequential_ascending(block.view, standard.view)
+                    standard.view >= self.latest_committed_view() and
+                    block.view == standard.view + 1
                 )
             case AggregateQc() as aggregated:
-                if aggregated.high_qc().view < self.latest_committed_view:
+                if aggregated.high_qc().view < self.latest_committed_view():
                     return False
                 return (
                         block.view >= self.current_view and
-                        is_sequential_ascending(block.view, aggregated.view)
+                        block.view == aggregated.view + 1
                 )
 
     # Ask Dani
@@ -301,15 +338,17 @@ class Carnot:
 
         if block.id() in self.safe_blocks:
             return
-        if self.seen_view_blocks.get(block.view) is not None or block.view <= self.latest_committed_view:
+        if self.blocks_in_view(block.view) != [] or block.view <= self.latest_committed_view():
             # TODO: Report malicious leader
+            # TODO: it could be possible that a malicious leader send a block to a node and another one to
+            # the rest of the network. The node should be able to catch up with the rest of the network after having
+            # validated that the history of the block is correct and diverged from its fork.
+            # By rejecting any other blocks except the first one received for a view this code does NOT do that.
             return
 
         if self.block_is_safe(block):
             self.safe_blocks[block.id()] = block
-            self.seen_view_blocks[block.view] = True
             self.update_high_qc(block.qc)
-            self.try_commit_grand_parent(block)
 
     def approve_block(self, block: Block, votes: Set[Vote]):
         assert block.id() in self.safe_blocks
@@ -428,8 +467,8 @@ class Carnot:
         # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
         # from previous view.
         return (
-                is_sequential_ascending(self.current_view, self.local_high_qc.view) or
-                is_sequential_ascending(self.current_view, self.last_timeout_view_qc.view) or
+                self.current_view == self.local_high_qc.view + 1  or
+                self.current_view == self.last_timeout_view_qc.view + 1 or
                 (self.current_view == self.last_timeout_view_qc.view)
         )
 
@@ -504,7 +543,7 @@ class Carnot:
             self.increment_voted_view(timeout_qc.view)
 
     # Just a suggestion that received_timeout_qc can be reused by each node when the process timeout_qc of the NewView msg.
-    def received_timeout_qc(self, timeout_qc: TimeoutQc):
+    def receive_timeout_qc(self, timeout_qc: TimeoutQc):
         # assert timeout_qc.view >= self.current_view
         new_high_qc = timeout_qc.high_qc
         if new_high_qc.view > self.local_high_qc.view:
@@ -533,31 +572,8 @@ class Carnot:
     def broadcast(self, block):
         pass
 
-    # todo blocks from latest_committed_block to grand_parent must be committed.
-    def try_commit_grand_parent(self, block: Block):
-
-        parent = self.safe_blocks.get(block.parent())
-        grand_parent = self.safe_blocks.get(parent.parent())
-        # this case should just trigger on genesis_case,
-        # as the preconditions on outer calls should check on block validity
-        if not parent or not grand_parent:
-            return
-        can_commit = (
-            parent.view == (grand_parent.view + 1) and
-            isinstance(block.qc, (StandardQc,)) and
-            isinstance(parent.qc, (StandardQc,))
-        )
-
-        while can_commit and grand_parent and grand_parent.id() not in self.committed_blocks:
-            self.committed_blocks[grand_parent.id()] = grand_parent
-            self.increment_latest_committed_view(grand_parent.view)
-            grand_parent = self.safe_blocks.get(grand_parent.parent())
-
     def increment_voted_view(self, view: View):
         self.highest_voted_view = max(view, self.highest_voted_view)
-
-    def increment_latest_committed_view(self, view: View):
-        self.latest_committed_view = max(view, self.latest_committed_view)
 
     def reset_last_timeout_view_qc(self, qc: Qc):
         if qc.view < self.current_view:
@@ -569,12 +585,6 @@ class Carnot:
             return
         self.last_timeout_view_qc = timeout_qc
         self.current_view = self.last_timeout_view_qc.view + 1
-        return True
-
-    @staticmethod
-    def get_max_timeout(timeouts: Set[Timeout]) -> Timeout:
-        assert len(timeouts) > 0
-        return max(timeouts, key=lambda time: time.qc.view)
 
 
 if __name__ == "__main__":

@@ -95,7 +95,6 @@ def add_genesis_block(carnot: Carnot) -> Block:
     carnot.increment_voted_view(0)
     carnot.local_high_qc = genesis_block.qc
     carnot.current_view = 1
-    carnot.committed_blocks[genesis_block.id()] = genesis_block
     return genesis_block
 
 
@@ -234,7 +233,7 @@ class TestCarnotUnhappyPath(TestCase):
             self.assertEqual(leader.highest_voted_view, view)
 
         for node in nodes.values():
-            self.assertEqual(node.latest_committed_view, 0)
+            self.assertEqual(node.latest_committed_view(), 0)
 
     def test_interleave_success_fails(self):
         """
@@ -272,4 +271,4 @@ class TestCarnotUnhappyPath(TestCase):
         committed_blocks = [view for view in range(1, 11) if view not in (4, 7)]
         for node in nodes.values():
             for view in committed_blocks:
-                self.assertIn(view, [block.view for block in node.committed_blocks.values()])
+                self.assertIn(view, [block.view for block in node.committed_blocks().values()])
