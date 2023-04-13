@@ -180,7 +180,7 @@ def fail(test_case: TestCase, overlay: MockOverlay, nodes: Dict[Id, MockCarnot],
     timeout_qc = root_member.latest_event
 
     for node in nodes.values():
-        node.received_timeout_qc(timeout_qc)
+        node.receive_timeout_qc(timeout_qc)
 
     votes = {}
     childs_ids = list(chain.from_iterable(overlay.leaf_committees()))
