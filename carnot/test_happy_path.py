@@ -20,7 +20,6 @@ class TestCarnotHappyPath(TestCase):
     def add_genesis_block(carnot: Carnot) -> Block:
         genesis_block = Block(view=0, qc=StandardQc(block=b"", view=0), _id=b"")
         carnot.safe_blocks[genesis_block.id()] = genesis_block
-        carnot.committed_blocks[genesis_block.id()] = genesis_block
         return genesis_block
 
     def test_receive_block(self):
@@ -134,9 +133,8 @@ class TestCarnotHappyPath(TestCase):
 
         block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4), _id=b"5")
         carnot.receive_block(block5)
-
         for block in (block1, block2, block3):
-            self.assertIn(block.id(), carnot.committed_blocks)
+            self.assertIn(block.id(), carnot.committed_blocks())
 
     def test_receive_block_has_an_old_qc_and_tries_to_revert_a_committed_block(self):
         """
@@ -190,7 +188,7 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(len(carnot.safe_blocks), 5)
         block5 = Block(view=5, qc=StandardQc(block=block4.id(), view=4), _id=b"5")
         carnot.receive_block(block5)
-        self.assertEqual(carnot.latest_committed_view, 3)
+        self.assertEqual(carnot.latest_committed_view(), 3)
         self.assertEqual(carnot.local_high_qc.view, 4)
 
     # Test cases for  vote:
@@ -230,8 +228,8 @@ class TestCarnotHappyPath(TestCase):
         carnot.approve_block(block1, votes)
         self.assertEqual(carnot.highest_voted_view, 1)
         self.assertEqual(carnot.current_view, 1)
-        self.assertEqual(carnot.latest_committed_view, 0)
-        self.assertEqual(carnot.last_timeout_view, None)
+        self.assertEqual(carnot.latest_committed_view(), 0)
+        self.assertEqual(carnot.last_timeout_view_qc, None)
 
     def test_vote_for_received_block_if_threshold_votes_has_not_reached(self):
         """
