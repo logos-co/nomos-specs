@@ -543,11 +543,22 @@ class Carnot:
             isinstance(block.qc, (StandardQc,)) and
             isinstance(parent.qc, (StandardQc,))
         )
+        # Commit must always be done incrementally (from lower view to the higher view).
+        for view in range(self.latest_committed_view + 1, grand_parent.view + 1):
+            block_id = self.get_block_id_for_view(view, self.safe_blocks)
+            if not block_id:
+                break
+            if block_id in self.committed_blocks:
+                continue
+            block = self.safe_blocks[block_id]
+            self.committed_blocks[block.id()] = block
+            self.increment_latest_committed_view(block.view)
 
-        while can_commit and grand_parent and grand_parent.id() not in self.committed_blocks:
-            self.committed_blocks[grand_parent.id()] = grand_parent
-            self.increment_latest_committed_view(grand_parent.view)
-            grand_parent = self.safe_blocks.get(grand_parent.parent())
+    def get_block_id_for_view(self, view: View, block_map: Dict[Id, Block]) -> bytes:
+        for block in block_map.values():
+            if block.view == view:
+                return block.id()
+        return None
 
     def increment_voted_view(self, view: View):
         self.highest_voted_view = max(view, self.highest_voted_view)
