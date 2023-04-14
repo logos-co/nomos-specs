@@ -228,7 +228,7 @@ class TestCarnotUnhappyPath(TestCase):
             self.assertEqual(proposed_block.view, view + 1)
             self.assertEqual(proposed_block.qc.view, view)
             self.assertEqual(proposed_block.qc.high_qc().view, 0)
-            self.assertEqual(leader.last_timeout_view_qc.view, view)
+            self.assertEqual(leader.last_view_timeout_qc.view, view)
             self.assertEqual(leader.local_high_qc.view, 0)
             self.assertEqual(leader.highest_voted_view, view)
 

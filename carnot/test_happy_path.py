@@ -229,7 +229,7 @@ class TestCarnotHappyPath(TestCase):
         self.assertEqual(carnot.highest_voted_view, 1)
         self.assertEqual(carnot.current_view, 1)
         self.assertEqual(carnot.latest_committed_view(), 0)
-        self.assertEqual(carnot.last_timeout_view_qc, None)
+        self.assertEqual(carnot.last_view_timeout_qc, None)
 
     def test_vote_for_received_block_if_threshold_votes_has_not_reached(self):
         """
