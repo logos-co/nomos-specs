@@ -549,7 +549,7 @@ class Carnot:
             if not block_id:
                 break
             if block_id in self.committed_blocks:
-                continue
+                raise ValueError(f"Block {block_id} already in committed_blocks")
             block = self.safe_blocks[block_id]
             self.committed_blocks[block.id()] = block
             self.increment_latest_committed_view(block.view)
