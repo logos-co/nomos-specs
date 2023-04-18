@@ -92,7 +92,6 @@ def add_genesis_block(carnot: Carnot) -> Block:
     genesis_block = Block(view=0, qc=StandardQc(block=b"", view=0), _id=b"")
     carnot.safe_blocks[genesis_block.id()] = genesis_block
     carnot.receive_block(genesis_block)
-    carnot.increment_voted_view(0)
     carnot.local_high_qc = genesis_block.qc
     carnot.current_view = 1
     return genesis_block
@@ -219,18 +218,25 @@ class TestCarnotUnhappyPath(TestCase):
 
         nodes, leader, proposed_block = setup_initial_setup(self, overlay, 5)
 
-        for view in range(1, 4):
+        # In this loop 'view' is the view that fails
+        for view in range(1, 4, 2):
+            # When view v fails, a timeout qc is built for view v and nodes jump to view v + 1
+            # while aggregating votes for the high qc. Those votes are then forwarded to the leader of view v + 2
+            # which can propose a block with those aggregate votes as proof of the previous round completion.
             root_votes = fail(self, overlay, nodes, proposed_block)
-            leader.propose_block(view+1, root_votes)
+            leader.propose_block(view+2, root_votes)
 
             # Add final assertions on nodes
             proposed_block = leader.latest_event
-            self.assertEqual(proposed_block.view, view + 1)
-            self.assertEqual(proposed_block.qc.view, view)
+            # Thus, the first block that can be proposed is 2 views after the timeout
+            self.assertEqual(proposed_block.view, view + 2)
+            # Its qc is always for the view before the block is proposed for
+            self.assertEqual(proposed_block.qc.view, view + 1)
+            # The high qc is 0, since we never had a successful round
             self.assertEqual(proposed_block.qc.high_qc().view, 0)
             self.assertEqual(leader.last_view_timeout_qc.view, view)
             self.assertEqual(leader.local_high_qc.view, 0)
-            self.assertEqual(leader.highest_voted_view, view)
+            self.assertEqual(leader.highest_voted_view, view+1)
 
         for node in nodes.values():
             self.assertEqual(node.latest_committed_view(), 0)
@@ -251,24 +257,24 @@ class TestCarnotUnhappyPath(TestCase):
             proposed_block = leader.latest_event
 
         root_votes = fail(self, overlay, nodes, proposed_block)
-        leader.propose_block(5, root_votes)
+        leader.propose_block(6, root_votes)
         proposed_block = leader.latest_event
 
-        for view in range(6, 8):
+        for view in range(7, 8):
             root_votes = succeed(self, overlay, nodes, proposed_block)
             leader.propose_block(view, root_votes)
             proposed_block = leader.latest_event
 
         root_votes = fail(self, overlay, nodes, proposed_block)
-        leader.propose_block(8, root_votes)
+        leader.propose_block(9, root_votes)
         proposed_block = leader.latest_event
 
-        for view in range(9, 15):
+        for view in range(10, 15):
             root_votes = succeed(self, overlay, nodes, proposed_block)
             leader.propose_block(view, root_votes)
             proposed_block = leader.latest_event
 
-        committed_blocks = [view for view in range(1, 11) if view not in (4, 7)]
+        committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8)]
         for node in nodes.values():
             for view in committed_blocks:
                 self.assertIn(view, [block.view for block in node.committed_blocks().values()])
