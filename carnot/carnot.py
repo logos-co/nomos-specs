@@ -366,7 +366,7 @@ class Carnot:
         else:
             self.send(vote, *self.overlay.parent_committee(self.id))
 
-        self.highest_voted_view = block.view
+        self.highest_voted_view = max(self.highest_voted_view, block.view)
 
     def forward_vote(self, vote: Vote):
         assert vote.block in self.safe_blocks
@@ -495,8 +495,7 @@ class Carnot:
 
         timeout_qc = self.build_timeout_qc(msgs, self.id)
         self.broadcast(timeout_qc)  # we broadcast so all nodes can get ready for voting on a new view
-        # TODO: this call could be avoided if `receive_timeout_qc` is triggered for all nodes
-        # self.receive_timeout_qc(timeout_qc)
+        # Note that receive_timeout qc should be called for root nodes as well
 
     # noinspection PyTypeChecker
     def approve_new_view(self, timeout_qc: TimeoutQc, new_views: Set[NewView]):
@@ -538,7 +537,7 @@ class Carnot:
 
         # This checks if a node has already incremented its voted view by local_timeout. If not then it should
         # do it now to avoid voting in this view.
-        self.highest_voted_view = view
+        self.highest_voted_view = max(self.highest_voted_view, view)
 
     # Just a suggestion that received_timeout_qc can be reused by each node when the process timeout_qc of the NewView msg.
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
