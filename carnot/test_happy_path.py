@@ -2,19 +2,6 @@ from carnot import *
 from unittest import TestCase
 
 
-class MockCarnot(Carnot):
-    def __init__(self, id):
-        super(MockCarnot, self).__init__(id)
-        self.proposed_block = None
-        self.latest_vote = None
-
-    def broadcast(self, block):
-        self.proposed_block = block
-
-    def send(self, vote: Vote | Timeout | TimeoutQc, *ids: Id):
-        self.latest_vote = vote
-
-
 class TestCarnotHappyPath(TestCase):
     @staticmethod
     def add_genesis_block(carnot: Carnot) -> Block:
@@ -299,7 +286,7 @@ class TestCarnotHappyPath(TestCase):
             def parent_committee(self, _id: Id) -> Optional[Committee]:
                 return set()
 
-        carnot = MockCarnot(int_to_id(0))
+        carnot = Carnot(int_to_id(0))
         carnot.overlay = MockOverlay()
         genesis_block = self.add_genesis_block(carnot)
 
@@ -316,8 +303,8 @@ class TestCarnotHappyPath(TestCase):
             ) for i in range(10)
         )
         # propose a new block
-        carnot.propose_block(view=1, quorum=votes)
-        proposed_block = carnot.proposed_block
+        proposed_block = carnot.propose_block(view=1, quorum=votes).payload
+
         # process the proposed block as member of a committee
         carnot.receive_block(proposed_block)
         child_votes = set(
@@ -382,7 +369,7 @@ class TestCarnotHappyPath(TestCase):
         """
         Test that having a single committee (both root and leaf) and a leader is able to advance
         """
-        nodes = [MockCarnot(int_to_id(i)) for i in range(4)]
+        nodes = [Carnot(int_to_id(i)) for i in range(4)]
         leader = nodes[0]
 
         class MockOverlay(Overlay):
@@ -433,15 +420,13 @@ class TestCarnotHappyPath(TestCase):
                 ),
             ) for i in range(3)
         )
-        leader.propose_block(1, votes)
-        proposed_block = leader.proposed_block
+        proposed_block = leader.propose_block(1, votes).payload
         votes = []
         for node in nodes:
             node.receive_block(proposed_block)
-            node.approve_block(proposed_block, set())
-            votes.append(node.latest_vote)
-        leader.propose_block(2, set(votes))
-        next_proposed_block = leader.proposed_block
+            vote = node.approve_block(proposed_block, set())
+            votes.append(vote.payload)
+        next_proposed_block = leader.propose_block(2, set(votes)).payload
         for node in nodes:
             # A node receives the second proposed block
             node.receive_block(next_proposed_block)
