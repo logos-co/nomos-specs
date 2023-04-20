@@ -372,7 +372,7 @@ class Carnot:
         assert vote.block in self.safe_blocks
         assert self.overlay.is_member_of_child_committee(self.id, vote.voter)
         # we only forward votes after we've voted ourselves
-        assert self.highest_voted_view >= vote.view
+        assert self.highest_voted_view == vote.view
 
         if self.overlay.is_member_of_root_committee(self.id):
             self.send(vote, self.overlay.leader(self.current_view + 1))
@@ -381,7 +381,7 @@ class Carnot:
         assert msg.view == self.current_view
         assert self.overlay.is_member_of_child_committee(self.id, msg.sender)
         # we only forward votes after we've voted ourselves
-        assert self.highest_voted_view >= vote.view
+        assert self.highest_voted_view == msg.view
 
         if self.overlay.is_member_of_root_committee(self.id):
             self.send(msg, self.overlay.leader(self.current_view + 1))
