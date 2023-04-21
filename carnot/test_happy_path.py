@@ -270,7 +270,7 @@ class TestCarnotHappyPath(TestCase):
 
         # The test passes as asserting fails in len(votes) == self.overlay.super_majority_threshold(self.id)
         # when number of votes are < 9
-        self.assertEqual(carnot.highest_voted_view, 0)
+        self.assertEqual(carnot.highest_voted_view, -1)
         self.assertEqual(carnot.current_view, 1)
 
     def test_initial_leader_proposes_and_advance(self):
