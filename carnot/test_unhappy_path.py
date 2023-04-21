@@ -6,13 +6,6 @@ from itertools import chain
 class MockCarnot(Carnot):
     def __init__(self, id):
         super(MockCarnot, self).__init__(id)
-        self.latest_event = None
-
-    def broadcast(self, block):
-        self.latest_event = block
-
-    def send(self, vote: Vote | Timeout | TimeoutQc, *ids: Id):
-        self.latest_event = vote
 
     def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
         pass
@@ -118,8 +111,7 @@ def setup_initial_setup(test_case: TestCase, overlay: MockOverlay, size: int) ->
             ),
         ) for i in range(5)
     )
-    leader.propose_block(1, genesis_votes)
-    proposed_block = leader.latest_event
+    proposed_block = leader.propose_block(1, genesis_votes).payload
     test_case.assertIsNotNone(proposed_block)
     return nodes, leader, proposed_block
 
@@ -143,20 +135,20 @@ def succeed(test_case: TestCase, overlay: MockOverlay, nodes: Dict[Id, MockCarno
     childs_ids = list(chain.from_iterable(overlay.leaf_committees()))
     leafs = [nodes[_id] for _id in childs_ids]
     for node in leafs:
-        node.approve_block(proposed_block, set())
-        votes[node.id] = node.latest_event
+        vote = node.approve_block(proposed_block, set()).payload
+        votes[node.id] = vote
 
     while len(parents := parents_from_childs(overlay, childs_ids)) != 0:
         for node_id in parents:
             node = nodes[node_id]
             child_votes = [votes[_id] for _id in votes.keys() if overlay.is_member_of_child_committee(node_id, _id)]
             if len(child_votes) == overlay.super_majority_threshold(node_id) and node_id not in votes:
-                node.approve_block(proposed_block, child_votes)
-                votes[node_id] = node.latest_event
+                vote = node.approve_block(proposed_block, child_votes).payload
+                votes[node_id] = vote
         childs_ids = list(set(parents))
 
     root_votes = [
-        nodes[node_id].latest_event
+        votes[node_id]
         for node_id in nodes
         if overlay.is_member_of_root_committee(node_id) or overlay.is_child_of_root_committee(node_id)
     ]
@@ -171,12 +163,11 @@ def fail(test_case: TestCase, overlay: MockOverlay, nodes: Dict[Id, MockCarnot],
     node: MockCarnot
     timeouts = []
     for node in (nodes[_id] for _id in nodes if overlay.is_member_of_root_committee(_id) or overlay.is_child_of_root_committee(_id)):
-        node.local_timeout()
-        timeouts.append(node.latest_event)
+        timeout = node.local_timeout().payload
+        timeouts.append(timeout)
 
     root_member = next(nodes[_id] for _id in nodes if overlay.is_member_of_root_committee(_id))
-    root_member.timeout_detected(timeouts)
-    timeout_qc = root_member.latest_event
+    timeout_qc = root_member.timeout_detected(timeouts).payload
 
     for node in nodes.values():
         node.receive_timeout_qc(timeout_qc)
@@ -185,20 +176,20 @@ def fail(test_case: TestCase, overlay: MockOverlay, nodes: Dict[Id, MockCarnot],
     childs_ids = list(chain.from_iterable(overlay.leaf_committees()))
     leafs = [nodes[_id] for _id in childs_ids]
     for node in leafs:
-        node.approve_new_view(timeout_qc, set())
-        votes[node.id] = node.latest_event
+        vote = node.approve_new_view(timeout_qc, set()).payload
+        votes[node.id] = vote
 
     while len(parents := parents_from_childs(overlay, childs_ids)) != 0:
         for node_id in parents:
             node = nodes[node_id]
             child_votes = [votes[_id] for _id in votes.keys() if overlay.is_member_of_child_committee(node_id, _id)]
             if len(child_votes) == overlay.super_majority_threshold(node_id) and node_id not in votes:
-                node.approve_new_view(timeout_qc, child_votes)
-                votes[node_id] = node.latest_event
+                vote = node.approve_new_view(timeout_qc, child_votes).payload
+                votes[node_id] = vote
         childs_ids = list(set(parents))
 
     root_votes = [
-        nodes[node_id].latest_event
+        votes[node_id]
         for node_id in nodes
         if overlay.is_member_of_root_committee(node_id) or overlay.is_child_of_root_committee(node_id)
     ]
@@ -224,10 +215,9 @@ class TestCarnotUnhappyPath(TestCase):
             # while aggregating votes for the high qc. Those votes are then forwarded to the leader of view v + 2
             # which can propose a block with those aggregate votes as proof of the previous round completion.
             root_votes = fail(self, overlay, nodes, proposed_block)
-            leader.propose_block(view+2, root_votes)
+            proposed_block = leader.propose_block(view+2, root_votes).payload
 
             # Add final assertions on nodes
-            proposed_block = leader.latest_event
             # Thus, the first block that can be proposed is 2 views after the timeout
             self.assertEqual(proposed_block.view, view + 2)
             # Its qc is always for the view before the block is proposed for
@@ -253,26 +243,21 @@ class TestCarnotUnhappyPath(TestCase):
 
         for view in range(2, 5):
             root_votes = succeed(self, overlay, nodes, proposed_block)
-            leader.propose_block(view, root_votes)
-            proposed_block = leader.latest_event
+            proposed_block = leader.propose_block(view, root_votes).payload
 
         root_votes = fail(self, overlay, nodes, proposed_block)
-        leader.propose_block(6, root_votes)
-        proposed_block = leader.latest_event
+        proposed_block = leader.propose_block(6, root_votes).payload
 
         for view in range(7, 8):
             root_votes = succeed(self, overlay, nodes, proposed_block)
-            leader.propose_block(view, root_votes)
-            proposed_block = leader.latest_event
+            proposed_block = leader.propose_block(view, root_votes).payload
 
         root_votes = fail(self, overlay, nodes, proposed_block)
-        leader.propose_block(9, root_votes)
-        proposed_block = leader.latest_event
+        proposed_block = leader.propose_block(9, root_votes).payload
 
         for view in range(10, 15):
             root_votes = succeed(self, overlay, nodes, proposed_block)
-            leader.propose_block(view, root_votes)
-            proposed_block = leader.latest_event
+            proposed_block = leader.propose_block(view, root_votes).payload
 
         committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8)]
         for node in nodes.values():
