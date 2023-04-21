@@ -358,7 +358,7 @@ class Carnot:
             self.safe_blocks[block.id()] = block
             self.update_high_qc(block.qc)
 
-    def approve_block(self, block: Block, votes: Set[Vote]) -> Optional[Event]:
+    def approve_block(self, block: Block, votes: Set[Vote]) -> Event:
         assert block.id() in self.safe_blocks
         assert len(votes) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.is_member_of_child_committee(self.id, vote.voter) for vote in votes)
@@ -381,10 +381,9 @@ class Carnot:
 
         if self.overlay.is_member_of_root_committee(self.id):
             return Send(to=self.overlay.leader(block.view + 1), payload=vote)
-        else:
-            return Send(to=self.overlay.parent_committee(self.id), payload=vote)
+        return Send(to=self.overlay.parent_committee(self.id), payload=vote)
 
-    def forward_vote(self, vote: Vote):
+    def forward_vote(self, vote: Vote) -> Optional[Event]:
         assert vote.block in self.safe_blocks
         assert self.overlay.is_member_of_child_committee(self.id, vote.voter)
         # we only forward votes after we've voted ourselves
@@ -497,7 +496,7 @@ class Carnot:
             )
             return Send(payload=timeout_msg, to=self.overlay.root_committee())
 
-    def timeout_detected(self, msgs: Set[Timeout]) -> Optional[Event]:
+    def timeout_detected(self, msgs: Set[Timeout]) -> Event:
         """
         Root committee detected that supermajority of root + its children has timed out
         The view has failed and this information is sent to all participants along with the information
@@ -514,7 +513,7 @@ class Carnot:
         # Note that receive_timeout qc should be called for root nodes as well
 
     # noinspection PyTypeChecker
-    def approve_new_view(self, timeout_qc: TimeoutQc, new_views: Set[NewView]) -> Optional[Event]:
+    def approve_new_view(self, timeout_qc: TimeoutQc, new_views: Set[NewView]) -> Event:
         """
         We will always need for timeout_qc to have been preprocessed by the received_timeout_qc method when the event
         happens before approve_new_view is processed.
@@ -552,8 +551,7 @@ class Carnot:
 
         if self.overlay.is_member_of_root_committee(self.id):
             return Send(payload=timeout_msg, to=[self.overlay.leader(self.current_view + 1)])
-        else:
-            return Send(payload=timeout_msg, to=self.overlay.parent_committee(self.id))
+        return Send(payload=timeout_msg, to=self.overlay.parent_committee(self.id))
 
 
 
