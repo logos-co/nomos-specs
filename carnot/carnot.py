@@ -418,17 +418,16 @@ class Carnot:
 
     def propose_block(self, view: View, quorum: Quorum) -> Event:
         assert self.overlay.is_leader(self.id)
+        assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id)
 
         qc = None
         quorum = list(quorum)
         # happy path
         if isinstance(quorum[0], Vote):
-            assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id)
             vote = quorum[0]
             qc = self.build_qc(vote.view, self.safe_blocks[vote.block], None)
         # unhappy path
         elif isinstance(quorum[0], NewView):
-            assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id)
             new_view = quorum[0]
             qc = self.build_qc(new_view.view, None, quorum)
 
