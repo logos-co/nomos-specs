@@ -354,6 +354,8 @@ class Carnot:
             # By rejecting any other blocks except the first one received for a view this code does NOT do that.
             return
 
+        # TODO: check the proposer of the block is indeed leader for that view
+
         if self.block_is_safe(block):
             self.safe_blocks[block.id()] = block
             self.update_high_qc(block.qc)
@@ -555,8 +557,11 @@ class Carnot:
 
 
     # Just a suggestion that received_timeout_qc can be reused by each node when the process timeout_qc of the NewView msg.
+    # TODO: check that receiving (and processing) a timeout qc "in the future" allows to process old(er) blocks
+    # e.g. we might still need access to the old leader schedule to validate qcs
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
-        assert timeout_qc.view >= self.current_view
+        if timeout_qc.view < self.current_view:
+            return
         new_high_qc = timeout_qc.high_qc
         self.update_high_qc(new_high_qc)
         self.update_timeout_qc(timeout_qc)
