@@ -524,7 +524,7 @@ class Carnot:
         # newView.view == self.last_timeout_view_qc.view for member of root committee and its children because
         # they have already created the timeout_qc. For other nodes newView.view > self.last_timeout_view_qc.view.
         if self.last_view_timeout_qc is not None:
-            assert all(new_view.view >= self.last_view_timeout_qc.view for new_view in new_views)
+            assert all(new_view.view > self.last_view_timeout_qc.view for new_view in new_views)
         assert all(new_view.timeout_qc.view == timeout_qc.view for new_view in new_views)
         assert len(new_views) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.is_member_of_child_committee(self.id, new_view.sender) for new_view in new_views)
