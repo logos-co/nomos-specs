@@ -33,6 +33,8 @@
 # by the majority of honest nodes. Hence, after the view change, the protocol safety is preserved.
 
 
+# Please note this is still a work in progress
+
 from dataclasses import dataclass
 from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
 from abc import abstractmethod
