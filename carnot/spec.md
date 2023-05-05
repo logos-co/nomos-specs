@@ -6,6 +6,10 @@ In addition, all types can be expected to have their invariants checked by the t
 'Q:' is used to indicate unresolved questions.
 Notation is loosely based on CDDL.
 
+Similar to the Carnot algorithm, this specification will be event-based, prescribing the actions to perform in response to relevant events in the Carnot consensus.
+Events should be processed one at a time, picking any from the available ones.
+As for ordering between events, there are some constraints (e.g. can't process a proposal before it's parent) which will likely form a DAG of relations. The expectation is that an implementation will respect these requirements by processing only events which have all preconditions satisfied.
+
 ## Messages
 A critical piece in the protocol, these are the different kind of messages used by participants during the protocol execution.
 * `Block`: propose a new block
@@ -93,7 +97,6 @@ class Timeout:
     view: View
     high_qc: AggregateQc
 ```
-
 ## Local Variables
 Participants in the protocol are expected to mainting the following data in addition to the DAG of received proposal:
 * `current_view`
@@ -105,7 +108,8 @@ Participants in the protocol are expected to mainting the following data in addi
 CURRENT_VIEW: View
 LOCAL_HIGH_QC: Qc
 LATEST_COMMITTED_VIEW: View
-COLLECTION: Q?
+SAFE_BLOCKS: Set[Block]
+LAST_VIEW_TIMEOUT_QC: TimeoutQc
 ```
 
 
@@ -140,38 +144,42 @@ The following functions are expected to be available to participants during the 
 
 
 
-## Core functions
+## Core events
 
-These are the core functions necessary for the Carnot consensus protocol, to be executed in response of incoming messages, except for `timeout` which is triggered by a participant configurable timer.     
-     
+These are the core events necessary for the Carnot consensus protocol. In response to such events a participant is expected to execute the corresponding handler action.
+
+* receive block b -> `receive_block(b)`
+    Preconditions:
+    * `b.parent() in SAFE_BLOCKS`
+* receive a supermajority of votes for block b -> `vote(b, votes)`
+    Preconditions:
+    * `b in SAFE_BLOCKS`
+    * `local_timeout(b.view)` never called
+* receive a vote v for block b when a supermajority of votes already exists -> `forward_votes(b, v)`
+    Preconditions:
+    * `b in SAFE_BLOCKS`
+    * `vote(b, some_votes)` already called and `v not in some_votes`
+    * `local_timeout(b.view)` never called
+* `current_time() - time(last view update) > TIMEOUT` and received new overlay -> `local_timeout(last view, new_overlay)`
+* leader for view v and leader supermajority for previous proposal -> `propose_block(v, votes)`
+* receive a supermajority of timeouts for view v -> `timeout(v, timeouts)`
+    Preconditions:
+    * `local_timeout(v)` already called
+
+
 ### Receive block
 
 ```python3
 def receive_block(block: Block):
-    if block.id() is known or block.view <=LATEST_COMMITTED_VIEW:
-        return
+    # checking preconditions
+    assert block.parent() in SAFE_BLOCKS
 
-    # Recursively make sure that we process blocks in order
-    if block.parent() is missing:
-        parent: Block = download(block.parent())
-        receive(parent)
+    if block.id() in SAFE_BLOCKS or block.view <= LATEST_COMMITTED_VIEW:
+        return
         
     if safe_block(block):
-        # This is not in the original spec, but 
-        # let's validate I have this clear.
-        assert block.view == current_view
-        
+        SAFE_BLOCKS.add(block)
         update_high_qc(block.qc)
-
-        vote = create_vote()
-        if member_of_leaf_committee():
-            if member_of_root_committee():
-                send(vote, leader(current_view + 1))
-            else:
-                send(vote, parent_commitee())
-            current_view += 1
-            reset_timer()
-            try_to_commit_grandparent(block)
 ```
 ##### Auxiliary functions
 
@@ -198,6 +206,8 @@ def safe_block(block: Block):
 ```
 
 ```python
+# FIX_ME: Don't think we need to specify this as a function if we don't use
+# LAST_COMMITTED_VIEW
 # Commit a grand parent if the grandparent and 
 # the parent have been added during two consecutive views.
 def try_to_commit_grand_parent(block: Block):
@@ -231,110 +241,96 @@ def update_high_qc(qc: Qc):
                 # Q: same thing about missing views
 ```
 
-### Receive Vote
-
-Q: this whole function needs to be revised
+### Vote
 
 ```python
+def vote(block: Block, votes: Set[Vote]):
+    # check preconditions
+    assert block in SAFE_BLOCKS
+    assert supermajority(votes)
+    assert all(child_committee(vote.id) for vote in votes)
+    assert all(vote.block == block for vote in votes)
 
-def receive_vote(vote: Vote):
-    if vote.block is missing:
-        block = download(vote.block)
-        receive(block)
+    vote = create_vote(votes)
 
-    # Q: we should probably return if we already received this vote
-    if member_of_internal_com() and not_member_of_root():
-        if child_commitee(vote.voter):
-            COLLECTION[vote.block].append(vote)
-        else:
-            # Q: not returning here would mean it's extremely easy to
-            # trigger building a new vote in the following branches
-            return
-        
-        if supermajority(COLLECTION[vote.block]):
-            # Q: should we send it to everyone in the committee?
-            self_vote = build_vote()
-            send(self_vote, parent_committee)
-            # Q: why here?
-            current_view += 1
-            reset_timer()
-            # Q: why do we do this here? 
-            try_to_commit_grand_parent(block)
-    
     if member_of_root():
-        if child_commitee(vote.voter):
-            COLLECTION[vote.block].append(vote)
-        else:
-            # Q: not returning here would mean it's extremely easy to
-            # trigger building a new vote in the following branches
-            return
-
-        if supermajority(COLLECTION[vote.block]):
-            # Q: The vote to send is not the one received but
-            # the one build by this participant, right?
-            self_vote = build_vote();
-            qc = build_qc(collection[vote.block])
-            self_vote.qc=qc
-            send(self_vote, leader(current_view + 1))
-            # Q: why here?
-            current_view += 1
-            reset_timer()
-            # Q: why here?
-            try_to_commit_grandparent(block)
-
-
-        # Q: this means that we send a message for every incoming
-        # message after the threshold has been reached, i.e. a vote
-        # from a node in the leaf committee can trigger
-        # at least height(tree) messages.
-        if morethanSsupermajority(collection[vote.block]):
-            # just forward the vote to the leader
-            # Q: But then childcommitte(vote.voter) would return false
-            # in the leader, as it's a granchild, not a child
-            send(vote, leader(current_view + 1))
-
-    if leader(view): # Q? Which view? CURRENT_VIEW or vote.view?
-        if vote.view < CURRENT_VIEW - 1:
-            return
-
-        # Q: No filtering? I can just create a key and  vote?
-        COLLECTION[vote.block].append(vote)
-        if supermajority(collection[vote.block]):
-            qc = build_qc(collection[vote.block])
-            block = build_block(qc)
-            broadcast(block)
+        vote.qc = build_qc(votes)
+        send(vote, leader(CURRENT_VIEW + 1))
+    else:
+        send(vote, parent_committee())
+    
+    # Q: what about a node that is joining later and does not
+    # have access to votes? how does it commit blocks?
+    current_view += 1
+    reset_timer()
+    try_to_commit_grandparent(block)
 ```
 
-### Receive Timeout
+
+### Forward vote
 ```python
-# Failure Case
-def receive(timeout: Timeout):
-    # download the missing block 
-    if timeout.high_qc().block is missing:
-        block = download(timeout.high_qc.block)
-        receive(block)
+def forward_vote(vote: Vote):
+    assert vote.block in SAFE_BLOCKS
+    assert child_committe(vote.id)
+    # already supermajority
 
-    # It's an old message. Ignore it.
-    if timeout.view < CURRENT_VIEW:
-        return
-    
-    update_high_qc(timeout.high_qc())
-    
-    if member_of_internal_com():
-        COLLECTION[timeout.view].append(timeout)
-        if supermajority(timeout.view):
-            new_view_qc = build_qc(COLLECTION[timeout.view])
-            if member_of_root():
-                send(new_view_qc, leader(CURRENT_VIEW +1))
-                CURRENT_VIEW += 1
-            else:
-                send(new_view_qc, parent_committee())
+    if member_of_root():
+        # just forward the vote to the leader
+        # Q: But then childcommitte(vote.voter) would return false
+        # in the leader, as it's a granchild, not a child
+        send(vote, leader(vote.block.view + 1))
 ```
+
+### Propose block
+```python
+def propose_block(view: View, quorum: Set[Vote] | Set[TimeoutMsg]):
+    assert leader(view)
+    assert leader_supermajority(quorum)
+
+    qc = build_qc(votes)
+    block = build_block(qc)
+    broadcast(block)
+```
+
+
 ### Timeout
 ```python
-def timeout():
-    raise NotImplementedError
-```     
+def local_timeout(new_overlay: Overlay):
+    # make it so we don't vote or forward any more vote after this
+    LAST_TIMEOUT_VIEW = CURRENT_VIEW
+    # TODO: change overlay
+
+    if member_of_leaf():
+        timeout_msg = create_timeout(CURRENT_VIEW, LOCAL_HIGH_QC, LAST_TIMEOUT_VIEW_QC)
+        send(timeout_msg, parent_committee())
+```
+
+### Receive
+this is called *after* local_timeout
+```python
+def timeout(view: View, msgs: Set[TimeoutMsg]):
+    assert supermajority(msgs)
+    assert all(child_committee(msg.id) for msg in msgs)
+    assert all(timeout.view == view for timeout in msgs)
+
+
+    if CURRENT_VIEW > view:
+        return
+    if view <= LAST_VIEW_TIMEOUT_QC.view:
+        return
+
+    if view > LOCAL_HIGH_QC.view:
+        LOCAL_HIGH_QC = timeout_Msg.high_qc
+
+    timeout_qc = create_timeout_qc(msgs)
+    increment_view_timeout_qc(timeout_qc.view)
+    LAST_VIEW_TIMEOUT_QC = timeout_qc
+    send(timeout_qc, own_committee()) ####helps nodes to sync quicker but not required
+    if member_of_root():
+        send(timeout_qc, leader(view+1))
+    else:
+        send(timeout_qc, parent_committee())
+```
 
 
 We need to make sure that qcs can't be removed from aggQc when going up the tree
