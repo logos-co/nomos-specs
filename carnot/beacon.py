@@ -11,6 +11,8 @@ from blspy import PrivateKey, Util, PopSchemeMPL, G2Element, G1Element
 
 # stdlib imports
 from hashlib import sha256
+
+
 Beacon: TypeAlias = bytes
 Proof: TypeAlias = bytes  # For now this is gonna be a public key, in future research we may pivot to zk proofs.
 
@@ -20,6 +22,8 @@ class RandomBeacon:
     version: int
     context: View
     entropy: Beacon
+    # TODO: Just the happy path beacons owns a proof, we can set the proof to empty bytes for now.
+    # Probably we should separate this into two kinds of beacons and group them under a single type later on.
     proof: Proof
 
 
@@ -40,11 +44,11 @@ class NormalMode:
         # TODO: Actually verify that the message is propoerly signed
         sig = G2Element.from_bytes(beacon.entropy)
         proof = G1Element.from_bytes(beacon.proof)
-        return PopSchemeMPL.verify(proof, Util.hash256(beacon.context), sig)
+        return PopSchemeMPL.verify(proof, Util.hash256(beacon.context.to_bytes(length=8)), sig)
 
     @staticmethod
-    def generate_beacon(private_key: PrivateKey, view) -> Beacon:
-        return PopSchemeMPL.sign(private_key, Util.hash256(view))
+    def generate_beacon(private_key: PrivateKey, view: View) -> Beacon:
+        return PopSchemeMPL.sign(private_key, Util.hash256(view.to_bytes(length=8)))
 
 
 class RecoveryMode:
@@ -61,7 +65,7 @@ class RecoveryMode:
         :return:
         """
         b = sha256(last_beacon.entropy + beacon.context.to_bytes(length=8)).digest()
-        return b == beacon  # TODO: last beacon should be updated with the possible result of this method
+        return b == beacon.entropy  # TODO: last beacon should be updated with the possible result of this method
 
     @staticmethod
     def generate_beacon(last_beacon: Beacon, view: View) -> Beacon:
@@ -69,7 +73,7 @@ class RecoveryMode:
 
 
 class BeaconHandler:
-    def __int__(self, beacon: RandomBeacon):
+    def __init__(self, beacon: RandomBeacon):
         """
         :param beacon: Beacon should be initialized with either the last known working beacon from recovery.
         Or the hash of the genesis block in case of first consensus round.
