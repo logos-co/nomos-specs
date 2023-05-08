@@ -3,7 +3,7 @@ from unittest import TestCase
 
 from blspy import AugSchemeMPL
 
-from .beacon import *
+from beacon import *
 from random import randint
 
 
