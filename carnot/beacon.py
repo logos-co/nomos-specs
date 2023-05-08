@@ -65,7 +65,7 @@ class RecoveryMode:
         :return:
         """
         b = sha256(last_beacon.entropy + beacon.context.to_bytes(length=8)).digest()
-        return b == beacon.entropy  # TODO: last beacon should be updated with the possible result of this method
+        return b == beacon.entropy
 
     @staticmethod
     def generate_beacon(last_beacon: Beacon, view: View) -> Beacon:

@@ -41,7 +41,7 @@ class TestRandomBeaconVerification(TestCase):
                     proof=proof
                 )
             self.beacon.verify_happy(new_beacon)
-        assert self.beacon.last_beacon.context == 2
+        self.assertEqual(self.beacon.last_beacon.context, 2)
 
     def test_unhappy(self):
         for i in range(1, 3):
@@ -53,4 +53,24 @@ class TestRandomBeaconVerification(TestCase):
                 proof=b""
             )
             self.beacon.verify_unhappy(new_beacon)
-        assert self.beacon.last_beacon.context == 2
+        self.assertEqual(self.beacon.last_beacon.context, 2)
+
+    def test_mixed(self):
+        for i in range(1, 6, 2):
+            entropy, proof = self.happy_entropy_and_proof(i)
+            new_beacon = RandomBeacon(
+                version=0,
+                context=i,
+                entropy=entropy,
+                proof=proof
+            )
+            self.beacon.verify_happy(new_beacon)
+            entropy = self.unhappy_entropy(self.beacon.last_beacon.entropy, i+1)
+            new_beacon = RandomBeacon(
+                version=0,
+                context=i+1,
+                entropy=entropy,
+                proof=b""
+            )
+            self.beacon.verify_unhappy(new_beacon)
+        self.assertEqual(self.beacon.last_beacon.context, 6)
