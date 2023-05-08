@@ -1,8 +1,6 @@
 from typing import Tuple
 from unittest import TestCase
 
-from blspy import AugSchemeMPL
-
 from beacon import *
 from random import randint
 
