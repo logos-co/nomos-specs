@@ -39,8 +39,7 @@ from dataclasses import dataclass
 from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
 from abc import abstractmethod
 
-from carnot import RandomBeaconHandler
-from carnot.beacon import RandomBeacon, NormalMode
+from beacon import RandomBeaconHandler, RandomBeacon, NormalMode, RecoveryMode, generate_random_sk
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
@@ -270,7 +269,7 @@ class Carnot:
             RandomBeacon(
                 version=0,
                 context=-1,
-                entropy=NormalMode.generate_beacon(),
+                entropy=NormalMode.generate_beacon(generate_random_sk(), -1),
                 proof=b""
             )
         )

@@ -1,19 +1,23 @@
 # typing imports
 from dataclasses import dataclass
-from typing import TypeAlias, Optional
+from random import randint
+from typing import TypeAlias
 
 # carnot imports
-from carnot import View, Block
-
 # lib imports
 from blspy import PrivateKey, Util, PopSchemeMPL, G2Element, G1Element
 
 # stdlib imports
 from hashlib import sha256
 
-
+View: TypeAlias = int
 Beacon: TypeAlias = bytes
 Proof: TypeAlias = bytes  # For now this is gonna be a public key, in future research we may pivot to zk proofs.
+
+
+def generate_random_sk() -> PrivateKey:
+    seed = bytes([randint(0, 255) for _ in range(32)])
+    return PopSchemeMPL.key_gen(seed)
 
 
 @dataclass
@@ -39,11 +43,11 @@ class NormalMode:
         # TODO: Actually verify that the message is propoerly signed
         sig = G2Element.from_bytes(beacon.entropy)
         proof = G1Element.from_bytes(beacon.proof)
-        return PopSchemeMPL.verify(proof, Util.hash256(beacon.context.to_bytes(length=8)), sig)
+        return PopSchemeMPL.verify(proof, Util.hash256(str(beacon.context).encode()), sig)
 
     @staticmethod
     def generate_beacon(private_key: PrivateKey, view: View) -> Beacon:
-        return PopSchemeMPL.sign(private_key, Util.hash256(view.to_bytes(length=8)))
+        return PopSchemeMPL.sign(private_key, Util.hash256(str(view).encode()))
 
 
 class RecoveryMode:
@@ -56,12 +60,12 @@ class RecoveryMode:
         :param view:
         :return:
         """
-        b = sha256(last_beacon.entropy + beacon.context.to_bytes(length=8)).digest()
+        b = sha256(last_beacon.entropy + str(beacon.context).encode()).digest()
         return b == beacon.entropy
 
     @staticmethod
     def generate_beacon(last_beacon: Beacon, view: View) -> Beacon:
-        return sha256(last_beacon + view.to_bytes(length=8)).digest()
+        return sha256(last_beacon + str(view).encode()).digest()
 
 
 class RandomBeaconHandler:

@@ -9,8 +9,7 @@ class TestRandomBeaconVerification(TestCase):
 
     @staticmethod
     def happy_entropy_and_proof(view: View) -> Tuple[Beacon, Proof]:
-        seed = bytes([randint(0, 255) for _ in range(32)])
-        sk: PrivateKey = PopSchemeMPL.key_gen(seed)
+        sk = generate_random_sk()
         beacon = NormalMode.generate_beacon(sk, view)
         return bytes(beacon), bytes(sk.get_g1())
 
