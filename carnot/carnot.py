@@ -39,6 +39,8 @@ from dataclasses import dataclass
 from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
 from abc import abstractmethod
 
+from carnot import RandomBeaconHandler
+from carnot.beacon import RandomBeacon, NormalMode
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
@@ -261,9 +263,17 @@ class Carnot:
         # Validated blocks with their validated QCs are included here. If commit conditions are satisfied for
         # each one of these blocks it will be committed.
         self.safe_blocks: Dict[Id, Block] = dict()
-        # Whether the node timeed out in the last view and corresponding qc
+        # Whether the node time out in the last view and corresponding qc
         self.last_view_timeout_qc: Optional[TimeoutQc] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
+        self.random_beacon: RandomBeaconHandler = RandomBeaconHandler(
+            RandomBeacon(
+                version=0,
+                context=-1,
+                entropy=NormalMode.generate_beacon(),
+                proof=b""
+            )
+        )
 
 
     # Committing conditions for a block

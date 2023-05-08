@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from typing import TypeAlias, Optional
 
 # carnot imports
-from carnot import View
-
+from carnot import View, Block
 
 # lib imports
 from blspy import PrivateKey, Util, PopSchemeMPL, G2Element, G1Element
@@ -28,10 +27,6 @@ class RandomBeacon:
 
 
 class NormalMode:
-    @staticmethod
-    def verify_beacon(beacon: Beacon, view: View):
-        # TODO: Actually fill this
-        return True
 
     @staticmethod
     def verify(beacon: RandomBeacon) -> bool:
@@ -52,9 +47,6 @@ class NormalMode:
 
 
 class RecoveryMode:
-    @staticmethod
-    def verify_beacon(beacon: Beacon, view: View) -> bool:
-        return True
 
     @staticmethod
     def verify(last_beacon: RandomBeacon, beacon: RandomBeacon) -> bool:
@@ -72,7 +64,7 @@ class RecoveryMode:
         return sha256(last_beacon + view.to_bytes(length=8)).digest()
 
 
-class BeaconHandler:
+class RandomBeaconHandler:
     def __init__(self, beacon: RandomBeacon):
         """
         :param beacon: Beacon should be initialized with either the last known working beacon from recovery.

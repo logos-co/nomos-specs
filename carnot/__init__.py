@@ -1,2 +1,2 @@
 from .carnot import *
-from .beacon import BeaconHandler
+from .beacon import RandomBeaconHandler

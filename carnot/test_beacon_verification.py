@@ -20,7 +20,7 @@ class TestRandomBeaconVerification(TestCase):
 
     def setUp(self):
         entropy, proof = self.happy_entropy_and_proof(0)
-        self.beacon = BeaconHandler(
+        self.beacon = RandomBeaconHandler(
             beacon=RandomBeacon(
                 version=0,
                 context=0,
