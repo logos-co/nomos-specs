@@ -37,8 +37,7 @@
 
 from dataclasses import dataclass
 from typing import TypeAlias, List, Set, Self, Optional, Dict
-from abc import abstractmethod
-
+from abc import abstractmethod, ABC
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
@@ -156,7 +155,8 @@ class Send:
 
 Event: TypeAlias = BroadCast | Send
 
-class Overlay:
+
+class Overlay(ABC):
     """
     Overlay structure for a View
     """
