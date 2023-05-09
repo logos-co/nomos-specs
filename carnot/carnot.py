@@ -36,10 +36,9 @@
 # Please note this is still a work in progress
 
 from dataclasses import dataclass
-from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
+from typing import TypeAlias, List, Set, Self, Optional, Dict
 from abc import abstractmethod
 
-from beacon import RandomBeaconHandler, RandomBeacon, NormalMode, RecoveryMode, generate_random_sk
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
@@ -265,14 +264,6 @@ class Carnot:
         # Whether the node time out in the last view and corresponding qc
         self.last_view_timeout_qc: Optional[TimeoutQc] = None
         self.overlay: Overlay = Overlay()  # TODO: integrate overlay
-        self.random_beacon: RandomBeaconHandler = RandomBeaconHandler(
-            RandomBeacon(
-                version=0,
-                context=-1,
-                entropy=NormalMode.generate_beacon(generate_random_sk(), -1),
-                proof=b""
-            )
-        )
 
 
     # Committing conditions for a block
@@ -484,7 +475,7 @@ class Carnot:
         # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
         # from previous view.
         return (
-                self.current_view == self.local_high_qc.view + 1  or
+                self.current_view == self.local_high_qc.view + 1 or
                 self.current_view == self.last_view_timeout_qc.view + 1 or
                 (self.current_view == self.last_view_timeout_qc.view)
         )
