@@ -1,6 +1,6 @@
 from typing import Set
 
-from carnot import Carnot, Block, TimeoutQc, Vote, Event, Send
+from carnot import Carnot, Block, TimeoutQc, Vote, Event, Send, Quorum
 from beacon import *
 
 
@@ -65,3 +65,16 @@ class BeaconizedCarnot(Carnot):
             proof=b""
         )
         self.random_beacon.verify_unhappy(new_beacon)
+
+    def propose_block(self, view: View, quorum: Quorum) -> Event:
+        beacon = RandomBeacon(
+            version=0,
+            context=self.current_view,
+            entropy=NormalMode.generate_beacon(self.sk, self.current_view),
+            proof=self.pk
+        )
+        event: Event = super(Carnot, self).propose_block(view, quorum)
+        block = event.payload
+        block = BeaconizedBlock(view=block.view, qc=block.qc, _id=block._id, beacon=beacon)
+        event.payload = block
+        return event
