@@ -1,14 +1,13 @@
-from typing import Set, Optional, List
 import random
+from typing import Set, Optional, List
 from carnot import Overlay, Id, Committee, View
 
 
 class FlatOverlay(Overlay):
     def is_leader(self, _id: Id):
-        return _id == self.leader(self.view)
+        return _id == self.leader()
 
-    def leader(self, view: View) -> Id:
-        assert view == self.view
+    def leader(self) -> Id:
         random.seed(a=self.entropy, version=2)
         return random.choice(self.nodes)
 

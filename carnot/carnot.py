@@ -156,7 +156,7 @@ class Send:
 Event: TypeAlias = BroadCast | Send
 
 
-class Overlay(ABC):
+class Overlay:
     """
     Overlay structure for a View
     """
@@ -167,14 +167,18 @@ class Overlay(ABC):
         :param _id:  Node id to be checked
         :return: true if node is the leader of the current view
         """
-        pass
+        return _id == self.leader()
 
     @abstractmethod
-    def leader(self, view: View) -> Id:
+    def leader(self) -> Id:
         """
         :param view:
         :return: the leader Id of the specified view
         """
+        pass
+
+    @abstractmethod
+    def next_leader(self) -> Id:
         pass
 
     @abstractmethod
@@ -394,7 +398,7 @@ class Carnot:
         assert self.highest_voted_view == vote.view
 
         if self.overlay.is_member_of_root_committee(self.id):
-            return Send(to=self.overlay.leader(self.current_view + 1), payload=vote)
+            return Send(to=self.overlay.next_leader(), payload=vote)
 
     def forward_new_view(self, msg: NewView) -> Optional[Event]:
         assert msg.view == self.current_view
@@ -403,7 +407,7 @@ class Carnot:
         assert self.highest_voted_view == msg.view
 
         if self.overlay.is_member_of_root_committee(self.id):
-            return Send(to=self.overlay.leader(self.current_view + 1), payload=msg)
+            return Send(to=self.overlay.next_leader(), payload=msg)
 
     def build_qc(self, view: View, block: Optional[Block], new_views: Optional[Set[NewView]]) -> Qc:
         # unhappy path
@@ -553,7 +557,7 @@ class Carnot:
         self.highest_voted_view = max(self.highest_voted_view, view)
 
         if self.overlay.is_member_of_root_committee(self.id):
-            return Send(payload=timeout_msg, to=[self.overlay.leader(self.current_view + 1)])
+            return Send(payload=timeout_msg, to=[self.overlay.next_leader()])
         return Send(payload=timeout_msg, to=self.overlay.parent_committee(self.id))
 
 
