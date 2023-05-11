@@ -252,7 +252,7 @@ def download(view) -> Block:
 
 
 class Carnot:
-    def __init__(self, _id: Id):
+    def __init__(self, _id: Id, overlay=Overlay()):
         self.id: Id = _id
         # Current View counter
         # It is the view currently being processed by the node. Once a Qc is received, the view is considered completed
@@ -267,7 +267,7 @@ class Carnot:
         self.safe_blocks: Dict[Id, Block] = dict()
         # Whether the node time out in the last view and corresponding qc
         self.last_view_timeout_qc: Optional[TimeoutQc] = None
-        self.overlay: Overlay = Overlay()  # TODO: integrate overlay
+        self.overlay: Overlay = overlay
 
 
     # Committing conditions for a block

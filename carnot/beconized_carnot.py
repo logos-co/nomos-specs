@@ -2,6 +2,7 @@ from typing import Set
 
 from carnot import Carnot, Block, TimeoutQc, Vote, Event, Send, Quorum
 from beacon import *
+from carnot.overlay import EntropyOverlay
 
 
 class BeaconizedBlock(Block):
@@ -9,9 +10,9 @@ class BeaconizedBlock(Block):
 
 
 class BeaconizedCarnot(Carnot):
-    def __int__(self):
-        self.sk = generate_random_sk()
-        self.pk = bytes(self.sk.get_gq())
+    def __init__(self, sk: PrivateKey, overlay: EntropyOverlay):
+        self.sk = sk
+        self.pk = bytes(self.sk.get_g1())
         self.random_beacon = RandomBeaconHandler(
             RandomBeacon(
                 version=0,
@@ -20,7 +21,8 @@ class BeaconizedCarnot(Carnot):
                 proof=self.pk
             )
         )
-        super(Carnot, self).__init__(self.pk)
+        overlay.set_entropy(self.random_beacon.last_beacon.entropy)
+        super(Carnot, self).__init__(self.pk, overlay)
 
     def approve_block(self, block: BeaconizedBlock, votes: Set[Vote]) -> Event:
         assert block.id() in self.safe_blocks
@@ -46,11 +48,13 @@ class BeaconizedCarnot(Carnot):
         # root members send votes to next leader, we update our beacon first
         if self.overlay.is_member_of_root_committee(self.id):
             self.random_beacon.verify_happy(block.beacon)
+            self.overlay.set_entropy(self.random_beacon.last_beacon.entropy)
             return Send(to=self.overlay.leader(), payload=vote)
 
         # otherwise we send to the parent committee and update the beacon second
         return_event = Send(to=self.overlay.parent_committee(self.id), payload=vote)
         self.random_beacon.verify_happy(block.beacon)
+        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy)
         return return_event
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
@@ -65,8 +69,10 @@ class BeaconizedCarnot(Carnot):
             proof=b""
         )
         self.random_beacon.verify_unhappy(new_beacon)
+        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy)
 
-    def propose_block(self, view: View, quorum: Quorum) -> Event:
+
+def propose_block(self, view: View, quorum: Quorum) -> Event:
         beacon = RandomBeacon(
             version=0,
             context=self.current_view,

@@ -126,7 +126,7 @@ def parents_from_childs(overlay: MockOverlay, childs: List[Id]) -> Set[Id]:
     return set(possible_parents) if possible_parents else set()
 
 
-def succeed(test_case: TestCase, overlay: MockOverlay, nodes: Dict[Id, MockCarnot], proposed_block: Block) -> List[Vote]:
+def succeed(test_case: TestCase, overlay: Overlay, nodes: Dict[Id, Carnot], proposed_block: Block) -> List[Vote]:
     # broadcast the block
     for node in nodes.values():
         node.receive_block(proposed_block)
@@ -155,7 +155,7 @@ def succeed(test_case: TestCase, overlay: MockOverlay, nodes: Dict[Id, MockCarno
     return root_votes
 
 
-def fail(test_case: TestCase, overlay: MockOverlay, nodes: Dict[Id, MockCarnot], proposed_block: Block) -> List[NewView]:
+def fail(test_case: TestCase, overlay: Overlay, nodes: Dict[Id, Carnot], proposed_block: Block) -> List[NewView]:
     # broadcast the block
     for node in nodes.values():
         node.receive_block(proposed_block)
