@@ -5,9 +5,9 @@ from itertools import chain
 from blspy import PrivateKey
 
 from carnot import Id, Carnot, Block, Overlay, Vote, StandardQc, NewView
-from carnot.beacon import generate_random_sk, RandomBeacon
-from carnot.beconized_carnot import BeaconizedCarnot, BeaconizedBlock
-from carnot.overlay import FlatOverlay, EntropyOverlay
+from beacon import generate_random_sk, RandomBeacon, NormalMode
+from beconized_carnot import BeaconizedCarnot, BeaconizedBlock
+from overlay import FlatOverlay, EntropyOverlay
 from test_unhappy_path import parents_from_childs
 
 
@@ -16,7 +16,7 @@ def gen_node(sk: PrivateKey, overlay: Overlay):
     return node.id, node
 
 
-def succeed(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> List[Vote]:
+def succeed(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> (List[Vote], EntropyOverlay):
     overlay = FlatOverlay(list(nodes.keys()))
     overlay.set_entropy(proposed_block.beacon.entropy)
 
@@ -45,10 +45,10 @@ def succeed(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_blo
         for node_id in nodes
         if overlay.is_member_of_root_committee(node_id) or overlay.is_child_of_root_committee(node_id)
     ]
-    return root_votes
+    return root_votes, overlay
 
 
-def fail(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_block: Block) -> List[NewView]:
+def fail(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_block: Block) -> (List[NewView], EntropyOverlay):
     overlay = FlatOverlay(list(nodes.keys()))
     overlay.set_entropy(proposed_block.beacon.entropy)
     # broadcast the block
@@ -88,40 +88,59 @@ def fail(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_block:
         for node_id in nodes
         if overlay.is_member_of_root_committee(node_id) or overlay.is_child_of_root_committee(node_id)
     ]
-    return root_votes
+    return root_votes, overlay
 
 
-def add_genesis_block(carnot: Carnot) -> Block:
-    genesis_block = BeaconizedBlock(view=0, qc=StandardQc(block=b"", view=0), _id=b"", beacon=RandomBeacon(version=0, context=-1, entropy=[], proof=""))
+def add_genesis_block(carnot: BeaconizedCarnot, sk: PrivateKey) -> Block:
+    entropy = NormalMode.generate_beacon(sk, -1)
+    genesis_block = BeaconizedBlock(
+        view=0,
+        qc=StandardQc(block=b"", view=0),
+        _id=b"",
+        beacon=RandomBeacon(
+            version=0,
+            context=-1,
+            entropy=entropy,
+            proof=bytes(sk.get_g1())
+        )
+    )
     carnot.safe_blocks[genesis_block.id()] = genesis_block
     carnot.receive_block(genesis_block)
     carnot.local_high_qc = genesis_block.qc
     carnot.current_view = 1
+    carnot.overlay.set_entropy(entropy)
     return genesis_block
 
-def setup_initial_setup(test_case: TestCase, overlay: EntropyOverlay, size: int) -> (Dict[Id, Carnot], Carnot, Block):
+
+def setup_initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, Block, EntropyOverlay):
     keys = [generate_random_sk() for _ in range(size)]
-    nodes = [key.get_g1() for key in keys]
-    nodes = dict(gen_node(key, FlatOverlay(nodes)) for key in keys)
-    leader: Carnot = nodes[overlay.leader()]
+    nodes_ids = [bytes(key.get_g1()) for key in keys]
+    nodes = dict(gen_node(key, FlatOverlay(nodes_ids)) for key in keys)
     genesis_block = None
+    genesis_sk = generate_random_sk()
+    overlay = FlatOverlay(nodes_ids)
+    overlay.set_entropy(NormalMode.generate_beacon(genesis_sk, -1))
+    leader: Carnot = nodes[overlay.leader()]
     for node in nodes.values():
-        genesis_block = add_genesis_block(node)
+        genesis_block = add_genesis_block(node, genesis_sk)
     # votes for genesis block
     genesis_votes = set(
         Vote(
             block=genesis_block.id(),
             view=0,
-            voter=id,
+            voter=nodes_ids[i],
             qc=StandardQc(
                 block=genesis_block.id(),
                 view=0
             ),
-        ) for id in nodes.keys()
+        ) for i in range(overlay.leader_super_majority_threshold(overlay.leader()))
     )
     proposed_block = leader.propose_block(1, genesis_votes).payload
     test_case.assertIsNotNone(proposed_block)
-    return nodes, leader, proposed_block
+    overlay = FlatOverlay(nodes_ids)
+    overlay.set_entropy(NormalMode.generate_beacon(genesis_sk, -1))
+    return nodes, leader, proposed_block, overlay
+
 
 class TestBeaconizedCarnot(TestCase):
     def test_interleave_success_fails(self):
@@ -131,24 +150,24 @@ class TestBeaconizedCarnot(TestCase):
         Majority means more than two thirds of total number of nodes, randomly assigned to committees.
         """
         leader: BeaconizedCarnot
-        nodes, leader, proposed_block = setup_initial_setup(self, overlay, 5)
+        nodes, leader, proposed_block, overlay = setup_initial_setup(self, 5)
 
         for view in range(2, 5):
-            root_votes = succeed(self, overlay, nodes, proposed_block)
+            root_votes, overlay = succeed(self, nodes, proposed_block)
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        root_votes = fail(self, overlay, nodes, proposed_block)
+        root_votes, overlay = fail(self, nodes, proposed_block)
         proposed_block = leader.propose_block(6, root_votes).payload
 
         for view in range(7, 8):
-            root_votes = succeed(self, overlay, nodes, proposed_block)
+            root_votes, overlay = succeed(self, nodes, proposed_block)
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        root_votes = fail(self, overlay, nodes, proposed_block)
+        root_votes, overlay = fail(self, nodes, proposed_block)
         proposed_block = leader.propose_block(9, root_votes).payload
 
         for view in range(10, 15):
-            root_votes = succeed(self, overlay, nodes, proposed_block)
+            root_votes, overlay = succeed(self, nodes, proposed_block)
             proposed_block = leader.propose_block(view, root_votes).payload
 
         committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8)]

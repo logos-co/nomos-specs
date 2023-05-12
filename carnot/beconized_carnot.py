@@ -2,9 +2,9 @@ from typing import Set
 
 from carnot import Carnot, Block, TimeoutQc, Vote, Event, Send, Quorum
 from beacon import *
-from carnot.overlay import EntropyOverlay
+from overlay import EntropyOverlay
 
-
+@dataclass
 class BeaconizedBlock(Block):
     beacon: RandomBeacon
 
@@ -22,7 +22,7 @@ class BeaconizedCarnot(Carnot):
             )
         )
         overlay.set_entropy(self.random_beacon.last_beacon.entropy)
-        super(Carnot, self).__init__(self.pk, overlay)
+        super().__init__(self.pk, overlay=overlay)
 
     def approve_block(self, block: BeaconizedBlock, votes: Set[Vote]) -> Event:
         assert block.id() in self.safe_blocks
@@ -71,16 +71,15 @@ class BeaconizedCarnot(Carnot):
         self.random_beacon.verify_unhappy(new_beacon)
         self.overlay.set_entropy(self.random_beacon.last_beacon.entropy)
 
-
-def propose_block(self, view: View, quorum: Quorum) -> Event:
-        beacon = RandomBeacon(
-            version=0,
-            context=self.current_view,
-            entropy=NormalMode.generate_beacon(self.sk, self.current_view),
-            proof=self.pk
-        )
-        event: Event = super(Carnot, self).propose_block(view, quorum)
-        block = event.payload
-        block = BeaconizedBlock(view=block.view, qc=block.qc, _id=block._id, beacon=beacon)
-        event.payload = block
-        return event
+    def propose_block(self, view: View, quorum: Quorum) -> Event:
+            beacon = RandomBeacon(
+                version=0,
+                context=self.current_view,
+                entropy=NormalMode.generate_beacon(self.sk, self.current_view),
+                proof=self.pk
+            )
+            event: Event = super().propose_block(view, quorum)
+            block = event.payload
+            block = BeaconizedBlock(view=block.view, qc=block.qc, _id=block._id, beacon=beacon)
+            event.payload = block
+            return event

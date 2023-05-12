@@ -47,7 +47,7 @@ class NormalMode:
 
     @staticmethod
     def generate_beacon(private_key: PrivateKey, view: View) -> Beacon:
-        return PopSchemeMPL.sign(private_key, Util.hash256(str(view).encode()))
+        return bytes(PopSchemeMPL.sign(private_key, Util.hash256(str(view).encode())))
 
 
 class RecoveryMode:

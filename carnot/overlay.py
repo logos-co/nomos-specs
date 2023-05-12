@@ -34,7 +34,7 @@ class FlatOverlay(EntropyOverlay):
         return None
 
     def leaf_committees(self) -> Set[Committee]:
-        return {set(self.nodes)}
+        return {frozenset(self.nodes)}
 
     def root_committee(self) -> Committee:
         return set(self.nodes)
@@ -43,10 +43,10 @@ class FlatOverlay(EntropyOverlay):
         return True
 
     def leader_super_majority_threshold(self, _id: Id) -> int:
-        return ((len(self.nodes) * 3) // 2) + 1
+        return ((len(self.nodes) * 2) // 3) + 1
 
     def super_majority_threshold(self, _id: Id) -> int:
-        return ((len(self.nodes) * 3) // 2) + 1
+        return 0
 
     def __init__(self, nodes: List[Id]):
         self.nodes = nodes
