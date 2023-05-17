@@ -16,7 +16,7 @@ def gen_node(sk: PrivateKey, overlay: Overlay):
     return node.id, node
 
 
-def succeed(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> (List[Vote], EntropyOverlay):
+def succeed(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> (List[Vote], EntropyOverlay):
     overlay = FlatOverlay(list(nodes.keys()))
     overlay.set_entropy(proposed_block.beacon.entropy)
 
@@ -48,7 +48,7 @@ def succeed(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_blo
     return root_votes, overlay
 
 
-def fail(test_case: TestCase, nodes: Dict[Id, BeaconizedCarnot], proposed_block: Block) -> (List[NewView], EntropyOverlay):
+def fail(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> (List[NewView], EntropyOverlay):
     overlay = FlatOverlay(list(nodes.keys()))
     overlay.set_entropy(proposed_block.beacon.entropy)
     # broadcast the block
@@ -153,21 +153,26 @@ class TestBeaconizedCarnot(TestCase):
         nodes, leader, proposed_block, overlay = setup_initial_setup(self, 5)
 
         for view in range(2, 5):
-            root_votes, overlay = succeed(self, nodes, proposed_block)
+            root_votes, overlay = succeed(nodes, proposed_block)
+            leader = nodes[overlay.leader()]
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        root_votes, overlay = fail(self, nodes, proposed_block)
+        root_votes, overlay = fail(nodes, proposed_block)
+        leader = nodes[overlay.leader()]
         proposed_block = leader.propose_block(6, root_votes).payload
 
         for view in range(7, 8):
-            root_votes, overlay = succeed(self, nodes, proposed_block)
+            root_votes, overlay = succeed(nodes, proposed_block)
+            leader = nodes[overlay.leader()]
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        root_votes, overlay = fail(self, nodes, proposed_block)
+        root_votes, overlay = fail(nodes, proposed_block)
+        leader = nodes[overlay.leader()]
         proposed_block = leader.propose_block(9, root_votes).payload
 
         for view in range(10, 15):
-            root_votes, overlay = succeed(self, nodes, proposed_block)
+            root_votes, overlay = succeed(nodes, proposed_block)
+            leader = nodes[overlay.leader()]
             proposed_block = leader.propose_block(view, root_votes).payload
 
         committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8)]

@@ -58,7 +58,7 @@ class BeaconizedCarnot(Carnot):
         return return_event
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
-        super(Carnot, self).receive_timeout_qc(timeout_qc)
+        super().receive_timeout_qc(timeout_qc)
         if timeout_qc.view < self.current_view:
             return
         entropy = RecoveryMode.generate_beacon(self.random_beacon.last_beacon.entropy, timeout_qc.view)
