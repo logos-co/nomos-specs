@@ -11,7 +11,7 @@ from overlay import FlatOverlay, EntropyOverlay
 from test_unhappy_path import parents_from_childs
 
 
-def gen_node(sk: PrivateKey, overlay: Overlay):
+def gen_node(sk: PrivateKey, overlay: Overlay, entropy: bytes = b""):
     node = BeaconizedCarnot(sk, overlay)
     return node.id, node
 
@@ -118,9 +118,9 @@ def add_genesis_block(carnot: BeaconizedCarnot, sk: PrivateKey) -> Block:
 def setup_initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, Block, EntropyOverlay):
     keys = [generate_random_sk() for _ in range(size)]
     nodes_ids = [bytes(key.get_g1()) for key in keys]
-    nodes = dict(gen_node(key, FlatOverlay(nodes_ids)) for key in keys)
-    genesis_block = None
     genesis_sk = generate_random_sk()
+    nodes = dict(gen_node(key, FlatOverlay(nodes_ids), bytes(genesis_sk.get_g1())) for key in keys)
+    genesis_block = None
     overlay = FlatOverlay(nodes_ids)
     overlay.set_entropy(NormalMode.generate_beacon(genesis_sk, -1))
     leader: Carnot = nodes[overlay.leader()]

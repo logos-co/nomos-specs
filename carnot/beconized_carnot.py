@@ -10,14 +10,14 @@ class BeaconizedBlock(Block):
 
 
 class BeaconizedCarnot(Carnot):
-    def __init__(self, sk: PrivateKey, overlay: EntropyOverlay):
+    def __init__(self, sk: PrivateKey, overlay: EntropyOverlay, entropy: bytes = b""):
         self.sk = sk
         self.pk = bytes(self.sk.get_g1())
         self.random_beacon = RandomBeaconHandler(
             RandomBeacon(
                 version=0,
                 context=-1,
-                entropy=RecoveryMode.generate_beacon(b"", -1),
+                entropy=RecoveryMode.generate_beacon(entropy, -1),
                 proof=self.pk
             )
         )
