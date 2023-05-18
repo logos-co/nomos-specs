@@ -573,7 +573,7 @@ class Carnot:
         self.update_timeout_qc(timeout_qc)
         # Update our current view and go ahead with the next step
         self.update_current_view_from_timeout_qc(timeout_qc)
-        self.rebuild_overlay_from_timeout_qc(timeout_qc)
+        # self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
     def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
         assert timeout_qc.view >= self.current_view

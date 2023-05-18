@@ -62,10 +62,13 @@ def fail(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> 
         timeouts.append(timeout)
 
     root_member = next(nodes[_id] for _id in nodes if overlay.is_member_of_root_committee(_id))
+    timeouts = [timeouts[i] for i in range(overlay.leader_super_majority_threshold(root_member.id))]
     timeout_qc = root_member.timeout_detected(timeouts).payload
 
     for node in nodes.values():
         node.receive_timeout_qc(timeout_qc)
+
+    overlay = next(iter(nodes.values())).overlay
 
     votes = {}
     childs_ids = list(chain.from_iterable(overlay.leaf_committees()))
