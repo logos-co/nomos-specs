@@ -17,7 +17,7 @@ class BeaconizedCarnot(Carnot):
             RandomBeacon(
                 version=0,
                 context=-1,
-                entropy=NormalMode.generate_beacon(self.sk, -1),
+                entropy=RecoveryMode.generate_beacon(b"", -1),
                 proof=self.pk
             )
         )
