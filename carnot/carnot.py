@@ -36,9 +36,8 @@
 # Please note this is still a work in progress
 
 from dataclasses import dataclass
-from typing import TypeAlias, List, Set, Self, Optional, Dict, FrozenSet
-from abc import abstractmethod
-
+from typing import TypeAlias, List, Set, Self, Optional, Dict
+from abc import abstractmethod, ABC
 
 Id: TypeAlias = bytes
 View: TypeAlias = int
@@ -156,6 +155,7 @@ class Send:
 
 Event: TypeAlias = BroadCast | Send
 
+
 class Overlay:
     """
     Overlay structure for a View
@@ -167,14 +167,18 @@ class Overlay:
         :param _id:  Node id to be checked
         :return: true if node is the leader of the current view
         """
-        pass
+        return _id == self.leader()
 
     @abstractmethod
-    def leader(self, view: View) -> Id:
+    def leader(self) -> Id:
         """
         :param view:
         :return: the leader Id of the specified view
         """
+        pass
+
+    @abstractmethod
+    def next_leader(self) -> Id:
         pass
 
     @abstractmethod
@@ -248,7 +252,7 @@ def download(view) -> Block:
 
 
 class Carnot:
-    def __init__(self, _id: Id):
+    def __init__(self, _id: Id, overlay=Overlay()):
         self.id: Id = _id
         # Current View counter
         # It is the view currently being processed by the node. Once a Qc is received, the view is considered completed
@@ -261,9 +265,9 @@ class Carnot:
         # Validated blocks with their validated QCs are included here. If commit conditions are satisfied for
         # each one of these blocks it will be committed.
         self.safe_blocks: Dict[Id, Block] = dict()
-        # Whether the node timeed out in the last view and corresponding qc
+        # Whether the node time out in the last view and corresponding qc
         self.last_view_timeout_qc: Optional[TimeoutQc] = None
-        self.overlay: Overlay = Overlay()  # TODO: integrate overlay
+        self.overlay: Overlay = overlay
 
 
     # Committing conditions for a block
@@ -394,7 +398,7 @@ class Carnot:
         assert self.highest_voted_view == vote.view
 
         if self.overlay.is_member_of_root_committee(self.id):
-            return Send(to=self.overlay.leader(self.current_view + 1), payload=vote)
+            return Send(to=self.overlay.next_leader(), payload=vote)
 
     def forward_new_view(self, msg: NewView) -> Optional[Event]:
         assert msg.view == self.current_view
@@ -403,7 +407,7 @@ class Carnot:
         assert self.highest_voted_view == msg.view
 
         if self.overlay.is_member_of_root_committee(self.id):
-            return Send(to=self.overlay.leader(self.current_view + 1), payload=msg)
+            return Send(to=self.overlay.next_leader(), payload=msg)
 
     def build_qc(self, view: View, block: Optional[Block], new_views: Optional[Set[NewView]]) -> Qc:
         # unhappy path
@@ -475,7 +479,7 @@ class Carnot:
         # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
         # from previous view.
         return (
-                self.current_view == self.local_high_qc.view + 1  or
+                self.current_view == self.local_high_qc.view + 1 or
                 self.current_view == self.last_view_timeout_qc.view + 1 or
                 (self.current_view == self.last_view_timeout_qc.view)
         )
@@ -553,7 +557,7 @@ class Carnot:
         self.highest_voted_view = max(self.highest_voted_view, view)
 
         if self.overlay.is_member_of_root_committee(self.id):
-            return Send(payload=timeout_msg, to=[self.overlay.leader(self.current_view + 1)])
+            return Send(payload=timeout_msg, to=[self.overlay.next_leader()])
         return Send(payload=timeout_msg, to=self.overlay.parent_committee(self.id))
 
 
@@ -569,7 +573,7 @@ class Carnot:
         self.update_timeout_qc(timeout_qc)
         # Update our current view and go ahead with the next step
         self.update_current_view_from_timeout_qc(timeout_qc)
-        self.rebuild_overlay_from_timeout_qc(timeout_qc)
+        # self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
     def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
         assert timeout_qc.view >= self.current_view
