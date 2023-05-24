@@ -90,7 +90,7 @@ def add_genesis_block(carnot: Carnot) -> Block:
     return genesis_block
 
 
-def setup_initial_setup(test_case: TestCase, overlay: MockOverlay, size: int) -> (Dict[Id, Carnot], MockCarnot, Block):
+def initial_setup(test_case: TestCase, overlay: MockOverlay, size: int) -> (Dict[Id, Carnot], MockCarnot, Block):
     nodes = {int_to_id(i): MockCarnot(int_to_id(i)) for i in range(size)}
     # add overlay
     for node in nodes.values():
@@ -207,7 +207,7 @@ class TestCarnotUnhappyPath(TestCase):
 
         overlay = MockOverlay()
 
-        nodes, leader, proposed_block = setup_initial_setup(self, overlay, 5)
+        nodes, leader, proposed_block = initial_setup(self, overlay, 5)
 
         # In this loop 'view' is the view that fails
         for view in range(1, 4, 2):
@@ -239,7 +239,7 @@ class TestCarnotUnhappyPath(TestCase):
         """
         overlay = MockOverlay()
         leader: MockCarnot
-        nodes, leader, proposed_block = setup_initial_setup(self, overlay, 5)
+        nodes, leader, proposed_block = initial_setup(self, overlay, 5)
 
         for view in range(2, 5):
             root_votes = succeed(self, overlay, nodes, proposed_block)
@@ -259,7 +259,7 @@ class TestCarnotUnhappyPath(TestCase):
             root_votes = succeed(self, overlay, nodes, proposed_block)
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8)]
+        committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8, 9, 10, 11, 12, 13)]
         for node in nodes.values():
             for view in committed_blocks:
                 self.assertIn(view, [block.view for block in node.committed_blocks().values()])

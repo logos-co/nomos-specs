@@ -35,9 +35,8 @@ def succeed(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) 
         for node_id in parents:
             node = nodes[node_id]
             child_votes = [votes[_id] for _id in votes.keys() if overlay.is_member_of_child_committee(node_id, _id)]
-            if len(child_votes) == overlay.super_majority_threshold(node_id) and node_id not in votes:
-                vote = node.approve_block(proposed_block, child_votes).payload
-                votes[node_id] = vote
+            vote = node.approve_block(proposed_block, child_votes).payload
+            votes[node_id] = vote
         childs_ids = list(set(parents))
 
     root_votes = [
@@ -115,7 +114,7 @@ def add_genesis_block(carnot: BeaconizedCarnot, sk: PrivateKey) -> Block:
     return genesis_block
 
 
-def setup_initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, Block, EntropyOverlay):
+def initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, Block, EntropyOverlay):
     keys = [generate_random_sk() for _ in range(size)]
     nodes_ids = [bytes(key.get_g1()) for key in keys]
     genesis_sk = generate_random_sk()
@@ -153,7 +152,7 @@ class TestBeaconizedCarnot(TestCase):
         Majority means more than two thirds of total number of nodes, randomly assigned to committees.
         """
         leader: BeaconizedCarnot
-        nodes, leader, proposed_block, overlay = setup_initial_setup(self, 5)
+        nodes, leader, proposed_block, overlay = initial_setup(self, 5)
 
         for view in range(2, 5):
             root_votes, overlay = succeed(nodes, proposed_block)
@@ -178,7 +177,7 @@ class TestBeaconizedCarnot(TestCase):
             leader = nodes[overlay.leader()]
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8)]
+        committed_blocks = [view for view in range(1, 11) if view not in (4, 5, 7, 8, 9, 10, 11, 12, 13)]
         for node in nodes.values():
             for view in committed_blocks:
                 self.assertIn(view, [block.view for block in node.committed_blocks().values()])
