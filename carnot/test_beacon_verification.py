@@ -8,66 +8,32 @@ from random import randint
 class TestRandomBeaconVerification(TestCase):
 
     @staticmethod
-    def happy_entropy_and_proof(view: View) -> Tuple[Beacon, Proof]:
+    def happy_beacon_and_pk(view: View) -> Tuple[RandomBeacon, PublicKey]:
         sk = generate_random_sk()
         beacon = NormalMode.generate_beacon(sk, view)
-        return bytes(beacon), bytes(sk.get_g1())
+        return beacon, sk.get_g1()
 
     @staticmethod
-    def unhappy_entropy(last_beacon: Beacon, view: View) -> Beacon:
+    def unhappy_beacon(last_beacon: Entropy, view: View) -> RandomBeacon:
         return RecoveryMode.generate_beacon(last_beacon, view)
 
     def setUp(self):
-        entropy, proof = self.happy_entropy_and_proof(0)
-        self.beacon = RandomBeaconHandler(
-            beacon=RandomBeacon(
-                version=0,
-                context=0,
-                entropy=entropy,
-                proof=proof
-            )
-        )
+        beacon, pk = self.happy_beacon_and_pk(0)
+        self.beacon = RandomBeaconHandler(beacon)
 
     def test_happy(self):
         for i in range(3):
-            entropy, proof = self.happy_entropy_and_proof(i)
-            new_beacon = RandomBeacon(
-                    version=0,
-                    context=i,
-                    entropy=entropy,
-                    proof=proof
-                )
-            self.beacon.verify_happy(new_beacon)
-        self.assertEqual(self.beacon.last_beacon.context, 2)
+            new_beacon, pk = self.happy_beacon_and_pk(i)
+            self.beacon.verify_happy(new_beacon, pk, i)
 
     def test_unhappy(self):
         for i in range(1, 3):
-            entropy = self.unhappy_entropy(self.beacon.last_beacon.entropy, i)
-            new_beacon = RandomBeacon(
-                version=0,
-                context=i,
-                entropy=entropy,
-                proof=b""
-            )
-            self.beacon.verify_unhappy(new_beacon)
-        self.assertEqual(self.beacon.last_beacon.context, 2)
+            new_beacon = self.unhappy_beacon(self.beacon.last_beacon.entropy(), i)
+            self.beacon.verify_unhappy(new_beacon, i)
 
     def test_mixed(self):
         for i in range(1, 6, 2):
-            entropy, proof = self.happy_entropy_and_proof(i)
-            new_beacon = RandomBeacon(
-                version=0,
-                context=i,
-                entropy=entropy,
-                proof=proof
-            )
-            self.beacon.verify_happy(new_beacon)
-            entropy = self.unhappy_entropy(self.beacon.last_beacon.entropy, i+1)
-            new_beacon = RandomBeacon(
-                version=0,
-                context=i+1,
-                entropy=entropy,
-                proof=b""
-            )
-            self.beacon.verify_unhappy(new_beacon)
-        self.assertEqual(self.beacon.last_beacon.context, 6)
+            new_beacon, pk = self.happy_beacon_and_pk(i)
+            self.beacon.verify_happy(new_beacon, pk, i)
+            new_beacon = self.unhappy_beacon(self.beacon.last_beacon.entropy(), i+1)
+            self.beacon.verify_unhappy(new_beacon, i+1)
