@@ -48,7 +48,7 @@ class NormalMode:
 
     @staticmethod
     def generate_beacon(private_key: PrivateKey, view: View) -> RandomBeacon:
-        return RandomBeacon(1, bytes(BasicSchemeMPL.sign(private_key, view_to_bytes(view))))
+        return RandomBeacon(VERSION, bytes(BasicSchemeMPL.sign(private_key, view_to_bytes(view))))
 
 
 class RecoveryMode:
@@ -66,7 +66,7 @@ class RecoveryMode:
 
     @staticmethod
     def generate_beacon(last_beacon_entropy: Entropy, view: View) -> RandomBeacon:
-        return RandomBeacon(1, sha256(last_beacon_entropy + view_to_bytes(view)).digest())
+        return RandomBeacon(VERSION, sha256(last_beacon_entropy + view_to_bytes(view)).digest())
 
 
 class RandomBeaconHandler:
