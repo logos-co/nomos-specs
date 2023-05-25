@@ -5,67 +5,68 @@ from typing import TypeAlias
 
 # carnot imports
 # lib imports
-from blspy import PrivateKey, Util, PopSchemeMPL, G2Element, G1Element
+from blspy import PrivateKey, Util, BasicSchemeMPL, G2Element, G1Element
 
 # stdlib imports
 from hashlib import sha256
 
 View: TypeAlias = int
-Beacon: TypeAlias = bytes
-Proof: TypeAlias = bytes  # For now this is gonna be a public key, in future research we may pivot to zk proofs.
-
+Sig: TypeAlias = bytes
+Entropy: TypeAlias = bytes
+PublicKey: TypeAlias = G1Element
+VERSION = 0
 
 def generate_random_sk() -> PrivateKey:
     seed = bytes([randint(0, 255) for _ in range(32)])
-    return PopSchemeMPL.key_gen(seed)
+    return BasicSchemeMPL.key_gen(seed)
 
+
+def view_to_bytes(view: View) -> bytes:
+    return view.to_bytes((view.bit_length() + 7) // 8, byteorder='little', signed=True)
 
 @dataclass
 class RandomBeacon:
     version: int
-    context: View
-    entropy: Beacon
-    # TODO: Just the happy path beacons owns a proof, we can set the proof to empty bytes for now.
-    # Probably we should separate this into two kinds of beacons and group them under a single type later on.
-    proof: Proof
+    sig: Sig
+
+    def entropy(self) -> Entropy:
+        return self.sig
 
 
 class NormalMode:
 
     @staticmethod
-    def verify(beacon: RandomBeacon) -> bool:
+    def verify(beacon: RandomBeacon, pk: PublicKey, view: View) -> bool:
         """
-        :param proof: BLS signature
-        :param beacon: Beacon is signature for current view
-        :param view: View to verify beacon upon
+        :param beacon: the provided beacon
+        :param view: view to verify beacon upon
+        :param pk: public key of the issuer of the beacon
         :return:
         """
-        # TODO: Actually verify that the message is propoerly signed
-        sig = G2Element.from_bytes(beacon.entropy)
-        proof = G1Element.from_bytes(beacon.proof)
-        return PopSchemeMPL.verify(proof, Util.hash256(str(beacon.context).encode()), sig)
+        sig = G2Element.from_bytes(beacon.sig)
+        return BasicSchemeMPL.verify(pk, view_to_bytes(view), sig)
 
     @staticmethod
-    def generate_beacon(private_key: PrivateKey, view: View) -> Beacon:
-        return bytes(PopSchemeMPL.sign(private_key, Util.hash256(str(view).encode())))
+    def generate_beacon(private_key: PrivateKey, view: View) -> RandomBeacon:
+        return RandomBeacon(VERSION, bytes(BasicSchemeMPL.sign(private_key, view_to_bytes(view))))
 
 
 class RecoveryMode:
 
     @staticmethod
-    def verify(last_beacon: RandomBeacon, beacon: RandomBeacon) -> bool:
+    def verify(last_beacon: RandomBeacon, beacon: RandomBeacon, view: View) -> bool:
         """
-        :param last_beacon: Unhappy -> last working beacon (signature), Happy -> Hash of previous beacon and next view number
-        :param beacon:
-        :param view:
+        :param last_beacon: beacon for view - 1
+        :param beacon: beacon for view
+        :param view: the view to verify beacon upon
         :return:
         """
-        b = sha256(last_beacon.entropy + str(beacon.context).encode()).digest()
-        return b == beacon.entropy
+        b = sha256(last_beacon.entropy() + view_to_bytes(view)).digest()
+        return b == beacon.entropy()
 
     @staticmethod
-    def generate_beacon(last_beacon: Beacon, view: View) -> Beacon:
-        return sha256(last_beacon + str(view).encode()).digest()
+    def generate_beacon(last_beacon_entropy: Entropy, view: View) -> RandomBeacon:
+        return RandomBeacon(VERSION, sha256(last_beacon_entropy + view_to_bytes(view)).digest())
 
 
 class RandomBeaconHandler:
@@ -77,14 +78,14 @@ class RandomBeaconHandler:
         """
         self.last_beacon: RandomBeacon = beacon
 
-    def verify_happy(self, new_beacon: RandomBeacon) -> bool:
-        if NormalMode.verify(new_beacon):
+    def verify_happy(self, new_beacon: RandomBeacon, pk: PublicKey, view: View) -> bool:
+        if NormalMode.verify(new_beacon, pk, view):
             self.last_beacon = new_beacon
             return True
         return False
 
-    def verify_unhappy(self, new_beacon: RandomBeacon) -> bool:
-        if RecoveryMode.verify(self.last_beacon, new_beacon):
+    def verify_unhappy(self, new_beacon: RandomBeacon, view: View) -> bool:
+        if RecoveryMode.verify(self.last_beacon, new_beacon, view):
             self.last_beacon = new_beacon
             return True
         return False

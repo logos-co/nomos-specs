@@ -6,7 +6,7 @@ from blspy import PrivateKey
 
 from carnot import Id, Carnot, Block, Overlay, Vote, StandardQc, NewView
 from beacon import generate_random_sk, RandomBeacon, NormalMode
-from beconized_carnot import BeaconizedCarnot, BeaconizedBlock
+from beaconized_carnot import BeaconizedCarnot, BeaconizedBlock
 from overlay import FlatOverlay, EntropyOverlay
 from test_unhappy_path import parents_from_childs
 
@@ -18,7 +18,7 @@ def gen_node(sk: PrivateKey, overlay: Overlay, entropy: bytes = b""):
 
 def succeed(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> (List[Vote], EntropyOverlay):
     overlay = FlatOverlay(list(nodes.keys()))
-    overlay.set_entropy(proposed_block.beacon.entropy)
+    overlay.set_entropy(proposed_block.beacon.entropy())
 
     # broadcast the block
     for node in nodes.values():
@@ -94,23 +94,19 @@ def fail(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> 
 
 
 def add_genesis_block(carnot: BeaconizedCarnot, sk: PrivateKey) -> Block:
-    entropy = NormalMode.generate_beacon(sk, -1)
+    beacon = NormalMode.generate_beacon(sk, -1)
     genesis_block = BeaconizedBlock(
         view=0,
         qc=StandardQc(block=b"", view=0),
         _id=b"",
-        beacon=RandomBeacon(
-            version=0,
-            context=-1,
-            entropy=entropy,
-            proof=bytes(sk.get_g1())
-        )
+        beacon=beacon,
+        pk=sk.get_g1()
     )
     carnot.safe_blocks[genesis_block.id()] = genesis_block
     carnot.receive_block(genesis_block)
     carnot.local_high_qc = genesis_block.qc
     carnot.current_view = 1
-    carnot.overlay.set_entropy(entropy)
+    carnot.overlay.set_entropy(beacon.entropy())
     return genesis_block
 
 
@@ -121,7 +117,7 @@ def initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, 
     nodes = dict(gen_node(key, FlatOverlay(nodes_ids), bytes(genesis_sk.get_g1())) for key in keys)
     genesis_block = None
     overlay = FlatOverlay(nodes_ids)
-    overlay.set_entropy(NormalMode.generate_beacon(genesis_sk, -1))
+    overlay.set_entropy(NormalMode.generate_beacon(genesis_sk, -1).entropy())
     leader: Carnot = nodes[overlay.leader()]
     for node in nodes.values():
         genesis_block = add_genesis_block(node, genesis_sk)
@@ -140,7 +136,7 @@ def initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, 
     proposed_block = leader.propose_block(1, genesis_votes).payload
     test_case.assertIsNotNone(proposed_block)
     overlay = FlatOverlay(nodes_ids)
-    overlay.set_entropy(NormalMode.generate_beacon(genesis_sk, -1))
+    overlay.set_entropy(genesis_block.beacon.entropy())
     return nodes, leader, proposed_block, overlay
 
 

@@ -7,6 +7,8 @@ from overlay import EntropyOverlay
 @dataclass
 class BeaconizedBlock(Block):
     beacon: RandomBeacon
+    # public key of the proposer
+    pk: PublicKey
 
 
 class BeaconizedCarnot(Carnot):
@@ -14,14 +16,9 @@ class BeaconizedCarnot(Carnot):
         self.sk = sk
         self.pk = bytes(self.sk.get_g1())
         self.random_beacon = RandomBeaconHandler(
-            RandomBeacon(
-                version=0,
-                context=-1,
-                entropy=RecoveryMode.generate_beacon(entropy, -1),
-                proof=self.pk
-            )
+            RecoveryMode.generate_beacon(entropy, -1)
         )
-        overlay.set_entropy(self.random_beacon.last_beacon.entropy)
+        overlay.set_entropy(self.random_beacon.last_beacon.entropy())
         super().__init__(self.pk, overlay=overlay)
 
     def approve_block(self, block: BeaconizedBlock, votes: Set[Vote]) -> Event:
@@ -47,39 +44,28 @@ class BeaconizedCarnot(Carnot):
 
         # root members send votes to next leader, we update our beacon first
         if self.overlay.is_member_of_root_committee(self.id):
-            self.random_beacon.verify_happy(block.beacon)
-            self.overlay.set_entropy(self.random_beacon.last_beacon.entropy)
+            assert(self.random_beacon.verify_happy(block.beacon, block.pk, block.qc.view))
+            self.overlay.set_entropy(self.random_beacon.last_beacon.entropy())
             return Send(to=self.overlay.leader(), payload=vote)
 
         # otherwise we send to the parent committee and update the beacon second
         return_event = Send(to=self.overlay.parent_committee(self.id), payload=vote)
-        self.random_beacon.verify_happy(block.beacon)
-        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy)
+        assert(self.random_beacon.verify_happy(block.beacon, block.pk, block.qc.view))
+        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy())
         return return_event
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
         super().receive_timeout_qc(timeout_qc)
         if timeout_qc.view < self.current_view:
             return
-        entropy = RecoveryMode.generate_beacon(self.random_beacon.last_beacon.entropy, timeout_qc.view)
-        new_beacon = RandomBeacon(
-            version=0,
-            context=self.current_view,
-            entropy=entropy,
-            proof=b""
-        )
-        self.random_beacon.verify_unhappy(new_beacon)
-        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy)
+        new_beacon = RecoveryMode.generate_beacon(self.random_beacon.last_beacon.entropy(), timeout_qc.view)
+        self.random_beacon.verify_unhappy(new_beacon, timeout_qc.view)
+        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy())
 
     def propose_block(self, view: View, quorum: Quorum) -> Event:
-            beacon = RandomBeacon(
-                version=0,
-                context=self.current_view,
-                entropy=NormalMode.generate_beacon(self.sk, self.current_view),
-                proof=self.pk
-            )
             event: Event = super().propose_block(view, quorum)
             block = event.payload
-            block = BeaconizedBlock(view=block.view, qc=block.qc, _id=block._id, beacon=beacon)
+            beacon = NormalMode.generate_beacon(self.sk, block.qc.view)
+            block = BeaconizedBlock(view=block.view, qc=block.qc, _id=block._id, beacon=beacon, pk = G1Element.from_bytes(self.pk))
             event.payload = block
             return event
