@@ -1,25 +1,34 @@
 import random
 from abc import abstractmethod
-from typing import Set, Optional, List
+from typing import Set, Optional, List, Self
 from carnot import Overlay, Id, Committee, View
 
 
 class EntropyOverlay(Overlay):
     @abstractmethod
-    def set_entropy(self, entropy: bytes):
+    def advance(self, entropy: bytes) -> Self:
         pass
 
 
 class FlatOverlay(EntropyOverlay):
-    def set_entropy(self, entropy: bytes):
+
+    def __init__(self, current_leader: Id, nodes: List[Id], entropy: bytes):
+        self.current_leader = current_leader
+        self.nodes = nodes
+        self.entropy = entropy
+
+    def next_leader(self) -> Id:
+        random.seed(a=self.entropy, version=2)
+        return random.choice(self.nodes)
+
+    def advance(self, entropy: bytes):
         self.entropy = entropy
 
     def is_leader(self, _id: Id):
         return _id == self.leader()
 
     def leader(self) -> Id:
-        random.seed(a=self.entropy, version=2)
-        return random.choice(self.nodes)
+        return self.current_leader
 
     def is_member_of_leaf_committee(self, _id: Id) -> bool:
         return True
@@ -47,10 +56,6 @@ class FlatOverlay(EntropyOverlay):
 
     def super_majority_threshold(self, _id: Id) -> int:
         return 0
-
-    def __init__(self, nodes: List[Id]):
-        self.nodes = nodes
-        self.entropy = None
 
 
 
