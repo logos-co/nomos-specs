@@ -22,7 +22,7 @@ class FlatOverlay(EntropyOverlay):
         return random.choice(self.nodes)
 
     def advance(self, entropy: bytes):
-        self.entropy = entropy
+        return FlatOverlay(self.next_leader(), self.nodes, entropy)
 
     def is_leader(self, _id: Id):
         return _id == self.leader()

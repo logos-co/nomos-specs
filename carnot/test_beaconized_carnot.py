@@ -1,3 +1,4 @@
+import random
 from typing import Dict, List
 from unittest import TestCase
 from itertools import chain
@@ -5,21 +6,19 @@ from itertools import chain
 from blspy import PrivateKey
 
 from carnot import Id, Carnot, Block, Overlay, Vote, StandardQc, NewView
-from beacon import generate_random_sk, RandomBeacon, NormalMode
+from beacon import generate_random_sk, RandomBeacon, NormalMode, RecoveryMode
 from beaconized_carnot import BeaconizedCarnot, BeaconizedBlock
 from overlay import FlatOverlay, EntropyOverlay
 from test_unhappy_path import parents_from_childs
 
 
 def gen_node(sk: PrivateKey, overlay: Overlay, entropy: bytes = b""):
-    node = BeaconizedCarnot(sk, overlay)
+    node = BeaconizedCarnot(sk, overlay, entropy)
     return node.id, node
 
 
-def succeed(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> (List[Vote], EntropyOverlay):
-    overlay = FlatOverlay(list(nodes.keys()))
-    overlay.set_entropy(proposed_block.beacon.entropy())
-
+def succeed(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock, overlay: EntropyOverlay) -> (List[Vote], EntropyOverlay):
+    overlay = overlay.advance(proposed_block.beacon.entropy())
     # broadcast the block
     for node in nodes.values():
         node.receive_block(proposed_block)
@@ -47,9 +46,8 @@ def succeed(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) 
     return root_votes, overlay
 
 
-def fail(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock) -> (List[NewView], EntropyOverlay):
-    overlay = FlatOverlay(list(nodes.keys()))
-    overlay.set_entropy(proposed_block.beacon.entropy)
+def fail(nodes: Dict[Id, BeaconizedCarnot], proposed_block: BeaconizedBlock, overlay: EntropyOverlay) -> (List[NewView], EntropyOverlay):
+    overlay = overlay.advance(proposed_block.beacon.entropy())
     # broadcast the block
     for node in nodes.values():
         node.receive_block(proposed_block)
@@ -106,7 +104,7 @@ def add_genesis_block(carnot: BeaconizedCarnot, sk: PrivateKey) -> Block:
     carnot.receive_block(genesis_block)
     carnot.local_high_qc = genesis_block.qc
     carnot.current_view = 1
-    carnot.overlay.set_entropy(beacon.entropy())
+    carnot.overlay = carnot.overlay.advance(beacon.entropy())
     return genesis_block
 
 
@@ -114,10 +112,14 @@ def initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, 
     keys = [generate_random_sk() for _ in range(size)]
     nodes_ids = [bytes(key.get_g1()) for key in keys]
     genesis_sk = generate_random_sk()
-    nodes = dict(gen_node(key, FlatOverlay(nodes_ids), bytes(genesis_sk.get_g1())) for key in keys)
+    entropy = RecoveryMode.generate_beacon(bytes(genesis_sk), -1).entropy()
+
+    random.seed(a=entropy, version=2)
+    current_leader = random.choice(nodes_ids)
+
+    nodes = dict(gen_node(key, FlatOverlay(current_leader, nodes_ids, entropy), entropy) for key in keys)
     genesis_block = None
-    overlay = FlatOverlay(nodes_ids)
-    overlay.set_entropy(NormalMode.generate_beacon(genesis_sk, -1).entropy())
+    overlay = FlatOverlay(current_leader, nodes_ids, entropy)
     leader: Carnot = nodes[overlay.leader()]
     for node in nodes.values():
         genesis_block = add_genesis_block(node, genesis_sk)
@@ -135,8 +137,7 @@ def initial_setup(test_case: TestCase, size: int) -> (Dict[Id, Carnot], Carnot, 
     )
     proposed_block = leader.propose_block(1, genesis_votes).payload
     test_case.assertIsNotNone(proposed_block)
-    overlay = FlatOverlay(nodes_ids)
-    overlay.set_entropy(genesis_block.beacon.entropy())
+    overlay = overlay.advance(genesis_block.beacon.entropy())
     return nodes, leader, proposed_block, overlay
 
 
@@ -151,25 +152,25 @@ class TestBeaconizedCarnot(TestCase):
         nodes, leader, proposed_block, overlay = initial_setup(self, 5)
 
         for view in range(2, 5):
-            root_votes, overlay = succeed(nodes, proposed_block)
+            root_votes, overlay = succeed(nodes, proposed_block, overlay)
             leader = nodes[overlay.leader()]
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        root_votes, overlay = fail(nodes, proposed_block)
+        root_votes, overlay = fail(nodes, proposed_block, overlay)
         leader = nodes[overlay.leader()]
         proposed_block = leader.propose_block(6, root_votes).payload
 
         for view in range(7, 8):
-            root_votes, overlay = succeed(nodes, proposed_block)
+            root_votes, overlay = succeed(nodes, proposed_block, overlay)
             leader = nodes[overlay.leader()]
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        root_votes, overlay = fail(nodes, proposed_block)
+        root_votes, overlay = fail(nodes, proposed_block, overlay)
         leader = nodes[overlay.leader()]
         proposed_block = leader.propose_block(9, root_votes).payload
 
         for view in range(10, 15):
-            root_votes, overlay = succeed(nodes, proposed_block)
+            root_votes, overlay = succeed(nodes, proposed_block, overlay)
             leader = nodes[overlay.leader()]
             proposed_block = leader.propose_block(view, root_votes).payload
 

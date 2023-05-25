@@ -18,7 +18,6 @@ class BeaconizedCarnot(Carnot):
         self.random_beacon = RandomBeaconHandler(
             RecoveryMode.generate_beacon(entropy, -1)
         )
-        overlay.set_entropy(self.random_beacon.last_beacon.entropy())
         super().__init__(self.pk, overlay=overlay)
 
     def approve_block(self, block: BeaconizedBlock, votes: Set[Vote]) -> Event:
@@ -45,13 +44,13 @@ class BeaconizedCarnot(Carnot):
         # root members send votes to next leader, we update our beacon first
         if self.overlay.is_member_of_root_committee(self.id):
             assert(self.random_beacon.verify_happy(block.beacon, block.pk, block.qc.view))
-            self.overlay.set_entropy(self.random_beacon.last_beacon.entropy())
+            self.overlay = self.overlay.advance(self.random_beacon.last_beacon.entropy())
             return Send(to=self.overlay.leader(), payload=vote)
 
         # otherwise we send to the parent committee and update the beacon second
         return_event = Send(to=self.overlay.parent_committee(self.id), payload=vote)
         assert(self.random_beacon.verify_happy(block.beacon, block.pk, block.qc.view))
-        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy())
+        self.overlay = self.overlay.advance(self.random_beacon.last_beacon.entropy())
         return return_event
 
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
@@ -60,12 +59,12 @@ class BeaconizedCarnot(Carnot):
             return
         new_beacon = RecoveryMode.generate_beacon(self.random_beacon.last_beacon.entropy(), timeout_qc.view)
         self.random_beacon.verify_unhappy(new_beacon, timeout_qc.view)
-        self.overlay.set_entropy(self.random_beacon.last_beacon.entropy())
+        self.overlay = self.overlay.advance(self.random_beacon.last_beacon.entropy())
 
     def propose_block(self, view: View, quorum: Quorum) -> Event:
-            event: Event = super().propose_block(view, quorum)
-            block = event.payload
-            beacon = NormalMode.generate_beacon(self.sk, block.qc.view)
-            block = BeaconizedBlock(view=block.view, qc=block.qc, _id=block._id, beacon=beacon, pk = G1Element.from_bytes(self.pk))
-            event.payload = block
-            return event
+        event: Event = super().propose_block(view, quorum)
+        block = event.payload
+        beacon = NormalMode.generate_beacon(self.sk, block.qc.view)
+        block = BeaconizedBlock(view=block.view, qc=block.qc, _id=block._id, beacon=beacon, pk = G1Element.from_bytes(self.pk))
+        event.payload = block
+        return event
