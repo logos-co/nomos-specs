@@ -68,7 +68,22 @@ def merge_bitarrays(bitarray1, bitarray2):
 
 
 
+def compressBitArrays(*bit_arrays):
+    # Flatten the bit arrays into a single list
+    flat_array = [bit for bit_array in bit_arrays for bit in bit_array]
 
+    # Convert the flat array to a bitarray object
+    bitarray_object = bitarray(flat_array)
+
+    # Compress the bitarray using zlib compression
+    compressed_data = zlib.compress(bitarray_object.tobytes())
+
+    # Calculate the compression ratio
+    actual_data_size = len(bitarray_object)
+    compressed_data_size = len(compressed_data)
+   # compression_ratio = actual_data_size / compressed_data_size
+
+    return compressed_data_size
 
 
 
