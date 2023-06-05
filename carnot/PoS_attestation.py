@@ -74,7 +74,7 @@ def compressBitArrays(*bit_arrays):
 
     # Convert the flat array to a bitarray object
     bitarray_object = bitarray(flat_array)
-
+    print("flat bitarray is ", bitarray_object)
     # Compress the bitarray using zlib compression
     compressed_data = zlib.compress(bitarray_object.tobytes())
 
@@ -97,8 +97,17 @@ def decompressBitArray(compressed_data):
     # Convert the bitarray object to a list
     decompressed_bitarray = bitarray_object.tolist()
 
+    # Remove any additional padding zeros
+    while decompressed_bitarray and decompressed_bitarray[-1] == 0:
+        decompressed_bitarray.pop()
+
     return decompressed_bitarray
 
+bit_array1 = [1, 0, 1, 1, 0]
+bit_array2 = [0, 1, 0, 1, 1, 0]
+bit_array3 = [1, 1, 0, 0, 1, 0, 1]
+compressed_bitarray = compressBitArrays(bit_array1, bit_array2, bit_array3)
 
+print("decompressed bitarray is ", decompressBitArray(compressed_bitarray))
 
 
