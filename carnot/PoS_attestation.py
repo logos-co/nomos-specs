@@ -103,11 +103,6 @@ def decompressBitArray(compressed_data):
 
     return decompressed_bitarray
 
-bit_array1 = [1, 0, 1, 1, 0]
-bit_array2 = [0, 1, 0, 1, 1, 0]
-bit_array3 = [1, 1, 0, 0, 1, 0, 1]
-compressed_bitarray = compressBitArrays(bit_array1, bit_array2, bit_array3)
 
-print("decompressed bitarray is ", decompressBitArray(compressed_bitarray))
 
 
