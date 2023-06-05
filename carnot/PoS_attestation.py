@@ -87,5 +87,26 @@ def compressBitArrays(*bit_arrays):
 
 
 
+# Usage example:
+bit_array1 = [1, 0, 1, 1, 0]
+bit_array2 = [0, 1, 0, 1, 1, 0]
+bit_array3 = [1, 1, 0, 0, 1, 0, 1]
+compressed_data=compressBitArrays(bit_array1, bit_array2, bit_array3)
+def decompressBitArray(compressed_data):
+    # Decompress the compressed data using zlib decompression
+    decompressed_data = zlib.decompress(compressed_data)
+
+    # Convert the decompressed data back to a bitarray object
+    bitarray_object = bitarray()
+    bitarray_object.frombytes(decompressed_data)
+
+    # Convert the bitarray object to a list
+    decompressed_bitarray = bitarray_object.tolist()
+
+    return decompressed_bitarray
+
+# Usage example:
+decompressed_bitarray = decompressBitArray(compressed_data)
+print("Decompressed Bit Array:", decompressed_bitarray)
 
 
