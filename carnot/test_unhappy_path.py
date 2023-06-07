@@ -259,6 +259,6 @@ class TestCarnotUnhappyPath(TestCase):
             root_votes = succeed(self, overlay, nodes, proposed_block)
             proposed_block = leader.propose_block(view, root_votes).payload
 
-        committed_blocks = [0, 1, 2, 3, 6, 9, 10, 11]
+        committed_blocks = {0, 1, 2, 3, 6, 9, 10, 11}
         for node in nodes.values():
-            self.assertEqual(committed_blocks, sorted([block.view for block in node.committed_blocks().values()]))
+            self.assertEqual(committed_blocks, {block.view for block in node.committed_blocks().values()})
