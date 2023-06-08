@@ -77,12 +77,6 @@ def compressBitArrays(*bit_arrays):
     print("flat bitarray is ", bitarray_object)
     # Compress the bitarray using zlib compression
     compressed_data = zlib.compress(bitarray_object.tobytes())
-
-    # Calculate the compression ratio
- #   actual_data_size = len(bitarray_object)
-  #  compressed_data_size = len(compressed_data)
-   # compression_ratio = actual_data_size / compressed_data_size
-
     return compressed_data
 
 
