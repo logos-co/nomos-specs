@@ -9,7 +9,29 @@ from bitarray import bitarray
 # This is the novel PoS attestation mechanism for Carnot. The goal of here is to avoid expensive O(n) signature
 # aggregation and verification.
 
+# First we describe how the PoS attestation mechanism works and then we discuss the directions that can be taken
+# in order to preserve staker's and stake privacy.
+
+#Overview:
+# The attestation serves a crucial purpose in the consensus process by allowing validators to express their agreement
+# with the current state of the chain. Specifically, validators use attestations to vote in favor of their view of the
+# blockchain, including the most recently justified block and the block currently being proposed. These attestations are
+# collected from all participating validators and play a vital role in achieving consensus and establishing a shared
+# understanding of the blockchain's state. The problem arises with a large network  when a validator requires to verify
+# attestation from the super majority of other validators in the network. Verifying and/or O(n) signatures, (where n  is
+# the network size) for a large n can be very expensive. This proposal is to decouple attestation and the consensus
+# and make sure attestation mechanism is also as scalable as the consensus.
+
+# Requirement:
+# Node identities are sorted within a committee, without knowing the actual node identity.
+
+# The basic idea is that a node that is member of a committee C forwards a bitarray with the respective bits on (true)
+# for all indices respective to the position of the nodes  in ordered committee set. At least one third of the nodes
+# from child committees has to have a specific bit switched on for a node to pass it as on to its parent.
+
+
 # A node receives bitarrays from its children, containing information on votes from its grand child committees.
+# These bitarrays are then merged together.
 def count_on_bitarray_fields(bitarrays, majority_threshold, threshold2):
     assert all(len(bitarray) == len(bitarrays[0]) for bitarray in bitarrays), "All bit arrays must have the same length"
     assert all(sum(bitarray) >= threshold2 for bitarray in
@@ -49,7 +71,7 @@ def getIndex(voteSet, sender):
             return index
     return -1  # Return -1 if the sender is not found in the idSet
 
-
+# Creating bitarray from received votes.
 def createCommitteeBitArray(voters, committee_size):
     committee_bit_array = [False] * committee_size
     assert committee_size >= len(voters)
@@ -65,8 +87,8 @@ def createCommitteeBitArray(voters, committee_size):
 
 
 
-
-def merge_bitarrays(bitarray1, bitarray2):
+#
+def concatenate_bitarrays(bitarray1, bitarray2):
     merged_array = bitarray1 + bitarray2
     return merged_array
 
