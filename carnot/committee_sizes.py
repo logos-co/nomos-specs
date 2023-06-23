@@ -52,15 +52,3 @@ def compute_optimal_number_of_committees_and_committee_size(
     # return number of committees, K_1, committee size, n_1, number of committees
     # with size n_1+1, r_1 and prob. of failure, Prob_1.
     return previous_number_of_committees, previous_committee_size, previous_remainder, previous_probability
-
-
-if __name__ == "__main__":
-    failure_threshold = 0.01
-    print(
-        compute_optimal_number_of_committees_and_committee_size(
-            600,
-            failure_threshold,
-            CARNOT_ADVERSARY_THRESHOLD_PER_COMMITTEE,
-            CARNOT_NETWORK_ADVERSARY_THRESHOLD
-        )
-    )
