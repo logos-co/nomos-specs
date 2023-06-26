@@ -1,25 +1,38 @@
+import itertools
 from typing import List, Dict, Tuple, Set, Optional, Self
 from carnot import Id, Committee
 from carnot.overlay import EntropyOverlay
 import random
 
+
 class CarnotTree:
     def __int__(self, nodes: List[Id], number_of_committees: int):
         self.number_of_committees = number_of_committees
         self.committee_size = len(nodes) // number_of_committees
-        self.inner_committees = CarnotTree.build_committee_from_nodes_with_size(
+        self.inner_committees, self.membership_committees = CarnotTree.build_committee_from_nodes_with_size(
             nodes, self.number_of_committees, self.committee_size
         )
-        self.committees = {k: v for v, k in self.inner_committees.values()}
+        self.committees = {k: v for v, k in self.inner_committees.items()}
         self.nodes = CarnotTree.build_nodes_index(nodes, self.committee_size)
+        self.committees_by_member = {
+            member: self.inner_committees[committee]
+            for committee, v in self.membership_committees.items()
+            for member in v
+        }
 
     @staticmethod
-    def build_committee_from_nodes_with_size(nodes: List[Id], number_of_committees: int, committee_size: int) -> Dict[int, Id]:
-        return dict(enumerate([
+    def build_committee_from_nodes_with_size(
+            nodes: List[Id],
+            number_of_committees: int,
+            committee_size: int
+    ) -> Tuple[Dict[int, Id], Dict[int, Set[Id]]]:
+        committees = [
             # TODO: This hash method should be specific to what we would want to use for the protocol
-            hash(frozenset(nodes[slice(n, n+number_of_committees)]))
+            frozenset(nodes[slice(n, n+number_of_committees)])
             for n in range(0, number_of_committees, committee_size)
-        ]))
+        ]
+        hashes = [hash(s) for s in committees]
+        return dict(enumerate(hashes)), dict(enumerate(committees))
 
     @staticmethod
     def build_nodes_index(nodes: List[Id], committee_size: int) -> Dict[Id, int]:
@@ -27,14 +40,30 @@ class CarnotTree:
             _id: i // committee_size for i, _id in enumerate(nodes)
         }
 
-    def parent_committee(self, committee_id: Id):
+    def parent_committee(self, committee_id: Id) -> Optional[Id]:
         return self.inner_committees[min(self.committees[committee_id] // 2 - 1, 0)]
 
-    def child_committees(self, committee_id: Id) -> Tuple[Id, Id]:
+    def child_committees(self, committee_id: Id) -> Tuple[Optional[Id], Optional[Id]]:
         base = self.committees[committee_id] * 2
         first_child = base + 1
         second_child = base + 2
         return self.inner_committees[first_child], self.inner_committees[second_child]
+
+    def leaf_committees(self) -> Dict[Id, Committee]:
+        total_leafs = (self.number_of_committees + 1) // 2
+        return {
+            self.committees[i]: self.membership_committees[i]
+            for i in range(self.number_of_committees - total_leafs, self.number_of_committees)
+        }
+
+    def root_committee(self) -> Committee:
+        return self.membership_committees[0]
+
+    def committee_by_committee_id(self, committee_id: Id) -> Optional[Committee]:
+        return self.membership_committees.get(self.inner_committees[committee_id])
+
+    def committee_by_member_id(self, member_id: Id) -> Id:
+        return self.committees_by_member[member_id]
 
 
 class CarnotOverlay(EntropyOverlay):
@@ -48,7 +77,7 @@ class CarnotOverlay(EntropyOverlay):
         self.carnot_tree = CarnotTree(nodes, number_of_committees)
 
     def advance(self, entropy: bytes) -> Self:
-        return CarnotOverlay(self.nodes, entropy, self.number_of_committees)
+        return CarnotOverlay(self.nodes, entropy, self.next_leader(), self.number_of_committees)
 
     def is_leader(self, _id: Id):
         return _id == self.leader()
@@ -61,28 +90,36 @@ class CarnotOverlay(EntropyOverlay):
         return random.choice(self.nodes)
 
     def is_member_of_leaf_committee(self, _id: Id) -> bool:
-        pass
+        return _id in set(itertools.chain.from_iterable(self.carnot_tree.leaf_committees().values()))
 
     def is_member_of_root_committee(self, _id: Id) -> bool:
-        pass
+        return _id in self.carnot_tree.root_committee()
 
     def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
-        pass
+        l, r = self.carnot_tree.child_committees(parent)
+        l = self.carnot_tree.committee_by_committee_id(l) if l is not None else set() or set()
+        r = self.carnot_tree.committee_by_committee_id(r) if r is not None else set() or set()
+        return child in l.join(r)
 
     def parent_committee(self, _id: Id) -> Optional[Committee]:
-        pass
+        return self.carnot_tree.committee_by_committee_id(
+            self.carnot_tree.parent_committee(
+                self.carnot_tree.committee_by_member_id(_id)
+            )
+        )
 
     def leaf_committees(self) -> Set[Committee]:
-        pass
+        return set(self.carnot_tree.leaf_committees().values())
 
     def root_committee(self) -> Committee:
-        pass
+        return self.carnot_tree.root_committee()
 
     def is_child_of_root_committee(self, _id: Id) -> bool:
-        pass
+        return _id in self.root_committee()
 
     def leader_super_majority_threshold(self, _id: Id) -> int:
-        pass
+        return (self.carnot_tree.committee_size * 2 // 3) + 1
 
     def super_majority_threshold(self, _id: Id) -> int:
-        pass
+        return (self.carnot_tree.committee_size * 2 // 3) + 1
+
