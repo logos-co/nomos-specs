@@ -8,7 +8,6 @@ Initially, all number_of_nodes are in one committee, and in subsequent iteration
 
 A more detailed description of the algorithm,  and of its mathematical aspects, is provided in the "Carnot paper" available at https://www.notion.so/Nomos-Specification-419bfb7a939648e9b3894a90d188c3be?pvs=4   
 """
-
 import math
 from scipy.stats import binom
 
@@ -24,10 +23,12 @@ def compute_optimal_number_of_committees_and_committee_size(
         network_adversary_threshold: float
 ):
     assert failure_threshold > 0
+    
     # number_of_nodes is the number of nodes in the network 
     # failure_threshold is the prob. of failure which can be tolerated
     # adversaries_threshold_per_committee is the fraction of Byzantine modes in a committee
     # network_adversary_threshold is the fraction of Byzantine nodes in the network
+    
     number_of_committees = 1
     committee_size = number_of_nodes
     remainder = 0
@@ -60,6 +61,8 @@ def compute_optimal_number_of_committees_and_committee_size(
             )
         else:
             current_probability = 1 - committee_size_probability ** number_of_committees
+            
     # return the number_of_committees, committee_size, remainder and current_probability
     # computed at the previous iteration. 
+
     return previous_number_of_committees, previous_committee_size, previous_remainder, previous_probability
