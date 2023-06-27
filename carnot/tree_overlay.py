@@ -1,12 +1,12 @@
 import itertools
 from typing import List, Dict, Tuple, Set, Optional, Self
 from carnot import Id, Committee
-from carnot.overlay import EntropyOverlay
+from overlay import EntropyOverlay
 import random
 
 
 class CarnotTree:
-    def __int__(self, nodes: List[Id], number_of_committees: int):
+    def __init__(self, nodes: List[Id], number_of_committees: int):
         self.number_of_committees = number_of_committees
         self.committee_size = len(nodes) // number_of_committees
         self.inner_committees, self.membership_committees = CarnotTree.build_committee_from_nodes_with_size(
@@ -28,9 +28,15 @@ class CarnotTree:
     ) -> Tuple[Dict[int, Id], Dict[int, Set[Id]]]:
         committees = [
             # TODO: This hash method should be specific to what we would want to use for the protocol
-            frozenset(nodes[slice(n, n+number_of_committees)])
-            for n in range(0, number_of_committees, committee_size)
+            set(nodes[n*committee_size:(n+1)*committee_size])
+            for n in range(0, number_of_committees)
         ]
+        # TODO: for now simples solution is make latest committee bigger
+        remainder = len(nodes) % committee_size
+        remainder_nodes = set(nodes[-remainder:])
+        committees[number_of_committees-1] |= remainder_nodes
+        committees = [frozenset(s) for s in committees]
+
         hashes = [hash(s) for s in committees]
         return dict(enumerate(hashes)), dict(enumerate(committees))
 
@@ -52,7 +58,7 @@ class CarnotTree:
     def leaf_committees(self) -> Dict[Id, Committee]:
         total_leafs = (self.number_of_committees + 1) // 2
         return {
-            self.committees[i]: self.membership_committees[i]
+            self.inner_committees[i]: self.membership_committees[i]
             for i in range(self.number_of_committees - total_leafs, self.number_of_committees)
         }
 
@@ -77,7 +83,7 @@ class CarnotOverlay(EntropyOverlay):
         self.carnot_tree = CarnotTree(nodes, number_of_committees)
 
     def advance(self, entropy: bytes) -> Self:
-        return CarnotOverlay(self.nodes, entropy, self.next_leader(), self.number_of_committees)
+        return CarnotOverlay(self.nodes, self.next_leader(), entropy, self.number_of_committees)
 
     def is_leader(self, _id: Id):
         return _id == self.leader()
@@ -121,5 +127,7 @@ class CarnotOverlay(EntropyOverlay):
         return (self.carnot_tree.committee_size * 2 // 3) + 1
 
     def super_majority_threshold(self, _id: Id) -> int:
+        if self.is_member_of_leaf_committee(_id):
+            return 0
         return (self.carnot_tree.committee_size * 2 // 3) + 1
 
