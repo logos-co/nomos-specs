@@ -42,7 +42,10 @@ def compute_optimal_number_of_committees_and_committee_size(
                 committee_size + 1,
                 network_adversary_threshold
             )
-            current_probability = 1 - committee_size_probability ** (number_of_committees - remainder) * committee_size_plus_one_probability ** remainder
+            current_probability = (
+                    1 - committee_size_probability ** (number_of_committees - remainder)
+                    * committee_size_plus_one_probability ** remainder
+            )
         else:
             current_probability = 1 - committee_size_probability ** number_of_committees
     # return number of committees, K_1, committee size, n_1, number of committees
