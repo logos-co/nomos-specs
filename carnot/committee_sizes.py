@@ -13,9 +13,10 @@ def compute_optimal_number_of_committees_and_committee_size(
         network_adversary_threshold: float
 ):
     assert failure_threshold > 0
-    # N is the number of nodes, delta is the failure prob. which can be tolerated,
-    # A is the fraction of a committee (typical value is  1/3) and P
-    # is the fraction of adversarial nodes (typical value is 1/4).
+    # number_of_nodes is the number of nodes in the network 
+    # failure_threshold is the prob. of failure which can be tolerated
+    # adversaries_threshold_per_committee is the fraction Byzantine modes in a committee
+    # network_adversary_threshold is the fraction of Byzantine nodes in the network
     number_of_committees = 1
     committee_size = number_of_nodes
     remainder = 0
@@ -48,6 +49,6 @@ def compute_optimal_number_of_committees_and_committee_size(
             )
         else:
             current_probability = 1 - committee_size_probability ** number_of_committees
-    # return number of committees, K_1, committee size, n_1, number of committees
-    # with size n_1+1, r_1 and prob. of failure, Prob_1.
+    # return the number_of_committees, committee_size, remainder and current_probability
+    # computed at the previous iteration. 
     return previous_number_of_committees, previous_committee_size, previous_remainder, previous_probability
