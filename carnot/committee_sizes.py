@@ -1,3 +1,13 @@
+"""
+This algorithm given the number_of_nodes in the network,  fraction of Byzantine nodes in the network, network_adversary_threshold,
+fraction of Byzantine modes in a committee, adversaries_threshold_per_committee, and the probability of failure_threshold  which can be tolerated computes  the maximum number_of_committees and  committee_size.
+
+The algorithm computes  the current_probability for the  number_of_nodes=committee_size*number_of_committees+remainder nodes where  the  committee_size and committee_size+1 number of nodes are assigned, respectively, to the  number_of_committees-remainder and remainder number of  committees. 
+
+Initially, all number_of_nodes are in one committee, and in subsequent iterations, the number_of_committees is increased by two until the current_probability <= failure_threshold. When the latter condition is violated  then the algorithm stops and outputs the number_of_committees, committee_size, remainder and current_probability.  
+
+A more detailed description of the algorithm,  and of its mathematical aspects, is provided in the "Carnot paper" available at https://www.notion.so/Nomos-Specification-419bfb7a939648e9b3894a90d188c3be?pvs=4   
+"""
 import math
 from scipy.stats import binom
 
@@ -13,9 +23,12 @@ def compute_optimal_number_of_committees_and_committee_size(
         network_adversary_threshold: float
 ):
     assert failure_threshold > 0
-    # N is the number of nodes, delta is the failure prob. which can be tolerated,
-    # A is the fraction of a committee (typical value is  1/3) and P
-    # is the fraction of adversarial nodes (typical value is 1/4).
+    
+    # number_of_nodes is the number of nodes in the network 
+    # failure_threshold is the prob. of failure which can be tolerated
+    # adversaries_threshold_per_committee is the fraction of Byzantine modes in a committee
+    # network_adversary_threshold is the fraction of Byzantine nodes in the network
+    
     number_of_committees = 1
     committee_size = number_of_nodes
     remainder = 0
@@ -48,6 +61,8 @@ def compute_optimal_number_of_committees_and_committee_size(
             )
         else:
             current_probability = 1 - committee_size_probability ** number_of_committees
-    # return number of committees, K_1, committee size, n_1, number of committees
-    # with size n_1+1, r_1 and prob. of failure, Prob_1.
+            
+    # return the number_of_committees, committee_size, remainder and current_probability
+    # computed at the previous iteration. 
+
     return previous_number_of_committees, previous_committee_size, previous_remainder, previous_probability
