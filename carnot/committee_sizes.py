@@ -30,12 +30,13 @@ def compute_optimal_number_of_committees_and_committee_size(
         number_of_committees = 2 * odd_committee + 1
         committee_size = number_of_nodes // number_of_committees
         remainder = number_of_nodes % number_of_committees
+
+        committee_size_probability = binom.cdf(
+            math.floor(adversaries_threshold_per_committee * committee_size),
+            committee_size,
+            network_adversary_threshold
+        )
         if 0 < remainder:
-            committee_size_probability = binom.cdf(
-                math.floor(adversaries_threshold_per_committee * committee_size),
-                committee_size,
-                network_adversary_threshold
-            )
             committee_size_plus_one_probability = binom.cdf(
                 math.floor(adversaries_threshold_per_committee * (committee_size + 1)),
                 committee_size + 1,
@@ -43,11 +44,6 @@ def compute_optimal_number_of_committees_and_committee_size(
             )
             current_probability = 1 - committee_size_probability ** (number_of_committees - remainder) * committee_size_plus_one_probability ** remainder
         else:
-            committee_size_probability = binom.cdf(
-                math.floor(adversaries_threshold_per_committee * committee_size),
-                committee_size,
-                network_adversary_threshold
-            )
             current_probability = 1 - committee_size_probability ** number_of_committees
     # return number of committees, K_1, committee size, n_1, number of committees
     # with size n_1+1, r_1 and prob. of failure, Prob_1.
