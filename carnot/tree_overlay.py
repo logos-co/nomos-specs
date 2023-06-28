@@ -49,7 +49,7 @@ class CarnotTree:
         }
 
     def parent_committee(self, committee_id: Id) -> Optional[Id]:
-        return self.inner_committees[min(self.committees[committee_id] // 2 - 1, 0)]
+        return self.inner_committees.get(self.committees[committee_id] // 2 - 1)
 
     def child_committees(self, committee_id: Id) -> Tuple[Optional[Id], Optional[Id]]:
         base = self.committees[committee_id] * 2
@@ -110,10 +110,12 @@ class CarnotOverlay(EntropyOverlay):
         return child in l.join(r)
 
     def parent_committee(self, _id: Id) -> Optional[Committee]:
-        return self.carnot_tree.committee_by_committee_id(
-            self.carnot_tree.parent_committee(
+        if (parent_id := self.carnot_tree.parent_committee(
                 self.carnot_tree.committee_by_member_id(_id)
-            )
+        )) is None:
+            return None
+        return self.carnot_tree.committee_by_committee_id(
+            parent_id
         )
 
     def leaf_committees(self) -> Set[Committee]:
