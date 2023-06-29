@@ -3,6 +3,25 @@ from unittest import TestCase
 from tree_overlay import CarnotOverlay
 
 
+class TestCarnotTree(TestCase):
+    def setUp(self) -> None:
+        self.nodes = [int.to_bytes(i, length=32, byteorder="little") for i in range(10)]
+        self.tree = CarnotOverlay(self.nodes, self.nodes[0], b"0"*32, 3).carnot_tree
+
+    def test_parenting(self):
+        root = self.tree.inner_committees[0]
+        one = self.tree.inner_committees[1]
+        two = self.tree.inner_committees[2]
+        self.assertIs(self.tree.parent_committee(one), root)
+        self.assertIs(self.tree.parent_committee(two), root)
+
+    def test_childs(self):
+        root = self.tree.inner_committees[0]
+        one = self.tree.inner_committees[1]
+        two = self.tree.inner_committees[2]
+        self.assertEqual(self.tree.child_committees(root), (one, two))
+
+
 class TestTreeOverlay(TestCase):
     def setUp(self) -> None:
         self.nodes = [int.to_bytes(i, length=32, byteorder="little") for i in range(10)]
@@ -30,3 +49,5 @@ class TestTreeOverlay(TestCase):
 
     def test_leader_super_majority_threshold(self):
         self.assertEqual(self.tree.leader_super_majority_threshold(self.nodes[-1]), 3)
+
+
