@@ -46,6 +46,9 @@ class CarnotTree:
         return hashes, dict(enumerate(committees))
 
     def parent_committee(self, committee_id: Id) -> Optional[Id]:
+        # root committee doesnt have a parent
+        if committee_id == self.inner_committees[0]:
+            return None
         return self.inner_committees[max(self.committees[committee_id] // 2 - 1, 0)]
 
     def child_committees(self, committee_id: Id) -> Tuple[Optional[Id], Optional[Id]]:

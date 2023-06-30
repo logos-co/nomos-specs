@@ -15,6 +15,10 @@ class TestCarnotTree(TestCase):
         self.assertIs(self.tree.parent_committee(one), root)
         self.assertIs(self.tree.parent_committee(two), root)
 
+    def test_root_parenting(self):
+        root = self.tree.inner_committees[0]
+        self.assertIsNone(self.tree.parent_committee(root))
+
     def test_childs(self):
         root = self.tree.inner_committees[0]
         one = self.tree.inner_committees[1]
