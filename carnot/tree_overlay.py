@@ -36,9 +36,8 @@ class CarnotTree:
             for n in range(0, number_of_committees)
         ]
         # refill committees with extra nodes,
-        # we fill the leafs first as they are the least important
         if remainder != 0:
-            cycling_committees = itertools.cycle(reversed(committees))
+            cycling_committees = itertools.cycle(committees)
             for node in nodes[-remainder:]:
                 next(cycling_committees).add(node)
         committees = [frozenset(s) for s in committees]
