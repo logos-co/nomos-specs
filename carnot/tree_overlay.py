@@ -31,7 +31,7 @@ class CarnotTree:
     def build_committee_from_nodes_with_size(
             nodes: List[Id],
             number_of_committees: int,
-    ) -> Tuple[List[Id], Dict[int, Committee]]:
+    ) -> Tuple[List[Id], Dict[Id, Committee]]:
         committee_size, remainder = divmod(len(nodes), number_of_committees)
         committees = [
             set(nodes[n*committee_size:(n+1)*committee_size])
