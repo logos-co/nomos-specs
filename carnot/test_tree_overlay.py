@@ -1,12 +1,12 @@
 from unittest import TestCase
 
-from tree_overlay import CarnotOverlay
+from tree_overlay import CarnotOverlay, CarnotTree
 
 
 class TestCarnotTree(TestCase):
     def setUp(self) -> None:
         self.nodes = [int.to_bytes(i, length=32, byteorder="little") for i in range(10)]
-        self.tree = CarnotOverlay(self.nodes, self.nodes[0], b"0"*32, 3).carnot_tree
+        self.tree = CarnotTree(self.nodes, 3)
 
     def test_parenting(self):
         root = self.tree.inner_committees[0]
