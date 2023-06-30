@@ -36,13 +36,13 @@ class TestTreeOverlay(TestCase):
         self.assertEqual(leader, self.tree.leader())
 
     def test_root_committee(self):
-        self.assertEqual(self.tree.root_committee(), set(self.nodes[:3]))
+        self.assertEqual(self.tree.root_committee(), set([self.nodes[9], *self.nodes[:3]]))
 
     def test_leaf_committees(self):
-        self.assertEqual(self.tree.leaf_committees(), {frozenset(self.nodes[3:6]), frozenset(self.nodes[6:])})
+        self.assertEqual(self.tree.leaf_committees(), {frozenset(self.nodes[3:6]), frozenset(self.nodes[6:9])})
 
     def test_super_majority_threshold_for_leaf(self):
-        self.assertEqual(self.tree.super_majority_threshold(self.nodes[-1]), 0)
+        self.assertEqual(self.tree.super_majority_threshold(self.nodes[-2]), 0)
 
     def test_super_majority_threshold_for_root_member(self):
         self.assertEqual(self.tree.super_majority_threshold(self.nodes[0]), 3)
