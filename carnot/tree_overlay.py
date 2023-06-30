@@ -1,8 +1,16 @@
 import itertools
+from hashlib import blake2b
 from typing import List, Dict, Tuple, Set, Optional, Self
 from carnot import Id, Committee
 from overlay import EntropyOverlay
 import random
+
+
+def blake2b_hash(committee: Committee) -> bytes:
+    hasher = blake2b(digest_size=32)
+    for member in committee:
+        hasher.update(member)
+    return hasher.digest()
 
 
 class CarnotTree:
@@ -66,8 +74,8 @@ class CarnotTree:
             for node in nodes[-remainder:]:
                 next(cycling_committees).add(node)
         committees = [frozenset(s) for s in committees]
-        # TODO: This hash method should be specific to what we would want to use for the protocol
-        hashes = [hash(s) for s in committees]
+
+        hashes = [blake2b_hash(s) for s in committees]
         return hashes, dict(enumerate(committees))
 
     def parent_committee(self, committee_id: Id) -> Optional[Id]:
