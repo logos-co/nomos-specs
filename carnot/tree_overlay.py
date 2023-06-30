@@ -7,14 +7,13 @@ import random
 
 class CarnotTree:
     def __init__(self, nodes: List[Id], number_of_committees: int):
-        self.number_of_committees = number_of_committees
         # inner_commitees: list of tree nodes (int index) matching hashed external committee id
         self.inner_committees: List[Id]
         # membership committees: matching external (hashed) id to the set of members of a committee
         self.membership_committees: Dict[Id, Committee]
         self.inner_committees, self.membership_committees = (
             CarnotTree.build_committee_from_nodes_with_size(
-                nodes, self.number_of_committees
+                nodes, number_of_committees
             )
         )
         # committee match between tree nodes and external hashed ids
@@ -57,10 +56,10 @@ class CarnotTree:
         return self.inner_committees[first_child], self.inner_committees[second_child]
 
     def leaf_committees(self) -> Dict[Id, Committee]:
-        total_leafs = (self.number_of_committees + 1) // 2
+        total_leafs = (len(self.inner_committees) + 1) // 2
         return {
             self.inner_committees[i]: self.membership_committees[i]
-            for i in range(self.number_of_committees - total_leafs, self.number_of_committees)
+            for i in range(len(self.inner_committees) - total_leafs, len(self.inner_committees))
         }
 
     def root_committee(self) -> Committee:
