@@ -67,8 +67,8 @@ class CarnotTree:
     def root_committee(self) -> Committee:
         return self.membership_committees[0]
 
-    def committee_by_committee_idx(self, committee_id: int) -> Optional[Committee]:
-        return self.membership_committees.get(committee_id)
+    def committee_by_committee_idx(self, committee_idx: int) -> Optional[Committee]:
+        return self.membership_committees.get(committee_idx)
 
     def committee_idx_by_member_id(self, member_id: Id) -> Optional[int]:
         return self.committees_by_member.get(member_id)
