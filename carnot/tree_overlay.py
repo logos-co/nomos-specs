@@ -32,7 +32,7 @@ class CarnotTree:
     def __init__(self, nodes: List[Id], number_of_committees: int):
         # useless to build an overlay with no committees
         assert number_of_committees > 0
-        # inner_commitees: list of tree nodes (int index) matching hashed external committee id
+        # inner_committees: list of tree nodes (int index) matching hashed external committee id
         self.inner_committees: List[Id]
         # membership committees: matching external (hashed) id to the set of members of a committee
         self.membership_committees: Dict[Id, Committee]
@@ -108,7 +108,6 @@ class CarnotTree:
     def committee_by_committee_id(self, committee_id: Id) -> Optional[Committee]:
         if (committee_idx := self.committee_id_to_index.get(committee_id)) is not None:
             return self.committee_by_committee_idx(committee_idx)
-
 
 
 class CarnotOverlay(EntropyOverlay):
