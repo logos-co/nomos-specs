@@ -6,6 +6,29 @@ import random
 
 
 class CarnotTree:
+    """
+    This balanced binary tree implementation uses a combination of indexes and keys to easily calculate parenting
+    committee relationships. It also has caching on different kind of access to conveniently retrieve the committees
+    based on:
+        * Member of a committee
+        * Committee id (hash)
+
+    It is composed of `inner_committees`, an array that matches a binary tree node distribution:
+          0,  1,  2,  3..
+        [c0, c1, c2, c3  ]
+        where `cX` is the committee id (hash of the set with the committee members ids)
+    The number of leafs in the committee is calculated with:
+        total_leafs = (len(inner_committees) + 1) // 2
+    Parenting relation can be calculated for a committee index (idx) with:
+        parent_committee_idx = committee_idx // 2 - 1
+    Children relation is calculated with those indexes (idx) as well:
+        left_child, right_child = (committee_idx*2 + 1, committee_idx*2 + 2)
+
+    Then we have some dictionaries/maps that matches different information to those indexes:
+        * `membership_committees`: matches committee id (hash) to the actual committee set of participants
+        * `committee_id_to_index`: matches committee id (hash) to committee index (idx) in `inner_committees`
+        * `committee_by_member`: matches member id to the committee id that is a member from
+    """
     def __init__(self, nodes: List[Id], number_of_committees: int):
         # useless to build an overlay with no committees
         assert number_of_committees > 0
@@ -19,7 +42,7 @@ class CarnotTree:
             )
         )
         # committee match between tree nodes and external hashed ids
-        self.committees: Dict[Id, int] = {c: i for i, c in enumerate(self.inner_committees)}
+        self.committee_id_to_index: Dict[Id, int] = {c: i for i, c in enumerate(self.inner_committees)}
         # id (int index) of committee membership by member id
         self.committees_by_member: Dict[Id, int] = {
             member: committee
@@ -51,10 +74,10 @@ class CarnotTree:
         # root committee doesnt have a parent
         if committee_id == self.inner_committees[0]:
             return None
-        return self.inner_committees[max(self.committees[committee_id] // 2 - 1, 0)]
+        return self.inner_committees[max(self.committee_id_to_index[committee_id] // 2 - 1, 0)]
 
     def child_committees(self, committee_id: Id) -> Tuple[Optional[Id], Optional[Id]]:
-        base = self.committees[committee_id] * 2
+        base = self.committee_id_to_index[committee_id] * 2
         first_child = base + 1
         second_child = base + 2
         return self.inner_committees[first_child], self.inner_committees[second_child]
@@ -83,7 +106,7 @@ class CarnotTree:
             return self.committee_by_committee_idx(committee_idx)
 
     def committee_by_committee_id(self, committee_id: Id) -> Optional[Committee]:
-        if (committee_idx := self.committees.get(committee_id)) is not None:
+        if (committee_idx := self.committee_id_to_index.get(committee_id)) is not None:
             return self.committee_by_committee_idx(committee_idx)
 
 
@@ -120,13 +143,13 @@ class CarnotOverlay(EntropyOverlay):
     def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
         child_parent = self.parent_committee(child)
         parent = self.carnot_tree.committee_by_member_id(parent)
-        return child_parent is parent
+        return child_parent == parent
 
     def parent_committee(self, _id: Id) -> Optional[Committee]:
         if (parent_id := self.carnot_tree.parent_committee(
                 self.carnot_tree.committee_id_by_member_id(_id)
         )) is not None:
-            return self.carnot_tree.committee_by_committee_idx(self.carnot_tree.committees[parent_id])
+            return self.carnot_tree.committee_by_committee_idx(self.carnot_tree.committee_id_to_index[parent_id])
 
     def leaf_committees(self) -> Set[Committee]:
         return set(self.carnot_tree.leaf_committees().values())
@@ -135,7 +158,7 @@ class CarnotOverlay(EntropyOverlay):
         return self.carnot_tree.root_committee()
 
     def is_child_of_root_committee(self, _id: Id) -> bool:
-        return self.parent_committee(_id) is self.root_committee()
+        return self.parent_committee(_id) == self.root_committee()
 
     def leader_super_majority_threshold(self, _id: Id) -> int:
         root_committee = self.carnot_tree.inner_committees[0]
