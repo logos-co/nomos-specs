@@ -33,7 +33,7 @@ class CarnotTree:
         left_child, right_child = (committee_idx*2 + 1, committee_idx*2 + 2)
 
     Then we have some dictionaries/maps that matches different information to those indexes:
-        * `membership_committees`: matches committee id (hash) to the actual committee set of participants
+        * `membership_committees`: matches committee idx to the actual committee set of participants
         * `committee_id_to_index`: matches committee id (hash) to committee index (idx) in `inner_committees`
         * `committee_by_member`: matches member id to the committee id that is a member from
     """
@@ -42,8 +42,8 @@ class CarnotTree:
         assert number_of_committees > 0
         # inner_committees: list of tree nodes (int index) matching hashed external committee id
         self.inner_committees: List[Id]
-        # membership committees: matching external (hashed) id to the set of members of a committee
-        self.membership_committees: Dict[Id, Committee]
+        # membership committees: matching committee idx to the set of members of a committee
+        self.membership_committees: Dict[int, Committee]
         self.inner_committees, self.membership_committees = (
             CarnotTree.build_committee_from_nodes_with_size(
                 nodes, number_of_committees
@@ -62,7 +62,7 @@ class CarnotTree:
     def build_committee_from_nodes_with_size(
             nodes: List[Id],
             number_of_committees: int,
-    ) -> Tuple[List[Id], Dict[Id, Committee]]:
+    ) -> Tuple[List[Id], Dict[int, Committee]]:
         committee_size, remainder = divmod(len(nodes), number_of_committees)
         committees = [
             set(nodes[n*committee_size:(n+1)*committee_size])
@@ -73,9 +73,10 @@ class CarnotTree:
             cycling_committees = itertools.cycle(committees)
             for node in nodes[-remainder:]:
                 next(cycling_committees).add(node)
-        committees = [frozenset(s) for s in committees]
 
         hashes = [blake2b_hash(s) for s in committees]
+        committees = [frozenset(s) for s in committees]
+
         return hashes, dict(enumerate(committees))
 
     def parent_committee(self, committee_id: Id) -> Optional[Id]:
@@ -183,4 +184,3 @@ class CarnotOverlay(EntropyOverlay):
             return 0
         committee_size = len(self.carnot_tree.committee_by_member_id(_id))
         return (committee_size * 2 // 3) + 1
-
