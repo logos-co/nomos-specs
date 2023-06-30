@@ -7,6 +7,8 @@ import random
 
 class CarnotTree:
     def __init__(self, nodes: List[Id], number_of_committees: int):
+        # useless to build an overlay with no committees
+        assert number_of_committees > 0
         # inner_commitees: list of tree nodes (int index) matching hashed external committee id
         self.inner_committees: List[Id]
         # membership committees: matching external (hashed) id to the set of members of a committee
@@ -80,6 +82,11 @@ class CarnotTree:
         if (committee_idx := self.committee_idx_by_member_id(member_id)) is not None:
             return self.committee_by_committee_idx(committee_idx)
 
+    def committee_by_committee_id(self, committee_id: Id) -> Optional[Committee]:
+        if (committee_idx := self.committees.get(committee_id)) is not None:
+            return self.committee_by_committee_idx(committee_idx)
+
+
 
 class CarnotOverlay(EntropyOverlay):
     def __init__(self, nodes: List[Id], current_leader: Id, entropy: bytes, number_of_committees: int):
@@ -131,7 +138,14 @@ class CarnotOverlay(EntropyOverlay):
         return self.parent_committee(_id) is self.root_committee()
 
     def leader_super_majority_threshold(self, _id: Id) -> int:
-        committee_size = len(self.carnot_tree.committee_by_member_id(_id))
+        root_committee = self.carnot_tree.inner_committees[0]
+        childs = self.carnot_tree.child_committees(root_committee)
+        childs_size = sum(
+            len(committee) for c in childs
+            if (committee := self.carnot_tree.committee_by_committee_id(c)) is not None
+        )
+        root_committee_size = len(self.root_committee())
+        committee_size = root_committee_size + childs_size
         return (committee_size * 2 // 3) + 1
 
     def super_majority_threshold(self, _id: Id) -> int:

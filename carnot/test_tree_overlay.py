@@ -52,6 +52,6 @@ class TestTreeOverlay(TestCase):
         self.assertEqual(self.tree.super_majority_threshold(self.nodes[0]), 3)
 
     def test_leader_super_majority_threshold(self):
-        self.assertEqual(self.tree.leader_super_majority_threshold(self.nodes[-1]), 3)
+        self.assertEqual(self.tree.leader_super_majority_threshold(self.nodes[0]), 7)
 
 
