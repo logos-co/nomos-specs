@@ -87,9 +87,12 @@ class CarnotTree:
 
     def child_committees(self, committee_id: Id) -> Tuple[Optional[Id], Optional[Id]]:
         base = self.committee_id_to_index[committee_id] * 2
+        committees_size = len(self.inner_committees)
         first_child = base + 1
         second_child = base + 2
-        return self.inner_committees[first_child], self.inner_committees[second_child]
+        first_child = self.inner_committees[first_child] if first_child < committees_size else None
+        second_child = self.inner_committees[second_child] if second_child < committees_size else None
+        return first_child, second_child
 
     def leaf_committees(self) -> Dict[Id, Committee]:
         total_leafs = (len(self.inner_committees) + 1) // 2
