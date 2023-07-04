@@ -121,6 +121,12 @@ class CarnotTree:
         if (committee_idx := self.committee_id_to_index.get(committee_id)) is not None:
             return self.committee_by_committee_idx(committee_idx)
 
+    def parent_committee_from_member_id(self, _id):
+        if (parent_id := self.parent_committee(
+                self.committee_id_by_member_id(_id)
+        )) is not None:
+            return self.committee_by_committee_idx(self.committee_id_to_index[parent_id])
+
 
 class CarnotOverlay(EntropyOverlay):
     def __init__(self, nodes: List[Id], current_leader: Id, entropy: bytes, number_of_committees: int):
@@ -157,10 +163,7 @@ class CarnotOverlay(EntropyOverlay):
         return child_parent == parent
 
     def parent_committee(self, _id: Id) -> Optional[Committee]:
-        if (parent_id := self.carnot_tree.parent_committee(
-                self.carnot_tree.committee_id_by_member_id(_id)
-        )) is not None:
-            return self.carnot_tree.committee_by_committee_idx(self.carnot_tree.committee_id_to_index[parent_id])
+        self.carnot_tree.parent_committee_from_member_id(_id)
 
     def leaf_committees(self) -> Set[Committee]:
         return set(self.carnot_tree.leaf_committees().values())
