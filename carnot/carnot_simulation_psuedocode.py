@@ -52,9 +52,9 @@ def simulate_message_passing(committee, latency):
         int: The number of levels the message passed through.
     """
     # Base case: if the committee is the root (no parent), return 0 (the message reached the root)
+    time.sleep(latency)
     if committee.parent_committee is None:
         return 0
-    time.sleep(latency)
     # Simulate the message passing to the parent committee and get its result
     parent_result = simulate_message_passing(committee.parent_committee,latency)
 

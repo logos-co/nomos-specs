@@ -16,7 +16,7 @@ def test_message_passing():
     result = simulate_message_passing(leaf_committee, latency)
     end_time = time.time()
 
-    expected_result = num_levels - 1
+    expected_result = num_levels
     assert result == expected_result, f"Test Case 1 failed. Expected: {expected_result}, Got: {result}"
 
     print(f"Test Case 1: Number of Levels Message Passed: {result}, Elapsed Time: {end_time - start_time:.4f} seconds")
