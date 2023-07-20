@@ -2,11 +2,10 @@ import time
 
 
 class Committee:
-    def __init__(self, committee_id, processing_time=0, parent_committee=None):
+    def __init__(self, committee_id, parent_committee=None):
         self.committee_id = committee_id
         self.child_committee = None
         self.parent_committee = parent_committee
-       # self.processing_time = processing_time
 
 def create_binary_tree_committees(num_levels, committee_id=0, parent_committee=None):
     """
@@ -24,7 +23,7 @@ def create_binary_tree_committees(num_levels, committee_id=0, parent_committee=N
         return None
 
     processing_time = 1  # Set the processing time for each committee (you can adjust this as needed)
-    committee = Committee(committee_id, processing_time, parent_committee)
+    committee = Committee(committee_id,  parent_committee)
     committee.child_committee = create_binary_tree_committees(num_levels - 1, committee_id + 1, committee)
     return committee
 
