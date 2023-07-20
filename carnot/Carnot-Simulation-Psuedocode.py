@@ -28,3 +28,18 @@ def create_binary_tree_committees(num_levels, committee_id=0, parent_committee=N
     committee.child_committee = create_binary_tree_committees(num_levels - 1, committee_id + 1, committee)
     return committee
 
+
+def find_leaf_committee(committee):
+    """
+    Find the leaf committee at the lowest level.
+
+    Parameters:
+        committee (Committee): The committee representing a level in the binary tree.
+
+    Returns:
+        Committee: The leaf committee at the lowest level.
+    """
+    if committee.child_committee is None:
+        return committee
+    return find_leaf_committee(committee.child_committee)
+
