@@ -43,3 +43,23 @@ def find_leaf_committee(committee):
         return committee
     return find_leaf_committee(committee.child_committee)
 
+def simulate_message_passing(committee, latency):
+    """
+    Simulates the message passing from a committee to its parent committee.
+
+    Parameters:
+        committee (Committee): The committee representing a level in the binary tree.
+
+    Returns:
+        int: The number of levels the message passed through.
+    """
+    # Base case: if the committee is the root (no parent), return 0 (the message reached the root)
+    if committee.parent_committee is None:
+        return 0
+    time.sleep(latency)
+    # Simulate the message passing to the parent committee and get its result
+    parent_result = simulate_message_passing(committee.parent_committee,latency)
+
+    # Increment the parent result by 1 (to count the current level) and return it
+    return parent_result + 1
+
