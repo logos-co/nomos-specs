@@ -1,3 +1,13 @@
+# Background / Rationale / Motivation
+
+ The Carnot protocol is designed to be elastic, responsive, and provide fast finality
+ Elastic scalability allows the protocol to operate effectively with both small and large networks
+ All nodes in the Carnot network participate in the consensus of a block
+ Optimistic responsiveness enables the protocol to operate quickly during periods of synchrony and honest leadership
+ There is no block generation time in Carnot, allowing for fast finality
+ Carnot avoids the chain reorg problem, making it compatible with PoS schemes
+ This enhances the robustness of the protocol, making it a valuable addition to the ecosystem of consensus protocols
+
 # Carnot Specification
 This is the pseudocode specification of the Carnot consensus algorithm.
 In this specification we will omit any cryptographic material, block validity and proof checks. A real implementation is expected to check those before hitting this code.
