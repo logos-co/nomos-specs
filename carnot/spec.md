@@ -49,20 +49,15 @@ As for ordering between events, there are some constraints (e.g. can't process a
 
 # Alias Data Types:
 ## Id: TypeAlias = bytes
-### Explanation:
 Id is an alias data type representing an identifier, which is essentially a sequence of bytes. It is used to uniquely identify various entities within the protocol. This includes node identity and block Id or block hash.
 ## View: TypeAlias = int
-### Explanation: 
 View is an alias data type representing a view, which is a monotonically increasing integer. Views are used to represent different phases or stages within the protocol. It is also called round.
 ## Committee: TypeAlias = Set[Id]
-### Explanation:
 A committee is an alias data type representing a set of Id values. It is used to define a committee, which is a group of participants in the protocol.
 ## Qc: TypeAlias = StandardQc | AggregateQc
-### Explanation:
 Qc is an alias data type representing a quorum certificate. It can either be a StandardQc or an AggregateQc, depending on the context. Quorum certificates are used to denote agreement on certain protocol-related actions. AggregateQc is a set of StandardQcs collected during a specific view after failure. 
 ## Payload: 
 TypeAlias = Block | Vote | Timeout | NewView | TimeoutQc
-## Explanation:
 Payload is an alias data type representing the payload of messages exchanged within the protocol. It can be one of several types, including Block, Vote, Timeout, NewView, or TimeoutQc, each serving a specific purpose in the protocol.
 
 ## Messages
