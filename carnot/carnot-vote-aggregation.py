@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union, List, Set, Optional
+from typing import Union, List, Set, Optional, Type
 from abc import ABC, abstractmethod
 
 Id = bytes
@@ -83,3 +83,9 @@ class TimeoutQc:
     qc_views: List[View]
     sender_ids: Set[Id]
     sender: Id
+
+class Timeout:
+    view: View
+    high_qc: Qc
+    sender: Id
+    timeout_qc: Type[TimeoutQc]
