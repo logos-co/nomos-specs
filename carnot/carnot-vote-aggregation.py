@@ -102,4 +102,4 @@ class NewView:
 
 Quorum: TypeAlias = Union[Set[Vote], Set[NewView]]
 
-Payload: TypeAlias = Union [Block, Vote, Timeout,  NewView, TimeoutQc]
+Payload: TypeAlias = Union[Block, Vote, Timeout,  NewView, TimeoutQc]
