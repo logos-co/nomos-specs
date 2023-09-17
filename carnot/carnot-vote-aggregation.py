@@ -6,16 +6,23 @@ Id = bytes
 View = int
 Committee = Set[Id]
 
+
 def int_to_id(i: int) -> Id:
     return bytes(str(i), encoding="utf8")
+
 
 @dataclass(unsafe_hash=True)
 class StandardQc:
     block: Id
     view_num: View  # Changed the variable name to avoid conflict with the class name
+    root_qc: bool  # Determines if the QC is build by the leader and is collection of 2/3+1 votes.
+
+    # If it is false then the QC is built by the committees with 2/3 collection of votes from subtree of the collector
+    # committee.
 
     def view(self) -> View:
         return self.view_num  # Changed the method name to view_num
+
 
 @dataclass
 class AggregateQc:
@@ -28,9 +35,12 @@ class AggregateQc:
 
     def high_qc(self) -> StandardQc:
         assert self.highest_qc.view() == max(self.qcs)  # Corrected method call
+        assert self.highest_qc.root_qc, "Expected self.highest_qc.root_qc to be True"
         return self.highest_qc
 
+
 Qc = Union[StandardQc, AggregateQc]  # Changed the type alias to use Union
+
 
 @dataclass
 class Block:
