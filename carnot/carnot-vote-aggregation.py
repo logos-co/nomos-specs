@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union, List, Set
+from typing import Union, List, Set, Optional
 from abc import ABC, abstractmethod
 
 Id = bytes
@@ -66,3 +66,20 @@ class Block:
 
     def id(self) -> Id:
         return self._id
+
+
+@dataclass(unsafe_hash=True)
+class Vote:
+    block: Id
+    view: View
+    voter: Id
+    qc: Optional[Qc]
+
+
+@dataclass
+class TimeoutQc:
+    view: View
+    high_qc: Qc
+    qc_views: List[View]
+    sender_ids: Set[Id]
+    sender: Id
