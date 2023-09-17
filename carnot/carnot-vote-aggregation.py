@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union, List, Set, Optional, Type
+from typing import Union, List, Set, Optional, Type, TypeAlias
 from abc import ABC, abstractmethod
 
 Id = bytes
@@ -84,8 +84,22 @@ class TimeoutQc:
     sender_ids: Set[Id]
     sender: Id
 
+
 class Timeout:
     view: View
     high_qc: Qc
     sender: Id
     timeout_qc: Type[TimeoutQc]
+
+
+@dataclass
+class NewView:
+    view: View
+    high_qc: Qc
+    sender: Id
+    timeout_qc: Type[TimeoutQc]
+
+
+Quorum: TypeAlias = Union[Set[Vote], Set[NewView]]
+
+Payload: TypeAlias = Union [Block, Vote, Timeout,  NewView, TimeoutQc]
