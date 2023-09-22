@@ -236,21 +236,27 @@ class Carnot:
         # Return True if both conditions are met
         return is_view_incremented and is_standard_qc
 
-def latest_committed_view(self) -> View:
-    return self.latest_committed_block().view
+    def latest_committed_view(self) -> View:
+        return self.latest_committed_block().view
 
-# Return a list of blocks received by a node for a specific view.
-# More than one block is returned only in case of a malicious leader.
-def blocks_in_view(self, view: View) -> List[Block]:
-    return [block for block in self.safe_blocks.values() if block.view == view]
+    # Return a list of blocks received by a node for a specific view.
+    # More than one block is returned only in case of a malicious leader.
+    def blocks_in_view(self, view: View) -> List[Block]:
+        return [block for block in self.safe_blocks.values() if block.view == view]
 
-def genesis_block(self) -> Block:
-    return self.blocks_in_view(0)[0]
+    def genesis_block(self) -> Block:
+        return self.blocks_in_view(0)[0]
 
-def latest_committed_block(self) -> Block:
-    for view in range(self.current_view, 0, -1):
-        for block in self.blocks_in_view(view):
-            if self.can_commit_grandparent(block):
-                return self.safe_blocks.get(self.safe_blocks.get(block.parent()).parent())
-    # The genesis block is always considered committed.
-    return self.genesis_block()
+    def latest_committed_block(self) -> Block:
+        for view in range(self.current_view, 0, -1):
+            for block in self.blocks_in_view(view):
+                if self.can_commit_grandparent(block):
+                    return self.safe_blocks.get(self.safe_blocks.get(block.parent()).parent())
+        # The genesis block is always considered committed.
+        return self.genesis_block()
+
+    def block_is_safe(self, block: Block) -> bool:
+        if isinstance(block.qc, (StandardQc,)):
+            return block.view_num == block.qc.view() + 1
+        if isinstance(block.qc, (AggregateQc,)):
+            return (block.view_num == block.qc.view() + 1) and block.extends(self.latest_committed_block())
