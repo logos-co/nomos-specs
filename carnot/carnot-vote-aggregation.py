@@ -256,7 +256,10 @@ class Carnot:
         return self.genesis_block()
 
     def block_is_safe(self, block: Block) -> bool:
-        if isinstance(block.qc, (StandardQc,)):
+        if isinstance(block.qc, StandardQc):
             return block.view_num == block.qc.view() + 1
-        if isinstance(block.qc, (AggregateQc,)):
-            return (block.view_num == block.qc.view() + 1) and block.extends(self.latest_committed_block())
+        elif isinstance(block.qc, AggregateQc):
+            return block.view_num == block.qc.view() + 1 and block.extends(self.latest_committed_block())
+        else:
+            return False
+
