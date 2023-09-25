@@ -116,7 +116,7 @@ class Send:
     payload: Payload
 
 
-Event: TypeAlias = BroadCast | Send
+TypeAlias = Union[BroadCast, Send]
 
 
 class Overlay:
