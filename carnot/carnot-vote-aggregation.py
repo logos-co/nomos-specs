@@ -271,12 +271,10 @@ class Carnot:
             case (None, new_qc) if isinstance(new_qc, AggregateQc):
                 # Set local high QC to the high QC from the new AggregateQc
                 self.local_high_qc = new_qc.high_qc()
-            case (old_qc, new_qc) if isinstance(old_qc, StandardQc) and isinstance(new_qc,
-                                                                                   StandardQc) and new_qc.view > old_qc.view:
+            case (old_qc, new_qc) if isinstance(new_qc, StandardQc) and new_qc.view > old_qc.view:
                 # Update local high QC if the new StandardQc has a higher view
                 self.local_high_qc = new_qc
-            case (old_qc, new_qc) if isinstance(old_qc, AggregateQc) and isinstance(new_qc,
-                                                                                    AggregateQc) and new_qc.high_qc().view != old_qc.view:
+            case (old_qc, new_qc) if isinstance(new_qc, AggregateQc) and new_qc.high_qc().view != old_qc.view and new_qc.view > old_qc.view:
                 # Update local high QC if the view of the high QC in the new AggregateQc is different
                 self.local_high_qc = new_qc.high_qc()
 
