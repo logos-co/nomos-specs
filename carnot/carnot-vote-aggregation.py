@@ -279,5 +279,5 @@ class Carnot:
                 self.local_high_qc = new_qc.high_qc()
 
         # If my view is not updated, I update it when I see a QC for that view
-        if qc.view == self.current_view:
-            self.current_view += 1
+        if qc.view >= self.current_view:
+            self.current_view = qc.view + 1
