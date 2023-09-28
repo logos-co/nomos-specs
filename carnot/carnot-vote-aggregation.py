@@ -286,3 +286,20 @@ class Carnot:
         if not self.last_view_timeout_qc or timeout_qc.view > self.last_view_timeout_qc.view:
             self.last_view_timeout_qc = timeout_qc
 
+    def receive_block(self, block: Block):
+        assert block.parent() in self.safe_blocks
+
+        # Check if the block is already in safe_blocks, if it's from a previous view,
+        # or if there are existing blocks for the same view
+        if block.id() in self.safe_blocks or block.view <= self.latest_committed_view() or self.blocks_in_view(
+                block.view):
+            # TODO: Report malicious leader or handle potential fork divergence
+            return
+
+        # TODO: Verify if the proposer is indeed the leader
+
+        # If the block is safe, add it to safe_blocks and update the high QC
+        if self.block_is_safe(block):
+            self.safe_blocks[block.id()] = block
+            self.update_high_qc(block.qc)
+
