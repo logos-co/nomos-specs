@@ -116,7 +116,7 @@ class Send:
     payload: Payload
 
 
-TypeAlias = Union[BroadCast, Send]
+Event: TypeAlias = Union[BroadCast, Send]
 
 
 class Overlay:
@@ -303,3 +303,33 @@ class Carnot:
             self.safe_blocks[block.id()] = block
             self.update_high_qc(block.qc)
 
+    def approve_block(self, block: Block, votes: Set[Vote]) -> Event:
+        # Assertions for input validation
+        assert block.id() in self.safe_blocks
+        assert len(votes) == self.overlay.super_majority_threshold(self.id)
+        assert all(self.overlay.is_member_of_child_committee(self.id, vote.voter) for vote in votes)
+        assert all(vote.block == block.id() for vote in votes)
+        assert self.highest_voted_view < block.view
+
+        # Create a QC based on committee membership
+        qc = self.build_qc(block.view, block, None) if self.overlay.is_member_of_root_committee(self.id) else None
+
+        # Create a new vote
+        vote = Vote(
+            block=block.id(),
+            voter=self.id,
+            view=block.view,
+            qc=qc
+        )
+
+        # Update the highest voted view
+        self.highest_voted_view = max(self.highest_voted_view, block.view)
+
+        # Determine the recipient based on committee membership
+        if self.overlay.is_member_of_root_committee(self.id):
+            recipient = self.overlay.leader(block.view + 1)
+        else:
+            recipient = self.overlay.parent_committee(self.id)
+
+        # Return a Send event to the appropriate recipient
+        return Send(to=recipient, payload=vote)
