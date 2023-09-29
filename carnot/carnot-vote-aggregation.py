@@ -161,6 +161,13 @@ class Overlay:
         pass
 
     @abstractmethod
+    def is_member_of_my_committee(self, _id: Id) -> bool:
+        """
+        :param _id:
+        :return: true if the participant with Id _id is member of the committee of the  verifying node withing the tree overlay
+        """
+        pass
+    @abstractmethod
     def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
         """
         :param parent:
@@ -204,6 +211,7 @@ class Overlay:
         :return:
         """
         pass
+
 
     @abstractmethod
     def super_majority_threshold(self, _id: Id) -> int:
