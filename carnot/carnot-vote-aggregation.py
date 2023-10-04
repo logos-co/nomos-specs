@@ -15,13 +15,16 @@ def int_to_id(i: int) -> Id:
 class StandardQc:
     block: Id
     view_num: View  # Changed the variable name to avoid conflict with the class name
-    root_qc: bool  # Determines if the QC is build by the leader and is collection of 2/3+1 votes.
+    Comm_No: int  # This committee position in the set of committees
 
     # If it is false then the QC is built by the committees with 2/3 collection of votes from subtree of the collector
     # committee.
 
     def view(self) -> View:
         return self.view_num  # Changed the method name to view_num
+
+
+
 
 
 @dataclass
@@ -314,13 +317,17 @@ class Carnot:
     def approve_block(self, block: Block, votes: Set[Vote]) -> Event:
         # Assertions for input validation
         assert block.id() in self.safe_blocks
-        assert len(votes) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.is_member_of_child_committee(self.id, vote.voter) for vote in votes)
+        # This assertion will be moved outside as the approve_block will be called in two cases:
+        #1st the fast path when len(votes) == self.overlay.super_majority_threshold(self.id) and the second
+        #When there is the first timeout t1 for the fast path and the protocol operates in the slower path
+        # in this case the node will prepare a QC from votes it has received.
+       # assert len(votes) == self.overlay.super_majority_threshold(self.id)
+        assert all(self.overlay.is_member_of_my_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
         assert self.highest_voted_view < block.view
 
         # Create a QC based on committee membership
-        qc = self.build_qc(block.view, block, None) if self.overlay.is_member_of_root_committee(self.id) else None
+        qc = self.build_qc(block.view, block, None) #if self.overlay.is_member_of_root_committee(self.id) else None
 
         # Create a new vote
         vote = Vote(
@@ -341,3 +348,4 @@ class Carnot:
 
         # Return a Send event to the appropriate recipient
         return Send(to=recipient, payload=vote)
+
