@@ -390,5 +390,20 @@ class Carnot:
             # Forward the vote to the next leader in the root committee
             return Send(to=self.overlay.next_leader(), payload=vote)
         else:
-            # Return None if not a member of the root committee
+            # Forward the vote to the parent committee
             return Send(to=self.overlay.parent_committee, payload=vote)
+
+    def forward_new_view(self, msg: NewView) -> Optional[Event]:
+        # Assertions for input validation
+        assert msg.view == self.current_view, "Received NewView with correct view"
+        assert self.overlay.is_member_of_child_committee(self.id,
+                                                             msg.sender) or\
+               self.overlay.is_member_of_my_committee(self.id, msg.sender), "Sender is  a member of child committee"
+        assert self.highest_voted_view == msg.view, "Can only forward NewView after voting ourselves"
+
+        if self.overlay.is_member_of_root_committee(self.id):
+            # Forward the NewView message to the next leader in the root committee
+            return Send(to=self.overlay.next_leader(), payload=msg)
+        else:
+            # Forward the NewView message to the parent committee
+            return Send(to=self.overlay.parent_committee, payload=msg)
