@@ -378,3 +378,17 @@ class Carnot:
                 view=view,
                 block=block_id
             )
+
+    def forward_vote(self, vote: Vote) -> Optional[Event]:
+        # Assertions for input validation
+        assert vote.block in self.safe_blocks
+        assert self.overlay.is_member_of_child_committee(self.id, vote.voter) or \
+               self.overlay.is_member_of_my_committee(self.id, vote.voter)
+        assert self.highest_voted_view == vote.view, "Can only forward votes after voting ourselves"
+
+        if self.overlay.is_member_of_root_committee(self.id):
+            # Forward the vote to the next leader in the root committee
+            return Send(to=self.overlay.next_leader(), payload=vote)
+        else:
+            # Return None if not a member of the root committee
+            return None
