@@ -420,7 +420,7 @@ class Carnot:
         if isinstance(first_quorum_item, Vote):
             # Happy path: Create a QC based on votes in the quorum
             vote = first_quorum_item
-            assert vote.block in self.safe_blocks,
+            assert vote.block in self.safe_blocks
             qc = self.build_qc(vote.view, self.safe_blocks[vote.block], None)
         elif isinstance(first_quorum_item, NewView):
             # Unhappy path: Create a QC based on NewView messages in the quorum
