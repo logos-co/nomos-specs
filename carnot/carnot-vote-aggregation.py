@@ -409,7 +409,7 @@ class Carnot:
     def propose_block(self, view: View, quorum: Quorum) -> Event:
         # Check if the node is a leader and if the quorum size is sufficient
         assert self.overlay.is_leader(self.id), "Only leaders can propose blocks"
-        assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id), "Insufficient quorum size"
+        assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id), "Sufficient quorum size is allowed"
 
         # Initialize QC to None
         qc = None
