@@ -349,3 +349,32 @@ class Carnot:
         # Return a Send event to the appropriate recipient
         return Send(to=recipient, payload=vote)
 
+    from typing import Optional, Set, List
+
+    def build_qc(self, view: int, block: Optional[Block] = None, new_views: Optional[Set[NewView]] = None,
+                 votes: Optional[List[Vote]] = None) -> Qc:
+        if new_views:
+            # Unhappy path: Aggregate QC
+            new_views_list = list(new_views)
+            highest_qc = max(new_views_list, key=lambda x: x.high_qc.view).high_qc
+            return AggregateQc(
+                qcs=[msg.high_qc.view for msg in new_views_list],
+                highest_qc=highest_qc,
+                view=new_views_list[0].view
+            )
+        else:
+            # Happy path: Standard QC
+            if votes:
+                # Use vote.block if votes are available
+                block_id = votes[0].block
+            elif block:
+                # Use the provided block if votes are not available
+                block_id = block.id()
+            else:
+                # No block or votes provided, return None
+                return None
+
+            return StandardQc(
+                view=view,
+                block=block_id
+            )
