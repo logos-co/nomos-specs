@@ -391,4 +391,4 @@ class Carnot:
             return Send(to=self.overlay.next_leader(), payload=vote)
         else:
             # Return None if not a member of the root committee
-            return return Send(to=self.overlay.parent_committee, payload=vote)
+            return Send(to=self.overlay.parent_committee, payload=vote)
