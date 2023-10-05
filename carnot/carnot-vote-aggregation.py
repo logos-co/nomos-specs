@@ -407,3 +407,36 @@ class Carnot:
         else:
             # Forward the NewView message to the parent committee
             return Send(to=self.overlay.parent_committee, payload=msg)
+
+
+    def propose_block(self, view: View, quorum: Quorum) -> Event:
+        # Check if the node is a leader and if the quorum size is sufficient
+        assert self.overlay.is_leader(self.id), "Only leaders can propose blocks"
+        assert len(quorum) >= self.overlay.leader_super_majority_threshold(self.id), "Insufficient quorum size"
+
+        # Initialize QC to None
+        qc = None
+
+        # Extract the first element from the quorum
+        first_quorum_item = quorum[0]
+
+        if isinstance(first_quorum_item, Vote):
+            # Happy path: Create a QC based on the first vote in the quorum
+            vote = first_quorum_item
+            assert vote.block in self.safe_blocks, "Vote references an unknown block"
+            qc = self.build_qc(vote.view, self.safe_blocks[vote.block], None)
+        elif isinstance(first_quorum_item, NewView):
+            # Unhappy path: Create a QC based on the first NewView in the quorum
+            new_view = first_quorum_item
+            qc = self.build_qc(new_view.view, None, quorum)
+
+        # Generate a new Block with a dummy ID for proposing the next block
+        block = Block(
+            view=view,
+            qc=qc,
+            # Dummy ID for proposing the next block
+            _id=int_to_id(hash((f"View-{view}", f"QC-View-{qc.view}")))
+        )
+
+        # Return a Broadcast event with the proposed block
+        return BroadCast(payload=block)
