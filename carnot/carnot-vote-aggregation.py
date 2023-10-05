@@ -24,9 +24,6 @@ class StandardQc:
         return self.view_num  # Changed the method name to view_num
 
 
-
-
-
 @dataclass
 class AggregateQc:
     qcs: List[View]
@@ -170,6 +167,7 @@ class Overlay:
         :return: true if the participant with Id _id is member of the committee of the  verifying node withing the tree overlay
         """
         pass
+
     @abstractmethod
     def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
         """
@@ -214,7 +212,6 @@ class Overlay:
         :return:
         """
         pass
-
 
     @abstractmethod
     def super_majority_threshold(self, _id: Id) -> int:
@@ -285,7 +282,8 @@ class Carnot:
             case (old_qc, new_qc) if isinstance(new_qc, StandardQc) and new_qc.view > old_qc.view:
                 # Update local high QC if the new StandardQc has a higher view
                 self.local_high_qc = new_qc
-            case (old_qc, new_qc) if isinstance(new_qc, AggregateQc) and new_qc.high_qc().view != old_qc.view and new_qc.view > old_qc.view:
+            case (old_qc, new_qc) if isinstance(new_qc,
+                                                AggregateQc) and new_qc.high_qc().view != old_qc.view and new_qc.view > old_qc.view:
                 # Update local high QC if the view of the high QC in the new AggregateQc is different
                 self.local_high_qc = new_qc.high_qc()
 
@@ -318,16 +316,16 @@ class Carnot:
         # Assertions for input validation
         assert block.id() in self.safe_blocks
         # This assertion will be moved outside as the approve_block will be called in two cases:
-        #1st the fast path when len(votes) == self.overlay.super_majority_threshold(self.id) and the second
-        #When there is the first timeout t1 for the fast path and the protocol operates in the slower path
+        # 1st the fast path when len(votes) == self.overlay.super_majority_threshold(self.id) and the second
+        # When there is the first timeout t1 for the fast path and the protocol operates in the slower path
         # in this case the node will prepare a QC from votes it has received.
-       # assert len(votes) == self.overlay.super_majority_threshold(self.id)
+        # assert len(votes) == self.overlay.super_majority_threshold(self.id)
         assert all(self.overlay.is_member_of_my_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
         assert self.highest_voted_view < block.view
 
         # Create a QC based on committee membership
-        qc = self.build_qc(block.view, block, None) #if self.overlay.is_member_of_root_committee(self.id) else None
+        qc = self.build_qc(block.view, block, None)  # if self.overlay.is_member_of_root_committee(self.id) else None
 
         # Create a new vote
         vote = Vote(
@@ -397,7 +395,7 @@ class Carnot:
         # Assertions for input validation
         assert msg.view == self.current_view, "Received NewView with correct view"
         assert self.overlay.is_member_of_child_committee(self.id,
-                                                             msg.sender) or\
+                                                         msg.sender) or \
                self.overlay.is_member_of_my_committee(self.id, msg.sender), "Sender is  a member of child committee"
         assert self.highest_voted_view == msg.view, "Can only forward NewView after voting ourselves"
 
@@ -407,7 +405,6 @@ class Carnot:
         else:
             # Forward the NewView message to the parent committee
             return Send(to=self.overlay.parent_committee, payload=msg)
-
 
     def propose_block(self, view: View, quorum: Quorum) -> Event:
         # Check if the node is a leader and if the quorum size is sufficient
