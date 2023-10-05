@@ -418,12 +418,12 @@ class Carnot:
         first_quorum_item = quorum[0]
 
         if isinstance(first_quorum_item, Vote):
-            # Happy path: Create a QC based on the first vote in the quorum
+            # Happy path: Create a QC based on votes in the quorum
             vote = first_quorum_item
-            assert vote.block in self.safe_blocks, "Vote references an unknown block"
+            assert vote.block in self.safe_blocks,
             qc = self.build_qc(vote.view, self.safe_blocks[vote.block], None)
         elif isinstance(first_quorum_item, NewView):
-            # Unhappy path: Create a QC based on the first NewView in the quorum
+            # Unhappy path: Create a QC based on NewView messages in the quorum
             new_view = first_quorum_item
             qc = self.build_qc(new_view.view, None, quorum)
 
