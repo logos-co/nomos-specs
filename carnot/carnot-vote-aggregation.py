@@ -198,6 +198,14 @@ class Overlay:
         pass
 
     @abstractmethod
+    def my_committee(self, _id: Id) -> Optional[Committee]:
+        """
+        :param _id:
+        :return: Some(committee) of the participant with Id _id withing the committee tree overlay
+        """
+        pass
+
+    @abstractmethod
     def is_child_of_root_committee(self, _id: Id) -> bool:
         """
         :return: returns child committee/s of root committee if present
@@ -454,4 +462,4 @@ class Carnot:
             timeout_qc=self.last_view_timeout_qc,
             sender=self.id
         )
-        return Send(payload=timeout_msg, to=self.overlay.)
+        return Send(payload=timeout_msg, to=self.overlay.m)
