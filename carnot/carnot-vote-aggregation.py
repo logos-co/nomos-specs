@@ -462,4 +462,4 @@ class Carnot:
             timeout_qc=self.last_view_timeout_qc,
             sender=self.id
         )
-        return Send(payload=timeout_msg, to=self.overlay.m)
+        return Send(payload=timeout_msg, to=self.overlay.my_committee())
