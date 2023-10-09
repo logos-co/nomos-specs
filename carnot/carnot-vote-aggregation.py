@@ -391,12 +391,12 @@ class Carnot:
             # Forward the vote to the parent committee
             return Send(to=self.overlay.parent_committee, payload=vote)
 
-    def forward_new_view(self, msg: NewView) -> Optional[Event]:
+# ToDo: Is not needed anymore
+    def forward_timeout_qc(self, msg: TimeoutQc) -> Optional[Event]:
         # Assertions for input validation
-        assert msg.view == self.current_view, "Received NewView with correct view"
-        assert self.overlay.is_member_of_child_committee(self.id,
-                                                         msg.sender) or \
-               self.overlay.is_member_of_my_committee(self.id, msg.sender), "Sender is  a member of child committee"
+        assert msg.view == self.current_view, "Received TimeoutQc with correct view"
+        assert self.overlay.is_member_of_child_committee(self.id, msg.sender)
+               #or self.overlay.is_member_of_my_committee(self.id, msg.sender), "Sender is  a member of child committee"
         assert self.highest_voted_view == msg.view, "Can only forward NewView after voting ourselves"
 
         if self.overlay.is_member_of_root_committee(self.id):
@@ -437,3 +437,21 @@ class Carnot:
 
         # Return a Broadcast event with the proposed block
         return BroadCast(payload=block)
+
+    def local_timeout(self) -> Optional[Event]:
+        """
+        Root committee changes for each failure, so repeated failure will be handled by different
+        root committees
+        """
+        # avoid voting after we timeout
+        self.highest_voted_view = self.current_view
+
+        timeout_msg: Timeout = Timeout(
+            view=self.current_view,
+            high_qc=self.local_high_qc,
+            # local_timeout is only true for the root committee or members of its children
+            # root committee or its children can trigger the timeout.
+            timeout_qc=self.last_view_timeout_qc,
+            sender=self.id
+        )
+        return Send(payload=timeout_msg, to=self.overlay.)
