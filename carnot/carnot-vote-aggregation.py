@@ -488,3 +488,29 @@ def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
 
     # Rebuild the overlay from scratch
     self.overlay = Overlay()
+
+
+@staticmethod
+def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
+    # Convert the set of Timeout messages to a list
+    msgs_list = list(msgs)
+
+    # Extract the view and high QC from the list of messages
+    view = msgs_list[0].view
+    high_qc_list = [msg.high_qc for msg in msgs_list]
+
+    # Find the highest high QC using the max function
+    high_qc = max(high_qc_list, key=lambda x: x.view)
+
+    # Extract the QC views and sender IDs
+    qc_views = [msg.view for msg in msgs_list]
+    sender_ids = {msg.sender for msg in msgs_list}
+
+    # Build the TimeoutQc object
+    return TimeoutQc(
+        view=view,
+        high_qc=high_qc,
+        qc_views=qc_views,
+        sender_ids=sender_ids,
+        sender=sender
+    )
