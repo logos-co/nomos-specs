@@ -481,3 +481,10 @@ def receive_timeout_qc(self, timeout_qc: TimeoutQc):
 
     # Optionally, rebuild the overlay from the timeout QC
     # self.rebuild_overlay_from_timeout_qc(timeout_qc)
+
+def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
+    # Ensure the timeout QC view is greater than or equal to the current view
+    assert timeout_qc.view >= self.current_view, "Timeout QC view should be greater than or equal to current view"
+
+    # Rebuild the overlay from scratch
+    self.overlay = Overlay()
