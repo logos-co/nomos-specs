@@ -514,3 +514,7 @@ def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
         sender_ids=sender_ids,
         sender=sender
     )
+
+
+def update_current_view_from_timeout_qc(self, timeout_qc: TimeoutQc):
+    self.current_view = timeout_qc.view + 1 if timeout_qc.view >= self.current_view else self.current_view
