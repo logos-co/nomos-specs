@@ -463,3 +463,21 @@ class Carnot:
             sender=self.id
         )
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
+
+
+def receive_timeout_qc(self, timeout_qc: TimeoutQc):
+    if timeout_qc.view < self.current_view:
+        # Ignore outdated timeout QC
+        return
+
+    # Update the local high QC with the new high QC from the timeout QC
+    self.update_high_qc(timeout_qc.high_qc)
+
+    # Update the last view timeout QC
+    self.update_timeout_qc(timeout_qc)
+
+    # Update the current view based on the timeout QC
+    self.update_current_view_from_timeout_qc(timeout_qc)
+
+    # Optionally, rebuild the overlay from the timeout QC
+    # self.rebuild_overlay_from_timeout_qc(timeout_qc)
