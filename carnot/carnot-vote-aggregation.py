@@ -357,16 +357,18 @@ class Carnot:
 
     from typing import Optional, Set, List
 
-    def build_qc(self, view: int, block: Optional[Block] = None, new_views: Optional[Set[NewView]] = None,
+
+# A committee member builds a QC or timeout QC with at least two-thirds of votes from its sub-branch within the overlay.
+    def build_qc(self, view: int, block: Optional[Block] = None, Timeouts: Optional[Set[Timeout]] = None,
                  votes: Optional[List[Vote]] = None) -> Qc:
-        if new_views:
+        if Timeout:
             # Unhappy path: Aggregate QC
-            new_views_list = list(new_views)
-            highest_qc = max(new_views_list, key=lambda x: x.high_qc.view).high_qc
+            new_timeout_list = list(Timeouts)
+            highest_qc = max(new_timeout_list, key=lambda x: x.high_qc.view).high_qc
             return AggregateQc(
-                qcs=[msg.high_qc.view for msg in new_views_list],
+                qcs=[msg.high_qc.view for msg in new_timeout_list],
                 highest_qc=highest_qc,
-                view=new_views_list[0].view
+                view=new_timeout_list[0].view
             )
         else:
             # Happy path: Standard QC
@@ -482,6 +484,8 @@ def receive_timeout_qc(self, timeout_qc: TimeoutQc):
     # Optionally, rebuild the overlay from the timeout QC
     # self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
+# The overlay can be built using a random seed for any random source.
+# Here we assume the TimeoutQC is the seed.
 def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
     # Ensure the timeout QC view is greater than or equal to the current view
     assert timeout_qc.view >= self.current_view, "Timeout QC view should be greater than or equal to current view"
