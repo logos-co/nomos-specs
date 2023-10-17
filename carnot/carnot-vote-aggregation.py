@@ -522,3 +522,18 @@ def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
 
 def update_current_view_from_timeout_qc(self, timeout_qc: TimeoutQc):
     self.current_view = timeout_qc.view + 1 if timeout_qc.view >= self.current_view else self.current_view
+
+def is_safe_to_timeout_invariant(self):
+    # Ensure that the current view is always higher than the highest voted view or the local high QC view.
+    assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view), "Current view should be higher than the highest voted view or local high QC view."
+
+    # Ensure that a node waits for the timeout QC from the root committee or the last view timeout QC
+    # from the previous view before changing its view.
+    assert (
+        self.current_view == self.local_high_qc.view + 1 or
+        self.current_view == self.last_view_timeout_qc.view + 1 or
+        self.current_view == self.last_view_timeout_qc.view
+    ), "Node must wait for appropriate QC before changing its view."
+
+    # If both assertions pass, the invariant is satisfied
+    return True
