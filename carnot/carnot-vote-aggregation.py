@@ -401,7 +401,7 @@ class Carnot:
             # Forward the vote to the parent committee
             return Send(to=self.overlay.parent_committee, payload=vote)
 
-# ToDo: Is not needed anymore
+
     def forward_timeout_qc(self, msg: TimeoutQc) -> Optional[Event]:
         # Assertions for input validation
         assert msg.view == self.current_view, "Received TimeoutQc with correct view"
