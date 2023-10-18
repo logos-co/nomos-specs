@@ -396,8 +396,16 @@ class Carnot:
                 block=block_id
             )
 
-   # A node initially forwards a QC
-    def forward_vote(self, vote: Optional[Vote] = None, qc: Optional[Qc] = None) -> Optional[Event]:
+   # A node initially forwards a vote or qc from its subtree to its parent committee. There can be two instances this
+    # can happen: 1:
+    #   If a node forms a QC qc from votes and QCs it receives from its subtree such that the total number of votes in the qc is at two-third of votes from the subtree, then
+    # it forwards this QC to the parent committee members or a subset of parent committee members.
+    # 2: After sending the qc any additional votes are forwarded to the parent committee members or a subset of parent committee members.
+
+
+
+
+    def forward_vote_qc(self, vote: Optional[Vote] = None, qc: Optional[Qc] = None) -> Optional[Event]:
         # Assertions for input validation if vote is provided
         if vote:
             assert vote.block in self.safe_blocks
@@ -429,11 +437,17 @@ class Carnot:
             return None
 
 
+    # 1: Similarly, if a node receives timeout QC and timeout messages, it builds a timeout qc (TC) representing 2/3 of timeout messages from its subtree,
+    # then it forwards it to the parent committee members or a subset of parent committee members.
+    # 2: It type 1 timeout occurs and the node haven't collected enough timeout messages, it can simply build a QC from whatever timeout messages it has
+    # and forward the QC to its parent.
+    # 3: Any additional timeout messages are forwarded to the parent committee members or a subset of parent committee members.
+
+
     def forward_timeout_qc(self, msg: TimeoutQc) -> Optional[Event]:
         # Assertions for input validation
         assert msg.view == self.current_view, "Received TimeoutQc with correct view"
-        assert self.overlay.is_member_of_child_committee(self.id, msg.sender)
-               #or self.overlay.is_member_of_my_committee(self.id, msg.sender), "Sender is  a member of child committee"
+        assert self.overlay.is_member_of_subtree(self.id, msg.sender)
         assert self.highest_voted_view == msg.view, "Can only forward NewView after voting ourselves"
 
         if self.overlay.is_member_of_root_committee(self.id):
