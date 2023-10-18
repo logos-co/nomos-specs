@@ -353,10 +353,11 @@ class Carnot:
         # Update the highest voted view
         self.highest_voted_view = max(self.highest_voted_view, block.view)
 
-        # Determine the recipient based on committee membership
-     #   if self.overlay.is_member_of_root_committee(self.id):
-      #      recipient = self.overlay.leader(block.view + 1)
-       # else:
+        # After block verification, votes are sent to committee members.
+        # When a QC is formed from 2/3rd of subtree votes, it's forwarded to the parent committee.
+        # If a Type 1 timeout occurs, a QC is built from available votes and QCs and sent to the parent.
+        # Subsequent votes are forwarded to the parent committee members.
+
         recipient = self.overlay.my_committee(self.id)
 
         # Return a Send event to the appropriate recipient
