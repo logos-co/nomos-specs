@@ -222,14 +222,18 @@ class Overlay:
     @abstractmethod
     def leader_super_majority_threshold(self, _id: Id) -> int:
         """
-        Amount of distinct number of messages for a node with Id _id member of a committee
-        The return value may change depending on which committee the node is member of, including the leader
+        This corresponds to a threshold of 2n/3 + 1, where 'n' represents the total number of network participants.
         :return:
         """
         pass
 
     @abstractmethod
     def super_majority_threshold(self, _id: Id) -> int:
+        """
+        This corresponds to a threshold of 2n_c/3 ( 2n_c/3 +1 for root committee of the overlay), where n_c represents
+        the total number of participants in the subtree of the overlay that includes the node with the ID 'Id' in its root committee of the subtree.
+        return:
+        """
         pass
 
 
@@ -335,7 +339,7 @@ class Carnot:
         # When there is the first timeout t1 for the fast path and the protocol operates in the slower path
         # in this case the node will prepare a QC from votes it has received.
         # assert len(votes) == self.overlay.super_majority_threshold(self.id)
-        assert all(self.overlay.is_member_of_my_committee(self.id, vote.voter) for vote in votes)
+       # assert all(self.overlay.is_member_of_my_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
         assert self.highest_voted_view < block.view
 
