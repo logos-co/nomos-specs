@@ -397,10 +397,11 @@ class Carnot:
             )
 
    # A node initially forwards a vote or qc from its subtree to its parent committee. There can be two instances this
-    # can happen: 1:
-    #   If a node forms a QC qc from votes and QCs it receives from its subtree such that the total number of votes in the qc is at two-third of votes from the subtree, then
+    # can happen: 1: If a node forms a QC qc from votes and QCs it receives from its subtree such that the total number of votes in the qc is at two-third of votes from the subtree, then
     # it forwards this QC to the parent committee members or a subset of parent committee members.
     # 2: After sending the qc any additional votes are forwarded to the parent committee members or a subset of parent committee members.
+    # 3: After type 1 timeout a node builds a QC from arbitrary number of votes+QCs it has received, building a QC qc such that total number of votes in qc is less
+    #than the two-thirds of the number of the nodes in the sub-tree.
 
 
 
