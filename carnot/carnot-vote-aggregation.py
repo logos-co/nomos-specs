@@ -216,9 +216,9 @@ class Carnot2(Carnot):
     # A committee member builds a QC or timeout QC with at least two-thirds of votes from its sub-branch within the
     # overlay. Furthermore, if a node builds a timeout QC with at least f+1 timeout messages, it forwards them to its
     # parents as well as the child committee. This allows any node that have not timed out to timeout.
-    def build_qc(self, view: int, block: Optional[Block] = None, Timeouts: Optional[Set[Timeout]] = None,
+    def build_qc(self, view: int, qc:Optional[Qc], t_qc:Optional[TimeoutQc],block: Optional[Block] = None, Timeouts: Optional[Set[Timeout]] = None,
                  votes: Optional[List[Vote]] = None) -> Qc:
-        if Timeout:
+        if Timeout or TimeoutQc:
             # Unhappy path: Aggregate QC
             new_timeout_list = list(Timeouts)
             highest_qc = max(new_timeout_list, key=lambda x: x.high_qc.view).high_qc
@@ -235,6 +235,8 @@ class Carnot2(Carnot):
             elif block:
                 # Use the provided block if votes are not available
                 block_id = block.id()
+            elif qc:
+                block_id = qc.block
             else:
                 # No block or votes provided, return None
                 return None
