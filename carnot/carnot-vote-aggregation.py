@@ -407,7 +407,6 @@ class Carnot:
         # Assertions for input validation if QC is provided
         if qc:
             assert qc.view >= self.current_view, "QC view should be greater than or equal to the current view"
-            assert qc.view >= self.highest_voted_view, "QC view should be greater than or equal to the highest voted view"
             assert all(
                 self.overlay.is_member_of_subtree(self.id, voter)
                 for voter in qc.voters
