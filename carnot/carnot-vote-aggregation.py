@@ -509,73 +509,73 @@ class Carnot:
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
 
 
-def receive_timeout_qc(self, timeout_qc: TimeoutQc):
-    if timeout_qc.view < self.current_view:
-        # Ignore outdated timeout QC
-        return
+    def receive_timeout_qc(self, timeout_qc: TimeoutQc):
+        if timeout_qc.view < self.current_view:
+            # Ignore outdated timeout QC
+            return
 
-    # Update the local high QC with the new high QC from the timeout QC
-    self.update_high_qc(timeout_qc.high_qc)
+        # Update the local high QC with the new high QC from the timeout QC
+        self.update_high_qc(timeout_qc.high_qc)
 
-    # Update the last view timeout QC
-    self.update_timeout_qc(timeout_qc)
+        # Update the last view timeout QC
+        self.update_timeout_qc(timeout_qc)
 
-    # Update the current view based on the timeout QC
-    self.update_current_view_from_timeout_qc(timeout_qc)
+        # Update the current view based on the timeout QC
+        self.update_current_view_from_timeout_qc(timeout_qc)
 
-    # Optionally, rebuild the overlay from the timeout QC
-    # self.rebuild_overlay_from_timeout_qc(timeout_qc)
+        # Optionally, rebuild the overlay from the timeout QC
+        # self.rebuild_overlay_from_timeout_qc(timeout_qc)
 
-# The overlay can be built using a random seed for any random source.
-# Here we assume the TimeoutQC is the seed.
-def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
-    # Ensure the timeout QC view is greater than or equal to the current view
-    assert timeout_qc.view >= self.current_view, "Timeout QC view should be greater than or equal to current view"
+    # The overlay can be built using a random seed for any random source.
+    # Here we assume the TimeoutQC is the seed.
+    def rebuild_overlay_from_timeout_qc(self, timeout_qc: TimeoutQc):
+        # Ensure the timeout QC view is greater than or equal to the current view
+        assert timeout_qc.view >= self.current_view, "Timeout QC view should be greater than or equal to current view"
 
-    # Rebuild the overlay from scratch
-    self.overlay = Overlay()
-
-
-@staticmethod
-def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
-    # Convert the set of Timeout messages to a list
-    msgs_list = list(msgs)
-
-    # Extract the view and high QC from the list of messages
-    view = msgs_list[0].view
-    high_qc_list = [msg.high_qc for msg in msgs_list]
-
-    # Find the highest high QC using the max function
-    high_qc = max(high_qc_list, key=lambda x: x.view)
-
-    # Extract the QC views and sender IDs
-    qc_views = [msg.view for msg in msgs_list]
-    sender_ids = {msg.sender for msg in msgs_list}
-
-    # Build the TimeoutQc object
-    return TimeoutQc(
-        view=view,
-        high_qc=high_qc,
-        qc_views=qc_views,
-        sender_ids=sender_ids,
-        sender=sender
-    )
+        # Rebuild the overlay from scratch
+        self.overlay = Overlay()
 
 
-def update_current_view_from_timeout_qc(self, timeout_qc: TimeoutQc):
-    self.current_view = timeout_qc.view + 1 if timeout_qc.view >= self.current_view else self.current_view
+    @staticmethod
+    def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
+        # Convert the set of Timeout messages to a list
+        msgs_list = list(msgs)
 
-def is_safe_to_timeout_invariant(self):
-    # Ensure that the current view is always higher than the highest voted view or the local high QC view.
-    assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view), "Current view should be higher than the highest voted view or local high QC view."
+        # Extract the view and high QC from the list of messages
+        view = msgs_list[0].view
+        high_qc_list = [msg.high_qc for msg in msgs_list]
 
-    # Ensure that a node waits for the timeout QC from the root committee or the last view timeout QC
-    # from the previous view before changing its view.
-    assert (
-        self.current_view == self.local_high_qc.view + 1 or
-        self.current_view == self.last_view_timeout_qc.view + 1 or
-        self.current_view == self.last_view_timeout_qc.view
-    ), "Node must wait for appropriate QC before changing its view."
+        # Find the highest high QC using the max function
+        high_qc = max(high_qc_list, key=lambda x: x.view)
 
-    # If both assertions pass, the invariant is satisfied
-    return True
+        # Extract the QC views and sender IDs
+        qc_views = [msg.view for msg in msgs_list]
+        sender_ids = {msg.sender for msg in msgs_list}
+
+        # Build the TimeoutQc object
+        return TimeoutQc(
+            view=view,
+            high_qc=high_qc,
+            qc_views=qc_views,
+            sender_ids=sender_ids,
+            sender=sender
+        )
+
+
+    def update_current_view_from_timeout_qc(self, timeout_qc: TimeoutQc):
+        self.current_view = timeout_qc.view + 1 if timeout_qc.view >= self.current_view else self.current_view
+
+    def is_safe_to_timeout_invariant(self):
+        # Ensure that the current view is always higher than the highest voted view or the local high QC view.
+        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view), "Current view should be higher than the highest voted view or local high QC view."
+
+        # Ensure that a node waits for the timeout QC from the root committee or the last view timeout QC
+        # from the previous view before changing its view.
+        assert (
+            self.current_view == self.local_high_qc.view + 1 or
+            self.current_view == self.last_view_timeout_qc.view + 1 or
+            self.current_view == self.last_view_timeout_qc.view
+        ), "Node must wait for appropriate QC before changing its view."
+
+        # If both assertions pass, the invariant is satisfied
+        return True
