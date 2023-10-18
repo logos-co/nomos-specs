@@ -177,6 +177,13 @@ class Overlay:
         """
         pass
 
+    def is_member_of_subtree(self, root_node: Id, child: Id) -> bool:
+        """
+        :param root_node:
+        :param child:
+        :return: true if participant with Id  is member of a committee in the subtree of the participant with Id root_node
+        """
+        pass
     @abstractmethod
     def parent_committee(self, _id: Id) -> Optional[Committee]:
         """
@@ -359,6 +366,8 @@ class Carnot:
 
 
 # A committee member builds a QC or timeout QC with at least two-thirds of votes from its sub-branch within the overlay.
+    #Furthermore, if a node builds a timeout QC with at least f+1 timeout messages, it forwards them to its parents
+    # as well as the child committee. This allows any node that have not timed out to timeout.
     def build_qc(self, view: int, block: Optional[Block] = None, Timeouts: Optional[Set[Timeout]] = None,
                  votes: Optional[List[Vote]] = None) -> Qc:
         if Timeout:
@@ -387,19 +396,38 @@ class Carnot:
                 block=block_id
             )
 
-    def forward_vote(self, vote: Vote) -> Optional[Event]:
-        # Assertions for input validation
-        assert vote.block in self.safe_blocks
-        assert self.overlay.is_member_of_child_committee(self.id, vote.voter) or \
-               self.overlay.is_member_of_my_committee(self.id, vote.voter)
-        assert self.highest_voted_view == vote.view, "Can only forward votes after voting ourselves"
+   # A node initially forwards a QC
+    def forward_vote(self, vote: Optional[Vote] = None, qc: Optional[Qc] = None) -> Optional[Event]:
+        # Assertions for input validation if vote is provided
+        if vote:
+            assert vote.block in self.safe_blocks
+            assert self.overlay.is_member_of_subtree(self.id, vote.voter), "Voter should be a member of the subtree"
+            assert self.highest_voted_view == vote.view, "Can only forward votes after voting ourselves"
+
+        # Assertions for input validation if QC is provided
+        if qc:
+            assert qc.view >= self.current_view, "QC view should be greater than or equal to the current view"
+            assert qc.view >= self.highest_voted_view, "QC view should be greater than or equal to the highest voted view"
+            assert all(
+                self.overlay.is_member_of_subtree(self.id, voter)
+                for voter in qc.voters
+            ), "All voters in QC should be members of the subtree"
 
         if self.overlay.is_member_of_root_committee(self.id):
-            # Forward the vote to the next leader in the root committee
-            return Send(to=self.overlay.next_leader(), payload=vote)
+            # Forward the vote or QC to the next leader in the root committee
+            recipient = self.overlay.next_leader()
         else:
-            # Forward the vote to the parent committee
-            return Send(to=self.overlay.parent_committee, payload=vote)
+            # Forward the vote or QC to the parent committee
+            recipient = self.overlay.parent_committee
+
+        # Create a Send event with either vote or QC as payload and return it
+        if vote:
+            return Send(to=recipient, payload=vote)
+        elif qc:
+            return Send(to=recipient, payload=qc)
+        else:
+            # If neither vote nor QC is provided, return None
+            return None
 
 
     def forward_timeout_qc(self, msg: TimeoutQc) -> Optional[Event]:
