@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import Union, List, Set, Optional, Type, TypeAlias, Dict
 from abc import ABC, abstractmethod
 
+from carnot import Carnot, Overlay
+
 Id = bytes
 View = int
 Committee = Set[Id]
@@ -119,61 +121,16 @@ class Send:
 Event: TypeAlias = Union[BroadCast, Send]
 
 
-class Overlay:
+class Overlay2(Overlay):
     """
     Overlay structure for a View
     """
-
-    @abstractmethod
-    def is_leader(self, _id: Id):
-        """
-        :param _id:  Node id to be checked
-        :return: true if node is the leader of the current view
-        """
-        return _id == self.leader()
-
-    @abstractmethod
-    def leader(self) -> Id:
-        """
-        :param view:
-        :return: the leader Id of the specified view
-        """
-        pass
-
-    @abstractmethod
-    def next_leader(self) -> Id:
-        pass
-
-    @abstractmethod
-    def is_member_of_leaf_committee(self, _id: Id) -> bool:
-        """
-        :param _id: Node id to be checked
-        :return: true if the participant with Id _id is in the leaf committee of the committee overlay
-        """
-        pass
-
-    @abstractmethod
-    def is_member_of_root_committee(self, _id: Id) -> bool:
-        """
-        :param _id:
-        :return: true if the participant with Id _id is member of the root committee withing the tree overlay
-        """
-        pass
 
     @abstractmethod
     def is_member_of_my_committee(self, _id: Id) -> bool:
         """
         :param _id:
         :return: true if the participant with Id _id is member of the committee of the  verifying node withing the tree overlay
-        """
-        pass
-
-    @abstractmethod
-    def is_member_of_child_committee(self, parent: Id, child: Id) -> bool:
-        """
-        :param parent:
-        :param child:
-        :return: true if participant with Id child is member of the child committee of the participant with Id parent
         """
         pass
 
@@ -186,37 +143,10 @@ class Overlay:
         pass
 
     @abstractmethod
-    def parent_committee(self, _id: Id) -> Optional[Committee]:
-        """
-        :param _id:
-        :return: Some(parent committee) of the participant with Id _id withing the committee tree overlay
-        or Empty if the member with Id _id is a participant of the root committee
-        """
-        pass
-
-    @abstractmethod
-    def leaf_committees(self) -> Set[Committee]:
-        pass
-
-    @abstractmethod
-    def root_committee(self) -> Committee:
-        """
-        :return: returns root committee
-        """
-        pass
-
-    @abstractmethod
     def my_committee(self, _id: Id) -> Optional[Committee]:
         """
         :param _id:
         :return: Some(committee) of the participant with Id _id withing the committee tree overlay
-        """
-        pass
-
-    @abstractmethod
-    def is_child_of_root_committee(self, _id: Id) -> bool:
-        """
-        :return: returns child committee/s of root committee if present
         """
         pass
 
@@ -237,9 +167,16 @@ class Overlay:
         """
         pass
 
+    def number_of_committees(self) -> int:
+        """
+        :return: returns total number of committees in the overlay.
+        """
+        pass
 
-class Carnot:
-    def __init__(self, _id: Id, overlay=Overlay()):
+
+class Carnot2(Carnot):
+    def __init__(self, _id: Id, overlay=Overlay2()):
+        self.latest_committed_block = None
         self.id: Id = _id
         self.current_view: View = 0
         self.highest_voted_view: View = -1
@@ -264,25 +201,32 @@ class Carnot:
         # Return True if both conditions are met
         return is_view_incremented and is_standard_qc
 
-    def latest_committed_view(self) -> View:
-        return self.latest_committed_block().view
+    @abstractmethod
+    def commit_block(self, block: Block) -> bool:
+        pass
 
-    # Return a list of blocks received by a node for a specific view.
-    # More than one block is returned only in case of a malicious leader.
-    def blocks_in_view(self, view: View) -> List[Block]:
-        return [block for block in self.safe_blocks.values() if block.view == view]
+    def commit_the_chain(self, grand_parent: Block):
+        # Create an empty stack to store the blocks in reverse order
+        block_stack = []
 
-    def genesis_block(self) -> Block:
-        return self.blocks_in_view(0)[0]
+        # Start with the grand_parent block
+        current_block = grand_parent
 
-    def latest_committed_block(self) -> Block:
-        for view in range(self.current_view, 0, -1):
-            for block in self.blocks_in_view(view):
-                if self.can_commit_grandparent(block):
-                    return self.safe_blocks.get(self.safe_blocks.get(block.parent()).parent())
-        # The genesis block is always considered committed.
-        return self.genesis_block()
+        # Push blocks onto the stack until we reach the parent of the latest_committed_block
+        while current_block != self.latest_committed_block.parent():
+            block_stack.append(current_block)
+            current_block = self.safe_blocks.get(current_block.parent())
+        # Pop and commit blocks from the stack to execute them in order
+        while block_stack:
+            block_to_commit = block_stack.pop()
+            # Commit the transactions of the block using your commit_block method
+            self.commit_block(block_to_commit)
+        latest_committed_block = block_to_commit
+        # Update the latest committed block to be the latest_committed_block
+        self.latest_committed_block = latest_committed_block
 
+
+# The the check for the first block generated after unhappy path is added.
     def block_is_safe(self, block: Block) -> bool:
         if isinstance(block.qc, StandardQc):
             return block.view_num == block.qc.view() + 1
@@ -308,29 +252,15 @@ class Carnot:
                 self.local_high_qc = new_qc.high_qc()
 
         # If my view is not updated, I update it when I see a QC for that view
+        # If there is any missing blocks then these blocks should be downloaded.
         if qc.view >= self.current_view:
             self.current_view = qc.view + 1
 
+# Feel free to remove, just added for simplicity.
     def update_timeout_qc(self, timeout_qc: TimeoutQc):
         if not self.last_view_timeout_qc or timeout_qc.view > self.last_view_timeout_qc.view:
             self.last_view_timeout_qc = timeout_qc
 
-    def receive_block(self, block: Block):
-        assert block.parent() in self.safe_blocks
-
-        # Check if the block is already in safe_blocks, if it's from a previous view,
-        # or if there are existing blocks for the same view
-        if block.id() in self.safe_blocks or block.view <= self.latest_committed_view() or self.blocks_in_view(
-                block.view):
-            # TODO: Report malicious leader or handle potential fork divergence
-            return
-
-        # TODO: Verify if the proposer is indeed the leader
-
-        # If the block is safe, add it to safe_blocks and update the high QC
-        if self.block_is_safe(block):
-            self.safe_blocks[block.id()] = block
-            self.update_high_qc(block.qc)
 
     def approve_block(self, block: Block, votes: Set[Vote]) -> Event:
         # Assertions for input validation
@@ -340,7 +270,7 @@ class Carnot:
         # When there is the first timeout t1 for the fast path and the protocol operates in the slower path
         # in this case the node will prepare a QC from votes it has received.
         # assert len(votes) == self.overlay.super_majority_threshold(self.id)
-        # assert all(self.overlay.is_member_of_my_committee(self.id, vote.voter) for vote in votes)
+        assert all(self.overlay.is_member_of_subtree(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
         assert self.highest_voted_view < block.view
 
@@ -362,8 +292,10 @@ class Carnot:
         # When a QC is formed from 2/3rd of subtree votes, it's forwarded to the parent committee.
         # If a Type 1 timeout occurs, a QC is built from available votes and QCs and sent to the parent.
         # Subsequent votes are forwarded to the parent committee members.
-
-        recipient = self.overlay.my_committee(self.id)
+        if self.overlay.number_of_committees==1:
+            recipient = self.overlay.leader(block.view + 1)
+        else:
+            recipient = self.overlay.my_committee(self.id)
 
         # Return a Send event to the appropriate recipient
         return Send(to=recipient, payload=vote)
