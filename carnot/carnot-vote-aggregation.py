@@ -354,15 +354,14 @@ class Carnot:
         self.highest_voted_view = max(self.highest_voted_view, block.view)
 
         # Determine the recipient based on committee membership
-        if self.overlay.is_member_of_root_committee(self.id):
-            recipient = self.overlay.leader(block.view + 1)
-        else:
-            recipient = self.overlay.parent_committee(self.id)
+     #   if self.overlay.is_member_of_root_committee(self.id):
+      #      recipient = self.overlay.leader(block.view + 1)
+       # else:
+        recipient = self.overlay.my_committee(self.id)
 
         # Return a Send event to the appropriate recipient
         return Send(to=recipient, payload=vote)
 
-    from typing import Optional, Set, List
 
 
 # A committee member builds a QC or timeout QC with at least two-thirds of votes from its sub-branch within the overlay.
