@@ -184,6 +184,7 @@ class Overlay:
         :return: true if participant with Id  is member of a committee in the subtree of the participant with Id root_node
         """
         pass
+
     @abstractmethod
     def parent_committee(self, _id: Id) -> Optional[Committee]:
         """
@@ -339,7 +340,7 @@ class Carnot:
         # When there is the first timeout t1 for the fast path and the protocol operates in the slower path
         # in this case the node will prepare a QC from votes it has received.
         # assert len(votes) == self.overlay.super_majority_threshold(self.id)
-       # assert all(self.overlay.is_member_of_my_committee(self.id, vote.voter) for vote in votes)
+        # assert all(self.overlay.is_member_of_my_committee(self.id, vote.voter) for vote in votes)
         assert all(vote.block == block.id() for vote in votes)
         assert self.highest_voted_view < block.view
 
@@ -367,11 +368,9 @@ class Carnot:
         # Return a Send event to the appropriate recipient
         return Send(to=recipient, payload=vote)
 
-
-
-# A committee member builds a QC or timeout QC with at least two-thirds of votes from its sub-branch within the overlay.
-    #Furthermore, if a node builds a timeout QC with at least f+1 timeout messages, it forwards them to its parents
-    # as well as the child committee. This allows any node that have not timed out to timeout.
+    # A committee member builds a QC or timeout QC with at least two-thirds of votes from its sub-branch within the
+    # overlay. Furthermore, if a node builds a timeout QC with at least f+1 timeout messages, it forwards them to its
+    # parents as well as the child committee. This allows any node that have not timed out to timeout.
     def build_qc(self, view: int, block: Optional[Block] = None, Timeouts: Optional[Set[Timeout]] = None,
                  votes: Optional[List[Vote]] = None) -> Qc:
         if Timeout:
@@ -400,15 +399,12 @@ class Carnot:
                 block=block_id
             )
 
-   # A node initially forwards a vote or qc from its subtree to its parent committee. There can be two instances this
+    # A node initially forwards a vote or qc from its subtree to its parent committee. There can be two instances this
     # can happen: 1: If a node forms a QC qc from votes and QCs it receives from its subtree such that the total number of votes in the qc is at two-third of votes from the subtree, then
     # it forwards this QC to the parent committee members or a subset of parent committee members.
     # 2: After sending the qc any additional votes are forwarded to the parent committee members or a subset of parent committee members.
     # 3: After type 1 timeout a node builds a QC from arbitrary number of votes+QCs it has received, building a QC qc such that total number of votes in qc is less
-    #than the two-thirds of the number of the nodes in the sub-tree.
-
-
-
+    # than the two-thirds of the number of the nodes in the sub-tree.
 
     def forward_vote_qc(self, vote: Optional[Vote] = None, qc: Optional[Qc] = None) -> Optional[Event]:
         # Assertions for input validation if vote is provided
@@ -441,13 +437,11 @@ class Carnot:
             # If neither vote nor QC is provided, return None
             return None
 
-
     # 1: Similarly, if a node receives timeout QC and timeout messages, it builds a timeout qc (TC) representing 2/3 of timeout messages from its subtree,
     # then it forwards it to the parent committee members or a subset of parent committee members.
     # 2: It type 1 timeout occurs and the node haven't collected enough timeout messages, it can simply build a QC from whatever timeout messages it has
     # and forward the QC to its parent.
     # 3: Any additional timeout messages are forwarded to the parent committee members or a subset of parent committee members.
-
 
     def forward_timeout_qc(self, msg: TimeoutQc) -> Optional[Event]:
         # Assertions for input validation
@@ -512,7 +506,6 @@ class Carnot:
         )
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
 
-
     def receive_timeout_qc(self, timeout_qc: TimeoutQc):
         if timeout_qc.view < self.current_view:
             # Ignore outdated timeout QC
@@ -539,7 +532,6 @@ class Carnot:
         # Rebuild the overlay from scratch
         self.overlay = Overlay()
 
-
     @staticmethod
     def build_timeout_qc(msgs: Set[Timeout], sender: Id) -> TimeoutQc:
         # Convert the set of Timeout messages to a list
@@ -565,20 +557,20 @@ class Carnot:
             sender=sender
         )
 
-
     def update_current_view_from_timeout_qc(self, timeout_qc: TimeoutQc):
         self.current_view = timeout_qc.view + 1 if timeout_qc.view >= self.current_view else self.current_view
 
     def is_safe_to_timeout_invariant(self):
         # Ensure that the current view is always higher than the highest voted view or the local high QC view.
-        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view), "Current view should be higher than the highest voted view or local high QC view."
+        assert self.current_view > max(self.highest_voted_view - 1,
+                                       self.local_high_qc.view), "Current view should be higher than the highest voted view or local high QC view."
 
         # Ensure that a node waits for the timeout QC from the root committee or the last view timeout QC
         # from the previous view before changing its view.
         assert (
-            self.current_view == self.local_high_qc.view + 1 or
-            self.current_view == self.last_view_timeout_qc.view + 1 or
-            self.current_view == self.last_view_timeout_qc.view
+                self.current_view == self.local_high_qc.view + 1 or
+                self.current_view == self.last_view_timeout_qc.view + 1 or
+                self.current_view == self.last_view_timeout_qc.view
         ), "Node must wait for appropriate QC before changing its view."
 
         # If both assertions pass, the invariant is satisfied
