@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from typing import Union, List, Set, Optional, Type, TypeAlias, Dict
 from abc import ABC, abstractmethod
 
-from carnot import Carnot, Overlay
+import carnot
+from carnot import Carnot, Overlay, Qc, Block, TimeoutQc, AggregateQc, Vote, Event, Send, Timeout, Quorum, NewView, \
+    BroadCast
 
 Id = bytes
 View = int
@@ -26,99 +28,10 @@ class StandardQc:
         return self.view_num  # Changed the method name to view_num
 
 
-@dataclass
-class AggregateQc:
-    qcs: List[View]
-    highest_qc: StandardQc
-    view_num: View  # Changed the variable name to avoid conflict with the class name
-
-    def view(self) -> View:
-        return self.view_num  # Changed the method name to view_num
-
-    def high_qc(self) -> StandardQc:
-        assert self.highest_qc.view() == max(self.qcs)  # Corrected method call
-        assert self.highest_qc.root_qc, "Expected self.highest_qc.root_qc to be True"
-        return self.highest_qc
 
 
-Qc = Union[StandardQc, AggregateQc]  # Changed the type alias to use Union
 
 
-@dataclass
-class Block:
-    view_num: View  # Changed the variable name to avoid conflict with the class name
-    qc: Qc
-    _id: Id
-
-    def extends(self, ancestor):
-        if self == ancestor:
-            return True
-        elif self.parent is None:
-            return False
-        elif self.parent.view < ancestor.view:  # Check the view of the parent
-            return False
-        else:
-            return self.parent.extends(ancestor)
-
-    def parent(self) -> Id:
-        if isinstance(self.qc, StandardQc):
-            return self.qc.block
-        elif isinstance(self.qc, AggregateQc):
-            return self.qc.high_qc().block
-
-    def id(self) -> Id:
-        return self._id
-
-
-@dataclass(unsafe_hash=True)
-class Vote:
-    block: Id
-    view: View
-    voter: Id
-    qc: Optional[Qc]
-
-
-@dataclass
-class TimeoutQc:
-    view: View
-    high_qc: Qc
-    qc_views: List[View]
-    sender_ids: Set[Id]
-    sender: Id
-
-
-class Timeout:
-    view: View
-    high_qc: Qc
-    sender: Id
-    timeout_qc: Type[TimeoutQc]
-
-
-@dataclass
-class NewView:
-    view: View
-    high_qc: Qc
-    sender: Id
-    timeout_qc: Type[TimeoutQc]
-
-
-Quorum: TypeAlias = Union[Set[Vote], Set[NewView]]
-
-Payload: TypeAlias = Union[Block, Vote, Timeout, NewView, TimeoutQc]
-
-
-@dataclass
-class BroadCast:
-    payload: Payload
-
-
-@dataclass
-class Send:
-    to: [Id]
-    payload: Payload
-
-
-Event: TypeAlias = Union[BroadCast, Send]
 
 
 class Overlay2(Overlay):
@@ -185,7 +98,7 @@ class Carnot2(Carnot):
         self.last_view_timeout_qc: Type[TimeoutQc] = None
         self.overlay: Overlay = overlay
 
-    def can_commit_grandparent(self, block) -> bool:
+    def can_commit_grandparent(self, block:carnot.Block) -> bool:
         # Get the parent block and grandparent block from the safe_blocks dictionary
         parent = self.safe_blocks.get(block.parent())
         grandparent = self.safe_blocks.get(parent.parent())
