@@ -4,34 +4,7 @@ from abc import ABC, abstractmethod
 
 import carnot
 from carnot import Carnot, Overlay, Qc, Block, TimeoutQc, AggregateQc, Vote, Event, Send, Timeout, Quorum, NewView, \
-    BroadCast
-
-Id = bytes
-View = int
-Committee = Set[Id]
-
-
-def int_to_id(i: int) -> Id:
-    return bytes(str(i), encoding="utf8")
-
-
-@dataclass(unsafe_hash=True)
-class StandardQc:
-    block: Id
-    view_num: View  # Changed the variable name to avoid conflict with the class name
-    Comm_No: int  # This committee position in the set of committees
-
-    # If it is false then the QC is built by the committees with 2/3 collection of votes from subtree of the collector
-    # committee.
-
-    def view(self) -> View:
-        return self.view_num  # Changed the method name to view_num
-
-
-
-
-
-
+    BroadCast, Id, Committee, View, StandardQc, int_to_id
 
 
 class Overlay2(Overlay):
@@ -219,9 +192,10 @@ class Carnot2(Carnot):
     def build_qc(self, view: int, qc:Optional[Qc], t_qc:Optional[TimeoutQc],block: Optional[Block] = None, Timeouts: Optional[Set[Timeout]] = None,
                  votes: Optional[List[Vote]] = None) -> Qc:
         if Timeout or TimeoutQc:
-            # Unhappy path: Aggregate QC
-            new_timeout_list = list(Timeouts)
-            highest_qc = max(new_timeout_list, key=lambda x: x.high_qc.view).high_qc
+            if Timeouts:
+                # Unhappy path: Aggregate QC
+                new_timeout_list = list(Timeouts)
+                highest_qc = max(new_timeout_list, key=lambda x: x.high_qc.view).high_qc
             return AggregateQc(
                 qcs=[msg.high_qc.view for msg in new_timeout_list],
                 highest_qc=highest_qc,
