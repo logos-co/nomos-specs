@@ -112,7 +112,7 @@ class Carnot2(Carnot):
         self.latest_committed_block = latest_committed_block
 
 
-# The the check for the first block generated after unhappy path is added.
+# The  check for the first block generated after unhappy path is added.
     def block_is_safe(self, block: Block) -> bool:
         if isinstance(block.qc, StandardQc):
             return block.view_num == block.qc.view() + 1
@@ -178,7 +178,7 @@ class Carnot2(Carnot):
         # When a QC is formed from 2/3rd of subtree votes, it's forwarded to the parent committee.
         # If a Type 1 timeout occurs, a QC is built from available votes and QCs and sent to the parent.
         # Subsequent votes are forwarded to the parent committee members.
-        if self.overlay.number_of_committees==1:
+        if self.overlay.is_member_of_root_committee():
             recipient = self.overlay.leader(block.view + 1)
         else:
             recipient = self.overlay.my_committee(self.id)
