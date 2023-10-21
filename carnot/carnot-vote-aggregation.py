@@ -8,6 +8,8 @@ from carnot import Carnot, Overlay, Qc, Block, TimeoutQc, AggregateQc, Vote, Eve
 
 
 
+
+
 class Overlay2(Overlay):
     """
     Overlay structure for a View
@@ -29,13 +31,6 @@ class Overlay2(Overlay):
         """
         pass
 
-    @abstractmethod
-    def my_committee(self, _id: Id) -> Optional[Committee]:
-        """
-        :param _id:
-        :return: Some(committee) of the participant with Id _id withing the committee tree overlay
-        """
-        pass
 
     @abstractmethod
     def leader_super_majority_threshold(self, _id: Id) -> int:
@@ -72,21 +67,6 @@ class Carnot2(Carnot):
         self.last_view_timeout_qc: Type[TimeoutQc] = None
         self.overlay: Overlay = overlay
 
-    def can_commit_grandparent(self, block: carnot.Block) -> bool:
-        # Get the parent block and grandparent block from the safe_blocks dictionary
-        parent = self.safe_blocks.get(block.parent())
-        grandparent = self.safe_blocks.get(parent.parent())
-
-        # Check if both parent and grandparent exist
-        if parent is None or grandparent is None:
-            return False
-
-        # Check if the view numbers and QC types match the expected criteria
-        is_view_incremented = parent.view == grandparent.view + 1
-        is_standard_qc = isinstance(block.qc, StandardQc) and isinstance(parent.qc, StandardQc)
-
-        # Return True if both conditions are met
-        return is_view_incremented and is_standard_qc
 
     @abstractmethod
     def commit_block(self, block: Block) -> bool:
@@ -315,6 +295,7 @@ class Carnot2(Carnot):
         # Return a Broadcast event with the proposed block
         return BroadCast(payload=block)
 
+# let your committee know that you have timed out.
     def local_timeout(self) -> Optional[Event]:
 
         # avoid voting after we timeout
@@ -330,18 +311,3 @@ class Carnot2(Carnot):
         )
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
 
-    def is_safe_to_timeout_invariant(self):
-        # Ensure that the current view is always higher than the highest voted view or the local high QC view.
-        assert self.current_view > max(self.highest_voted_view - 1,
-                                       self.local_high_qc.view), "Current view should be higher than the highest voted view or local high QC view."
-
-        # Ensure that a node waits for the timeout QC from the root committee or the last view timeout QC
-        # from the previous view before changing its view.
-        assert (
-                self.current_view == self.local_high_qc.view + 1 or
-                self.current_view == self.last_view_timeout_qc.view + 1 or
-                self.current_view == self.last_view_timeout_qc.view
-        ), "Node must wait for appropriate QC before changing its view."
-
-        # If both assertions pass, the invariant is satisfied
-        return True
