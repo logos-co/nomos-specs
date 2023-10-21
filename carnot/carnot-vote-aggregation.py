@@ -185,58 +185,21 @@ class Carnot2(Carnot):
         # Return a Send event to the appropriate recipient
         return Send(to=recipient, payload=vote)
 
-    # A committee member builds a QC or timeout QC with at least two-thirds of votes from its sub-branch within the
-    # overlay. Furthermore, if a node builds a timeout QC with at least f+1 timeout messages, it forwards them to its
-    # parents as well as the child committee. This allows any node that have not timed out to timeout.
-    def build_qc(self, view: int, qc: Optional[Qc], t_qc: Optional[TimeoutQc], block: Optional[Block] = None,
-                 Timeouts: Optional[Set[Timeout]] = None,
-                 votes: Optional[List[Vote]] = None) -> Qc:
-
-        if Timeouts or TimeoutQc:
-            # Create a list to hold  timeout messages that are not repeated in the timeout qc
-            uniq_timeout_messages = []
-
-            # Create a set to store sender IDs from TimeoutQc (if it's not None)
-            timeout_qc_sender_ids = set()
-            if TimeoutQc:
-                timeout_qc_sender_ids = TimeoutQc.sender_ids
-
-            # Iterate over Timeout messages and add them to uniq_timeout_messages if their sender's ID is not in the timeout_qc_sender_ids set
-            if Timeouts:
-                for timeout_msg in Timeouts:
-                    # Check if the sender's ID is not in the sender_ids set of TimeoutQc
-                    if timeout_msg.sender not in timeout_qc_sender_ids:
-                        uniq_timeout_messages.append(timeout_msg)
-
-            # Calculate the highest_qc by finding the maximum high_qc.view value
-            highest_qc_timeouts = max(uniq_timeout_messages, key=lambda x: x.high_qc.view).high_qc
-            highest_qc = max(highest_qc_timeouts,TimeoutQc.high_qc)
-
-            # Create an AggregateQc using all timeout messages
+    # NewView msgs are not needed anymore
+    def build_qc(self, view: View, block: Optional[Block], timeouts: Optional[Set[Timeout]]) -> Qc:
+        # unhappy path
+        if timeouts:
+            timeouts = list(timeouts)
             return AggregateQc(
-                qcs=[msg.high_qc.view for msg in uniq_timeout_messages]+TimeoutQc.qc_views,
-                highest_qc=highest_qc,
-                view=uniq_timeout_messages[0].view if uniq_timeout_messages else (TimeoutQc.view if TimeoutQc else 0)
+                qcs=[msg.high_qc.view for msg in timeouts],
+                highest_qc=max(timeouts, key=lambda x: x.high_qc.view).high_qc,
+                view=timeouts[0].view
             )
-
-        else:
-            # Happy path: Standard QC
-            if votes:
-                # Use vote.block if votes are available
-                block_id = votes[0].block
-            elif block:
-                # Use the provided block if votes are not available
-                block_id = block.id()
-            elif qc:
-                block_id = qc.block
-            else:
-                # No block or votes provided, return None
-                return None
-
-            return StandardQc(
-                view=view,
-                block=block_id
-            )
+        # happy path
+        return StandardQc(
+            view=view,
+            block=block.id()
+        )
 
     # A node initially forwards a vote or qc from its subtree to its parent committee. There can be two instances this
     # can happen: 1: If a node forms a QC qc from votes and QCs it receives from its subtree such that the total number of votes in the qc is at two-third of votes from the subtree, then
