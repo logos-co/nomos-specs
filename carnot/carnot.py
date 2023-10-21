@@ -52,10 +52,9 @@ def int_to_id(i: int) -> Id:
 class StandardQc:
     block: Id
     view: View
-
+    voters: Set[Id]
     def view(self) -> View:
         return self.view
-
 
 @dataclass
 class AggregateQc:
