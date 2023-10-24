@@ -392,6 +392,12 @@ class Carnot:
         return Send(to=self.overlay.parent_committee(self.id), payload=vote)
 
     def forward_vote(self, vote: Vote) -> Optional[Event]:
+        """
+        Recall that for the leader to propose a block it's necessary to have a threshold of the top three committees
+        votes. In case part of the root committee is malicious and does not vote, the leader might not reach this threshold
+        even though more than 2/3 of the total nodes voted in favor if nodes stop sending votes after the threshold.
+        By forwarding votes from children (only the root committee does this), we can improve liveness in this case.
+        """
         assert vote.block in self.safe_blocks
         assert self.overlay.is_member_of_child_committee(self.id, vote.voter)
         # we only forward votes after we've voted ourselves
