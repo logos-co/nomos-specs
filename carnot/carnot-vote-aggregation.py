@@ -1,3 +1,26 @@
+# Carnot-2 is extension of the Carnot protocol. Carnot-2 is designed to include majority of votes in the QC as a proof.
+# Since aggregating signatures is expensive, therefore Carnot-2 has been designed to optimize signature aggregation
+# Below is the description of the Carnot-2 Protocol.
+# Happy Path:
+
+# Step 1: Vote Multicast
+# Associated Function: Send(to=recipient, payload=vote)
+# Description: Each node multicasts its vote to the members of its committee.
+# Step 2: Certificate Generation
+# Associated Function: approve_block(block: Block, votes: Set[Vote]) -> Event, build_qc(self, view: View, block: Optional[Block], timeouts: Optional[Set[Timeout]]) -> Qc
+# Description: Each node generates a certificate by collecting votes from at least 2/3 of the members in its committee.
+# Step 3: Certificate Transmission
+# Associated Function: forward_vote_qc(self, vote: Optional[Vote] = None, qc: Optional[Qc] = None) -> Optional[Event]:
+# Description: Forward a QC if it is built by the timeout t1 else forward votes.
+# Step 4: Certificate Concatenation
+# Associated Function: concatenate_standard_qcs(qc_set: Set[StandardQc]) -> StandardQc
+# Description: Parent committee members concatenate/merge certificates received from child committees, including their own certificate/vote.
+# Step 5: Final Certificate Construction
+# Associated Function: propose_block(view: View, quorum: Quorum) -> Event
+# Description: The leader of the parent committee also concatenates received certificates and builds the final certificate by gathering signatures from at least 2/3 + 1 committee members.
+# Step 6: Block Proposal
+# The proposal of a new block is done using the propose_block function in Carnot psuedocode.
+
 from dataclasses import dataclass
 from typing import Union, List, Set, Optional, Type, TypeAlias, Dict
 from abc import ABC, abstractmethod
@@ -5,9 +28,6 @@ from abc import ABC, abstractmethod
 import carnot
 from carnot import Carnot, Overlay, Qc, Block, TimeoutQc, AggregateQc, Vote, Event, Send, Timeout, Quorum, NewView, \
     BroadCast, Id, Committee, View, StandardQc, int_to_id
-
-
-
 
 
 class Overlay2(Overlay):
@@ -30,7 +50,6 @@ class Overlay2(Overlay):
         :return: true if participant with Id  is member of a committee in the subtree of the participant with Id root_node
         """
         pass
-
 
     @abstractmethod
     def leader_super_majority_threshold(self, _id: Id) -> int:
@@ -67,11 +86,12 @@ class Carnot2(Carnot):
         self.last_view_timeout_qc: Type[TimeoutQc] = None
         self.overlay: Overlay = overlay
 
-
     @abstractmethod
     def commit_block(self, block: Block) -> bool:
+
         pass
 
+    # Commit the grandparent and all its uncommitted ancestors
     def commit_the_chain(self, grand_parent: Block):
         # Create an empty stack to store the blocks in reverse order
         block_stack = []
@@ -101,6 +121,7 @@ class Carnot2(Carnot):
         else:
             return False
 
+    # Update the view for any QC with higher view than the current view.
     def update_high_qc(self, qc: Qc):
         match (self.local_high_qc, qc):
             case (None, new_qc) if isinstance(new_qc, StandardQc):
@@ -241,9 +262,6 @@ class Carnot2(Carnot):
 
         return concatenated_qc
 
-
-
-
     # 1: Similarly, if a node receives timeout QC and timeout messages, it builds a timeout qc (TC) representing 2/3 of timeout messages from its subtree,
     # then it forwards it to the parent committee members or a subset of parent committee members.
     # 2: It type 1 timeout occurs and the node haven't collected enough timeout messages, it can simply build a QC from whatever timeout messages it has
@@ -295,7 +313,7 @@ class Carnot2(Carnot):
         # Return a Broadcast event with the proposed block
         return BroadCast(payload=block)
 
-# let your committee know that you have timed out.
+    # let your committee know that you have timed out.
     def local_timeout(self) -> Optional[Event]:
 
         # avoid voting after we timeout
@@ -310,4 +328,3 @@ class Carnot2(Carnot):
             sender=self.id
         )
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
-
