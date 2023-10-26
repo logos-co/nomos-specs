@@ -53,8 +53,8 @@ class StandardQc:
     block: Id
     view: View
     voters: Set[Id]
-    def view(self) -> View:
-        return self.view
+    def get_view(self) -> View:
+        return self.get_view
 
 @dataclass
 class AggregateQc:
@@ -66,7 +66,7 @@ class AggregateQc:
         return self.view
 
     def high_qc(self) -> StandardQc:
-        assert self.highest_qc.view == max(self.qcs)
+        assert self.highest_qc.get_view == max(self.qcs)
         return self.highest_qc
 
 
@@ -320,8 +320,8 @@ class Carnot:
 
     def block_is_safe(self, block: Block) -> bool:
         return (
-            block.view >= self.current_view and
-            block.view == block.qc.view + 1
+                block.view >= self.current_view and
+                block.view == block.qc.get_view + 1
         )
 
     # Ask Dani
@@ -331,19 +331,19 @@ class Carnot:
                 self.local_high_qc = new_qc
             case (None, AggregateQc() as new_qc):
                 self.local_high_qc = new_qc.high_qc()
-            case (old_qc, StandardQc() as new_qc) if new_qc.view > old_qc.view:
+            case (old_qc, StandardQc() as new_qc) if new_qc.get_view > old_qc.get_view:
                 self.local_high_qc = new_qc
-            case (old_qc, AggregateQc() as new_qc) if new_qc.high_qc().view != old_qc.view:
+            case (old_qc, AggregateQc() as new_qc) if new_qc.high_qc().get_view != old_qc.get_view:
                 self.local_high_qc = new_qc.high_qc()
         # if my view is not updated I update it when I see a qc for that view
-        if qc.view == self.current_view:
+        if qc.get_view == self.current_view:
             self.current_view = self.current_view + 1
 
     def update_timeout_qc(self, timeout_qc: TimeoutQc):
         match (self.last_view_timeout_qc, timeout_qc):
             case (None, timeout_qc):
                 self.last_view_timeout_qc = timeout_qc
-            case (self.last_view_timeout_qc, timeout_qc) if timeout_qc.view > self.last_view_timeout_qc.view:
+            case (self.last_view_timeout_qc, timeout_qc) if timeout_qc.get_view > self.last_view_timeout_qc.view:
                 self.last_view_timeout_qc = timeout_qc
 
     def receive_block(self, block: Block):
@@ -413,8 +413,8 @@ class Carnot:
         if new_views:
             new_views = list(new_views)
             return AggregateQc(
-                qcs=[msg.high_qc.view for msg in new_views],
-                highest_qc=max(new_views, key=lambda x: x.high_qc.view).high_qc,
+                qcs=[msg.high_qc.get_view for msg in new_views],
+                highest_qc=max(new_views, key=lambda x: x.high_qc.get_view).high_qc,
                 view=new_views[0].view
             )
         # happy path
@@ -445,7 +445,7 @@ class Carnot:
             _id=int_to_id(hash(
                 (
                     bytes(f"{view}".encode(encoding="utf8")),
-                    bytes(f"{qc.view}".encode(encoding="utf8"))
+                    bytes(f"{qc.get_view}".encode(encoding="utf8"))
                 )
             ))
         )
@@ -472,13 +472,13 @@ class Carnot:
         # Make sure the node doesn't time out continuously without finishing the step to increment the current view.
         # Make sure current view is always higher than the local_high_qc so that the node won't timeout unnecessary
         # for a previous view.
-        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.view)
+        assert self.current_view > max(self.highest_voted_view - 1, self.local_high_qc.get_view)
         # This condition makes sure a node waits for timeout_qc from root committee to change increment its view with
         # a view change.
         # A node must  change its view  after making sure it has the high_Qc or last_timeout_view_qc
         # from previous view.
         return (
-                self.current_view == self.local_high_qc.view + 1 or
+                self.current_view == self.local_high_qc.get_view + 1 or
                 self.current_view == self.last_view_timeout_qc.view + 1 or
                 (self.current_view == self.last_view_timeout_qc.view)
         )
@@ -540,7 +540,7 @@ class Carnot:
         messages_high_qc = (new_view.high_qc for new_view in new_views)
         high_qc = max(
             [timeout_qc.high_qc, *messages_high_qc],
-            key=lambda qc: qc.view
+            key=lambda qc: qc.get_view
         )
         self.update_high_qc(high_qc)
         timeout_msg = NewView(
@@ -583,7 +583,7 @@ class Carnot:
         msgs = list(msgs)
         return TimeoutQc(
             view=msgs[0].view,
-            high_qc=max(msgs, key=lambda x: x.high_qc.view).high_qc,
+            high_qc=max(msgs, key=lambda x: x.high_qc.get_view).high_qc,
             qc_views=[msg.view for msg in msgs],
             sender_ids={msg.sender for msg in msgs},
             sender=sender,
