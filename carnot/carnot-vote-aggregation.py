@@ -263,6 +263,39 @@ class Carnot2(Carnot):
 
         return concatenated_qc
 
+    from carnot import AggregateQc, Qc, StandardQc
+
+# Similarly aggregated qcs are concatenated after timeout t2:
+    def concatenate_aggregate_qcs(qc_set: Set[AggregateQc]) -> AggregateQc:
+        # Initialize the attributes for the concatenated AggregateQc
+        concatenated_qcs = []
+        concatenated_view = None
+        concatenated_sender_ids = set()
+        highest_standard_qc = None
+
+        # Iterate through the input set of AggregateQc objects
+        for qc in qc_set:
+            concatenated_qcs.extend(qc.qcs)
+            concatenated_sender_ids.update(qc.sender_ids)
+
+            # Choose the view value from the first AggregateQc in the set
+            if concatenated_view is None:
+                concatenated_view = qc.view
+
+            # Find the highest StandardQc among the AggregateQc.high_qc.view fields
+            if highest_standard_qc is None or qc.high_qc.view > highest_standard_qc.view:
+                highest_standard_qc = qc.high_qc
+
+        # Create the concatenated AggregateQc object
+        concatenated_aggregate_qc = AggregateQc(
+            qcs=concatenated_qcs,
+            highest_qc=highest_standard_qc,
+            view=concatenated_view,
+            sender_ids=concatenated_sender_ids
+        )
+
+        return concatenated_aggregate_qc
+
     # 1: Similarly, if a node receives timeout QC and timeout messages, it builds a timeout qc (TC) representing 2/3 of timeout messages from its subtree,
     # then it forwards it to the parent committee members or a subset of parent committee members.
     # 2: It type 1 timeout occurs and the node haven't collected enough timeout messages, it can simply build a QC from whatever timeout messages it has
