@@ -21,6 +21,8 @@
 # Step 6: Block Proposal
 # The proposal of a new block is done using the propose_block function in Carnot psuedocode.
 
+# UnHappy Path:
+
 
 from dataclasses import dataclass
 from typing import Union, List, Set, Optional, Type, TypeAlias, Dict
