@@ -48,13 +48,29 @@ def int_to_id(i: int) -> Id:
     return bytes(str(i), encoding="utf8")
 
 
-@dataclass(unsafe_hash=True)
 class StandardQc:
     block: Id
     view: View
     voters: Set[Id]
-    def get_view(self) -> View:
-        return self.get_view
+
+    def __init__(self, block: Id, view: View, voters: Set[Id]):
+        self.block = block
+        self.view = view
+        self.voters = voters
+
+    def __hash__(self):
+        # Customize the hash function based on your requirements
+        return hash((self.block, self.view, frozenset(self.voters)))
+
+    def __eq__(self, other):
+        if isinstance(other, StandardQc):
+            return (
+                self.block == other.block and
+                self.view == other.view and
+                self.voters == other.voters
+            )
+        return False
+
 
 @dataclass
 class AggregateQc:

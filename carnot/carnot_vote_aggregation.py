@@ -245,29 +245,32 @@ class Carnot2(Carnot):
 
     # A node may receive QCs from child committee members. It may also build it's own QC.
     # These QCs are then concatenated into one before sending to the parent committee.
+
+
     def concatenate_standard_qcs(qc_set: Set[StandardQc]) -> StandardQc:
+        # Convert the set of StandardQc objects into a list
+        qc_list = list(qc_set)
+
         # Initialize the attributes for the concatenated StandardQc
         concatenated_block = None
         concatenated_view = None
         concatenated_voters = set()
 
-        # Iterate through the input set of StandardQc objects
-        for qc in qc_set:
+        # Iterate through the input list of StandardQc objects
+        for qc in qc_list:
             concatenated_voters.update(qc.voters)
 
-        # Choose the block and view values from the first StandardQc in the set
-        if qc_set:
-            concatenated_block = qc_set[0].block
-            concatenated_view = qc_set[0].view
+        # Choose the block and view values from the first StandardQc in the list
+        if qc_list:
+            concatenated_block = qc_list[0].block
+            concatenated_view = qc_list[0].view
 
         # Create the concatenated StandardQc object
         concatenated_qc = StandardQc(concatenated_block, concatenated_view, concatenated_voters)
 
         return concatenated_qc
 
-    from carnot import AggregateQc, Qc, StandardQc
-
-# Similarly aggregated qcs are concatenated after timeout t2:
+    # Similarly aggregated qcs are concatenated after timeout t2:
     def concatenate_aggregate_qcs(qc_set: Set[AggregateQc]) -> AggregateQc:
         # Initialize the attributes for the concatenated AggregateQc
         concatenated_qcs = []
