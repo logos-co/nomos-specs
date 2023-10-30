@@ -294,8 +294,10 @@ class Carnot2(Carnot):
                 if concatenated_view is None:
                     concatenated_view = qc.view
 
-                if highest_standard_qc is None or (isinstance(qc.highest_qc, StandardQc) and
-                                                   qc.highest_qc.view > highest_standard_qc.view):
+                if highest_standard_qc is None or (
+                        isinstance(qc.highest_qc, StandardQc) and
+                        qc.highest_qc.view > highest_standard_qc.view
+                ):
                     highest_standard_qc = qc.highest_qc
 
         concatenated_aggregate_qc = AggregateQc(
