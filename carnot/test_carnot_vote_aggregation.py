@@ -76,19 +76,19 @@ class TestConcatenateAggregateQcs(unittest.TestCase):
         # Test concatenating multiple AggregateQcs
         qc1 = AggregateQc(
             qcs=[1, 2, 3],
-            highest_qc=StandardQc(9, 9, {1, 2, 3, 4, 5, 6, 7, 8, 9}),
+            highest_qc=StandardQc(1, 3, {1, 2, 3, 4, 5, 6, 7, 8, 9}),
             view=9,
             sender_ids={1, 2, 3}
         )
         qc2 = AggregateQc(
             qcs=[4, 5, 6],
-            highest_qc=StandardQc(6, 2, {4, 5, 6}),
+            highest_qc=StandardQc(2, 6, {4, 5, 6}),
             view=2,
             sender_ids={4, 5, 6}
         )
         qc3 = AggregateQc(
             qcs=[7, 8, 9],
-            highest_qc=StandardQc(9, 3, {7, 8, 9}),
+            highest_qc=StandardQc(3, 9, {7, 8, 9}),
             view=3,
             sender_ids={7, 8, 9}
         )
@@ -99,7 +99,7 @@ class TestConcatenateAggregateQcs(unittest.TestCase):
         self.assertSetsEqual(concatenated_qc.sender_ids, {1, 2, 3, 4, 5, 6, 7, 8, 9})
         self.assertListsEqual(sorted(concatenated_qc.qcs), [1, 2, 3, 4, 5, 6, 7, 8, 9])
         self.assertEqual(concatenated_qc.highest_qc.view, 9)
-        self.assertEqual(sorted(concatenated_qc.highest_qc.voters), [1, 2, 3, 4, 5, 6, 7, 8, 9])
+        self.assertEqual(sorted(concatenated_qc.highest_qc.voters), [7, 8, 9])
 
 
 if __name__ == '__main__':
