@@ -74,10 +74,11 @@ class StandardQc:
 
 @dataclass
 class AggregateQc:
+    sender_ids: Set[Id]
     qcs: List[View]
     highest_qc: StandardQc
     view: View
-    sender_ids: Set[Id]
+
 
     def view(self) -> View:
         return self.view
@@ -86,6 +87,9 @@ class AggregateQc:
         assert self.highest_qc.get_view == max(self.qcs)
         return self.highest_qc
 
+    def __hash__(self):
+        # Define a hash function based on the attributes that need to be considered for hashing
+        return hash((frozenset(self.sender_ids), tuple(self.qcs), self.highest_qc, self.view))
 
 Qc: TypeAlias = StandardQc | AggregateQc
 

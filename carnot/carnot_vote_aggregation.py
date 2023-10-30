@@ -272,28 +272,32 @@ class Carnot2(Carnot):
 
         return concatenated_qc
 
-    # Similarly aggregated qcs are concatenated after timeout t2:
-    def concatenate_aggregate_qcs(qc_set: Set[AggregateQc]) -> AggregateQc:
-        # Initialize the attributes for the concatenated AggregateQc
+    # Similarly aggregated qcs are concatenated after timeout t2.
+    from typing import Set, List, Optional, Union
+
+    # Define your types here (Id, View, StandardQc, AggregateQc, etc.)
+
+    def concatenate_aggregate_qcs(qc_set: Set[Union[StandardQc, AggregateQc]]) -> AggregateQc:
+        if qc_set is None:
+            return None
+
         concatenated_qcs = []
         concatenated_view = None
         concatenated_sender_ids = set()
         highest_standard_qc = None
 
-        # Iterate through the input set of AggregateQc objects
         for qc in qc_set:
-            concatenated_qcs.extend(qc.qcs)
-            concatenated_sender_ids.update(qc.sender_ids)
+            if isinstance(qc, AggregateQc):
+                concatenated_qcs.extend(qc.qcs)
+                concatenated_sender_ids.update(qc.sender_ids)
 
-            # Choose the view value from the first AggregateQc in the set
-            if concatenated_view is None:
-                concatenated_view = qc.view
+                if concatenated_view is None:
+                    concatenated_view = qc.view
 
-            # Find the highest StandardQc among the AggregateQc.high_qc.view fields
-            if highest_standard_qc is None or qc.high_qc.view > highest_standard_qc.view:
-                highest_standard_qc = qc.high_qc
+                if highest_standard_qc is None or (isinstance(qc.highest_qc, StandardQc) and
+                                                   qc.highest_qc.view > highest_standard_qc.view):
+                    highest_standard_qc = qc.highest_qc
 
-        # Create the concatenated AggregateQc object
         concatenated_aggregate_qc = AggregateQc(
             qcs=concatenated_qcs,
             highest_qc=highest_standard_qc,
@@ -369,3 +373,5 @@ class Carnot2(Carnot):
             sender=self.id
         )
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
+
+

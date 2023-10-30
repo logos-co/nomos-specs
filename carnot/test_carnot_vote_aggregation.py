@@ -1,7 +1,7 @@
 import unittest
 
 import carnot
-from carnot import merging_committees
+from carnot.carnot_vote_aggregation import  AggregateQc
 from carnot.merging_committees import merge_committees
 import itertools
 import unittest
@@ -47,6 +47,50 @@ class TestConcatenateStandardQcs(unittest.TestCase):
 
         # Assert that the concatenated StandardQc matches the expected one
         self.assertEqual(concatenated_qc, expected_qc)
+
+
+class TestConcatenateAggregateQcs(unittest.TestCase):
+
+    def test_concatenate_aggregate_qcs_single_qc(self):
+        # Test concatenating a single AggregateQc
+        qc1 = AggregateQc(
+            sender_ids={1, 2, 3},
+            qcs=[1, 2, 3],
+            highest_qc=3,
+            view=1
+        )
+        aggregate_qcs = {qc1}
+        concatenated_qc = carnot.carnot_vote_aggregation.Carnot2.concatenate_aggregate_qcs(aggregate_qcs)
+        self.assertEqual(concatenated_qc, qc1)
+
+    def test_concatenate_aggregate_qcs_multiple_qcs(self):
+        # Test concatenating multiple AggregateQcs
+        qc1 = AggregateQc(
+            sender_ids={1, 2, 3},
+            qcs=[1, 2, 3],
+            highest_qc=3,
+            view=1
+        )
+        qc2 = AggregateQc(
+            sender_ids={4, 5, 6},
+            qcs=[4, 5, 6],
+            highest_qc=6,
+            view=2
+        )
+        qc3 = AggregateQc(
+            sender_ids={7, 8, 9},
+            qcs=[7, 8, 9],
+            highest_qc=9,
+            view=3
+        )
+        aggregate_qcs = {qc1, qc2, qc3}
+        concatenated_qc = carnot.carnot_vote_aggregation.Carnot2.concatenate_aggregate_qcs(aggregate_qcs)
+
+        # Assert that the concatenated AggregateQc has the correct attributes
+        self.assertEqual(concatenated_qc.sender_ids, {1, 2, 3, 4, 5, 6, 7, 8, 9})
+        self.assertEqual(concatenated_qc.qcs, [1, 2, 3, 4, 5, 6, 7, 8, 9])
+        self.assertEqual(concatenated_qc.highest_qc, 9)
+        self.assertEqual(concatenated_qc.view, 1)  # View should be from the first QC
 
 
 if __name__ == '__main__':
