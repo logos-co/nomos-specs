@@ -298,7 +298,7 @@ class TestCarnotHappyPath(TestCase):
                 voter=int_to_id(i),
                 qc=StandardQc(
                     block=genesis_block.id(),
-                    view=0
+                    view=0,
                 ),
             ) for i in range(10)
         )

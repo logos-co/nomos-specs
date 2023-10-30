@@ -53,24 +53,11 @@ class StandardQc:
     view: View
     voters: Set[Id]
 
-    def __init__(self, block: Id, view: View, voters: Set[Id]):
+    def __init__(self, block, view):
         self.block = block
         self.view = view
-        self.voters = voters
-
-    def __hash__(self):
-        # Customize the hash function based on your requirements
-        return hash((self.block, self.view, frozenset(self.voters)))
-
-    def __eq__(self, other):
-        if isinstance(other, StandardQc):
-            return (
-                self.block == other.block and
-                self.view == other.view and
-                self.voters == other.voters
-            )
-        return False
-
+    def get_view(self) -> View:
+        return self.view
 
 @dataclass
 class AggregateQc:
@@ -87,9 +74,6 @@ class AggregateQc:
         assert self.highest_qc.get_view == max(self.qcs)
         return self.highest_qc
 
-    def __hash__(self):
-        # Define a hash function based on the attributes that need to be considered for hashing
-        return hash((frozenset(self.sender_ids), tuple(self.qcs), self.highest_qc, self.view))
 
 Qc: TypeAlias = StandardQc | AggregateQc
 
@@ -109,8 +93,8 @@ class Block:
 
     def parent(self) -> Id:
         match self.qc:
-            case StandardQc(block):
-                return block
+            case StandardQc():
+                return self.qc.block
             case AggregateQc() as aqc:
                 return aqc.high_qc().block
 
@@ -342,7 +326,7 @@ class Carnot:
     def block_is_safe(self, block: Block) -> bool:
         return (
                 block.view >= self.current_view and
-                block.view == block.qc.get_view + 1
+                block.view == block.qc.get_view() + 1
         )
 
     # Ask Dani
@@ -352,12 +336,12 @@ class Carnot:
                 self.local_high_qc = new_qc
             case (None, AggregateQc() as new_qc):
                 self.local_high_qc = new_qc.high_qc()
-            case (old_qc, StandardQc() as new_qc) if new_qc.get_view > old_qc.get_view:
+            case (old_qc, StandardQc() as new_qc) if new_qc.get_view() > old_qc.get_view():
                 self.local_high_qc = new_qc
-            case (old_qc, AggregateQc() as new_qc) if new_qc.high_qc().get_view != old_qc.get_view:
+            case (old_qc, AggregateQc() as new_qc) if new_qc.high_qc().get_view() != old_qc.get_view():
                 self.local_high_qc = new_qc.high_qc()
         # if my view is not updated I update it when I see a qc for that view
-        if qc.get_view == self.current_view:
+        if qc.get_view() == self.current_view:
             self.current_view = self.current_view + 1
 
     def update_timeout_qc(self, timeout_qc: TimeoutQc):
@@ -406,7 +390,6 @@ class Carnot:
         )
 
         self.highest_voted_view = max(self.highest_voted_view, block.view)
-
         if self.overlay.is_member_of_root_committee(self.id):
             return Send(to=self.overlay.leader(block.view + 1), payload=vote)
         return Send(to=self.overlay.parent_committee(self.id), payload=vote)

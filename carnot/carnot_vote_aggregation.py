@@ -33,6 +33,52 @@ from carnot import Carnot, Overlay, Qc, Block, TimeoutQc, AggregateQc, Vote, Eve
     BroadCast, Id, Committee, View, StandardQc, int_to_id
 
 
+class StandardQc:
+    block: Id
+    view: View
+    voters: Set[Id]
+
+    def __init__(self, block: Id, view: View, voters: Set[Id]):
+        self.block = block
+        self.view = view
+        self.voters = voters
+
+    def __hash__(self):
+        # Customize the hash function based on your requirements
+        return hash((self.block, self.view, frozenset(self.voters)))
+
+    def __eq__(self, other):
+        if isinstance(other, StandardQc):
+            return (
+                    self.block == other.block and
+                    self.view == other.view and
+                    self.voters == other.voters
+            )
+        return False
+
+
+@dataclass
+class AggregateQc:
+    sender_ids: Set[Id]
+    qcs: List[View]
+    highest_qc: StandardQc
+    view: View
+
+    def view(self) -> View:
+        return self.view
+
+    def high_qc(self) -> StandardQc:
+        assert self.highest_qc.get_view == max(self.qcs)
+        return self.highest_qc
+
+    def __hash__(self):
+        # Define a hash function based on the attributes that need to be considered for hashing
+        return hash((frozenset(self.sender_ids), tuple(self.qcs), self.highest_qc, self.view))
+
+
+Qc: TypeAlias = StandardQc | AggregateQc
+
+
 class Overlay2(Overlay):
     """
     Overlay structure for a View
@@ -246,7 +292,6 @@ class Carnot2(Carnot):
     # A node may receive QCs from child committee members. It may also build it's own QC.
     # These QCs are then concatenated into one before sending to the parent committee.
 
-
     def concatenate_standard_qcs(qc_set: Set[StandardQc]) -> StandardQc:
         if not qc_set:
             return None
@@ -265,7 +310,6 @@ class Carnot2(Carnot):
             concatenated_voters.update(qc.voters)
 
         # Choose the block and view values from the first StandardQc in the list
-
 
         # Create the concatenated StandardQc object
         concatenated_qc = StandardQc(concatenated_block, concatenated_view, concatenated_voters)
@@ -375,5 +419,3 @@ class Carnot2(Carnot):
             sender=self.id
         )
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
-
-
