@@ -86,7 +86,7 @@ class Carnot2(Carnot):
         self.highest_voted_view: View = -1
         self.local_high_qc: Type[Qc] = None
         self.safe_blocks: Dict[Id, Block] = dict()
-        self.last_view_timeout_qc: Type[TimeoutQc] = None
+        self.last_view_timeout_qc: Type[AggregateQc] = None
         self.overlay: Overlay = overlay
 
     @abstractmethod
@@ -147,7 +147,7 @@ class Carnot2(Carnot):
             self.current_view = qc.view + 1
 
     # Feel free to remove, just added for simplicity.
-    def update_timeout_qc(self, timeout_qc: TimeoutQc):
+    def update_timeout_qc(self, timeout_qc: AggregateQc):
         if not self.last_view_timeout_qc or timeout_qc.view > self.last_view_timeout_qc.view:
             self.last_view_timeout_qc = timeout_qc
 
@@ -248,22 +248,24 @@ class Carnot2(Carnot):
 
 
     def concatenate_standard_qcs(qc_set: Set[StandardQc]) -> StandardQc:
+        if not qc_set:
+            return None
         # Convert the set of StandardQc objects into a list
         qc_list = list(qc_set)
 
         # Initialize the attributes for the concatenated StandardQc
-        concatenated_block = None
-        concatenated_view = None
+        concatenated_block = qc_list[0].block
+        concatenated_view = qc_list[0].view
         concatenated_voters = set()
+        # Add an assertion to check if all StandardQc objects have the same view and block
+        assert all(qc.block == concatenated_block and qc.view == concatenated_view for qc in qc_set)
 
         # Iterate through the input list of StandardQc objects
         for qc in qc_list:
             concatenated_voters.update(qc.voters)
 
         # Choose the block and view values from the first StandardQc in the list
-        if qc_list:
-            concatenated_block = qc_list[0].block
-            concatenated_view = qc_list[0].view
+
 
         # Create the concatenated StandardQc object
         concatenated_qc = StandardQc(concatenated_block, concatenated_view, concatenated_voters)
@@ -307,10 +309,10 @@ class Carnot2(Carnot):
     # and forward the QC to its parent.
     # 3: Any additional timeout messages are forwarded to the parent committee members or a subset of parent committee members.
 
-    def forward_timeout_qc(self, msg: TimeoutQc) -> Optional[Event]:
+    def forward_timeout_qc(self, msg: AggregateQc) -> Optional[Event]:
         # Assertions for input validation
         assert msg.view == self.current_view, "Received TimeoutQc with correct view"
-        assert self.overlay.is_member_of_subtree(self.id, msg.sender)
+        assert all(self.overlay.is_member_of_subtree(self.id, id) for id in msg.sender_ids)
         assert self.highest_voted_view == msg.view, "Can only forward NewView after voting ourselves"
 
         if self.overlay.is_member_of_root_committee(self.id):

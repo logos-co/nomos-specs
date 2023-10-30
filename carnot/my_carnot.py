@@ -77,6 +77,7 @@ class AggregateQc:
     qcs: List[View]
     highest_qc: StandardQc
     view: View
+    sender_ids: Set[Id]
 
     def view(self) -> View:
         return self.view
