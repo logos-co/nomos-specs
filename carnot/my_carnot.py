@@ -61,17 +61,15 @@ class StandardQc:
 
 @dataclass
 class AggregateQc:
-    sender_ids: Set[Id]
     qcs: List[View]
     highest_qc: StandardQc
     view: View
 
-
-    def view(self) -> View:
-        return self.view
+   # def view(self) -> View:
+    #    return self.view
 
     def high_qc(self) -> StandardQc:
-        assert self.highest_qc.get_view == max(self.qcs)
+        assert self.highest_qc.view == max(self.qcs)
         return self.highest_qc
 
 
@@ -418,7 +416,7 @@ class Carnot:
             new_views = list(new_views)
             return AggregateQc(
                 qcs=[msg.high_qc.get_view for msg in new_views],
-                highest_qc=max(new_views, key=lambda x: x.high_qc.get_view).high_qc,
+                highest_qc=max(new_views, key=lambda x: x.high_qc.get_view()).high_qc,
                 view=new_views[0].view
             )
         # happy path
@@ -449,7 +447,7 @@ class Carnot:
             _id=int_to_id(hash(
                 (
                     bytes(f"{view}".encode(encoding="utf8")),
-                    bytes(f"{qc.get_view}".encode(encoding="utf8"))
+                    bytes(f"{qc.view}".encode(encoding="utf8"))
                 )
             ))
         )
@@ -544,7 +542,7 @@ class Carnot:
         messages_high_qc = (new_view.high_qc for new_view in new_views)
         high_qc = max(
             [timeout_qc.high_qc, *messages_high_qc],
-            key=lambda qc: qc.get_view
+            key=lambda qc: qc.get_view()
         )
         self.update_high_qc(high_qc)
         timeout_msg = NewView(
@@ -587,7 +585,7 @@ class Carnot:
         msgs = list(msgs)
         return TimeoutQc(
             view=msgs[0].view,
-            high_qc=max(msgs, key=lambda x: x.high_qc.get_view).high_qc,
+            high_qc=max(msgs, key=lambda x: x.high_qc.get_view()).high_qc,
             qc_views=[msg.view for msg in msgs],
             sender_ids={msg.sender for msg in msgs},
             sender=sender,

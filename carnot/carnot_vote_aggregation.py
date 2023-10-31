@@ -366,8 +366,10 @@ class Carnot2(Carnot):
         assert self.highest_voted_view == msg.view, "Can only forward NewView after voting ourselves"
 
         if self.overlay.is_member_of_root_committee(self.id):
-            # Forward the NewView message to the next leader in the root committee
-            return Send(to=self.overlay.next_leader(), payload=msg)
+            # Forward the AggregateQc (timeout QC) message to the next leader in the root committee and also broadcast it to the
+            # network. The broadcast can propagate through the overlay tree, with child committees forwarding it to their children
+            # # and so on, ensuring network-wide dissemination.
+            return Send(to=self.overlay.next_leader(), payload=msg) and BroadCast(payload=msg)
         else:
             # Forward the NewView message to the parent committee
             return Send(to=self.overlay.parent_committee, payload=msg)
@@ -405,7 +407,14 @@ class Carnot2(Carnot):
         return BroadCast(payload=block)
 
     # let your committee know that you have timed out.
-    def local_timeout(self) -> Optional[Event]:
+    # Two cases can trigger this:
+    # 1. A Timeout Type 2 event has occurred.
+    # 2. The node receives an aggregated QC containing more than one-third but less than two-thirds of timeout QCs.
+
+    def local_timeout(self, qc: Optional[AggregateQc] = None) -> Optional[Event]:
+        if qc:
+            qc_count = qc.qcs.count()
+            assert self.overlay.leader_super_majority_threshold() / 2 < qc_count < self.overlay.leader_super_majority_threshold()
 
         # avoid voting after we timeout
         self.highest_voted_view = self.current_view
@@ -418,4 +427,10 @@ class Carnot2(Carnot):
             timeout_qc=self.last_view_timeout_qc,
             sender=self.id
         )
+        # Broadcast this QC to force other nodes as well to timeout.
+        # The broadcast can propagate through the overlay tree, with child committees forwarding it to their children
+        # and so on, ensuring network-wide dissemination.
+        if self.overlay.is_member_of_root_committee():
+            return BroadCast(qc)
+
         return Send(payload=timeout_msg, to=self.overlay.my_committee())
