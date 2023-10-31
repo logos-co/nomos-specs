@@ -321,7 +321,7 @@ class Carnot2(Carnot):
 
     # Define your types here (Id, View, StandardQc, AggregateQc, etc.)
 
-    def concatenate_aggregate_qcs(qc_set: Set[Union[StandardQc, AggregateQc]]) -> AggregateQc:
+    def concatenate_aggregate_qcs(qc_set: Set[Union[StandardQc, AggregateQc]]) -> Optional[AggregateQc]:
         if qc_set is None:
             return None
 
