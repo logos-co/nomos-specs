@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from typing import List, TypeAlias
 
@@ -43,24 +44,26 @@ class Mixnet:
             layers.append(layer)
         return MixnetTopology(layers)
 
+    def choose_mixnode(self) -> MixNode:
+        return random.choice(self.mix_nodes)
+
 
 @dataclass
 class MixNode:
-    identity_public_key: BlsPublicKey
-    encryption_public_key: X25519PublicKey
+    identity_private_key: BlsPrivateKey
+    encryption_private_key: X25519PrivateKey
     addr: NodeAddress
 
-    def __init__(
-        self,
-        identity_private_key: BlsPrivateKey,
-        encryption_private_key: X25519PrivateKey,
-        addr: NodeAddress,
-    ):
-        self.identity_public_key = identity_private_key.get_g1()
-        self.encryption_public_key = encryption_private_key.public_key()
-        self.addr = addr
+    def identity_public_key(self) -> BlsPublicKey:
+        return self.identity_private_key.get_g1()
+
+    def encryption_public_key(self) -> X25519PublicKey:
+        return self.encryption_private_key.public_key()
 
 
 @dataclass
 class MixnetTopology:
     layers: List[List[MixNode]]
+
+    def generate_route(self) -> list[MixNode]:
+        return [random.choice(layer) for layer in self.layers]
