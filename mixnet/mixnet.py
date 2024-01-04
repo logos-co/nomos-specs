@@ -1,24 +1,33 @@
 from dataclasses import dataclass
 from typing import List, Self, Tuple, TypeAlias
 
+from bls import BlsPrivateKey, BlsPublicKey
 from cryptography.hazmat.primitives.asymmetric.x25519 import (X25519PrivateKey,
                                                               X25519PublicKey)
 from fisheryates import FisherYates
 
-NodeId: TypeAlias = X25519PublicKey
+NodeId: TypeAlias = BlsPublicKey
 SocketAddr: TypeAlias = Tuple[str, int]
 
 
 @dataclass
 class MixNode:
-    id: NodeId
-    public_key: X25519PublicKey
+    identity_public_key: BlsPublicKey
+    encryption_public_key: X25519PublicKey
     addr: SocketAddr
 
     @classmethod
-    def build(cls, private_key: X25519PrivateKey, addr: SocketAddr) -> Self:
-        public_key = private_key.public_key()
-        return cls(id=public_key, public_key=public_key, addr=addr)
+    def build(
+        cls,
+        identity_private_key: BlsPrivateKey,
+        encryption_private_key: X25519PrivateKey,
+        addr: SocketAddr,
+    ) -> Self:
+        return cls(
+            identity_private_key.get_g1(),
+            encryption_private_key.public_key(),
+            addr,
+        )
 
 
 @dataclass

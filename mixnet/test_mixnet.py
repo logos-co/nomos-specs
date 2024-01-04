@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+from bls import generate_bls
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from mixnet import Mixnet, MixNode
@@ -8,7 +9,7 @@ from mixnet import Mixnet, MixNode
 class TestMixnet(TestCase):
     def test_build_topology(self):
         nodes = [
-            MixNode.build(X25519PrivateKey.generate(), ("127.0.0.1", i))
+            MixNode.build(generate_bls(), X25519PrivateKey.generate(), ("127.0.0.1", i))
             for i in range(12)
         ]
         mixnet = Mixnet(nodes)
