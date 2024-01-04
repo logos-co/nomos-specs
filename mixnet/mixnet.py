@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from typing import Self, TypeAlias
+from typing import List, Self, Tuple, TypeAlias
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import (X25519PrivateKey,
                                                               X25519PublicKey)
 from fisheryates import FisherYates
 
 NodeId: TypeAlias = X25519PublicKey
-SocketAddr: TypeAlias = tuple[str, int]
+SocketAddr: TypeAlias = Tuple[str, int]
 
 
 @dataclass
@@ -23,12 +23,12 @@ class MixNode:
 
 @dataclass
 class MixnetTopology:
-    layers: list[list[MixNode]]
+    layers: List[List[MixNode]]
 
 
 @dataclass
 class Mixnet:
-    mix_nodes: list[MixNode]
+    mix_nodes: List[MixNode]
 
     def build_topology(
         self,
