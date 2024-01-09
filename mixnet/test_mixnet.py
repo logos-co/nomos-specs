@@ -1,10 +1,10 @@
 from unittest import TestCase
 
-from bls import generate_bls
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
-from utils import random_bytes
 
-from mixnet import Mixnet, MixNode
+from mixnet.bls import generate_bls
+from mixnet.mixnet import Mixnet, MixNode
+from mixnet.utils import random_bytes
 
 
 class TestMixnet(TestCase):

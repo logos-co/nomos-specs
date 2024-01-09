@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from fisheryates import FisherYates
+from mixnet.fisheryates import FisherYates
 
 
 class TestFisherYates(TestCase):

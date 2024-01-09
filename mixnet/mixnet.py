@@ -3,12 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Self, TypeAlias
 
-from bls import BlsPrivateKey, BlsPublicKey
-from cryptography.hazmat.primitives.asymmetric.x25519 import (
-    X25519PrivateKey,
-    X25519PublicKey,
-)
-from fisheryates import FisherYates
+from cryptography.hazmat.primitives.asymmetric.x25519 import (X25519PrivateKey,
+                                                              X25519PublicKey)
+
+from mixnet.bls import BlsPrivateKey, BlsPublicKey
+from mixnet.fisheryates import FisherYates
 
 NodeId: TypeAlias = BlsPublicKey
 # 32-byte that represents an IP address and a port of a mix node.
