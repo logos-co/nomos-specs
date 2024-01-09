@@ -1,7 +1,7 @@
 import random
 from abc import abstractmethod
 from typing import Set, Optional, List, Self
-from carnot import Overlay, Id, Committee, View
+from carnot.carnot import Overlay, Id, Committee, View
 
 
 class EntropyOverlay(Overlay):

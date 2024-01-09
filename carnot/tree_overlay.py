@@ -1,8 +1,8 @@
 import itertools
 from hashlib import blake2b
 from typing import List, Dict, Tuple, Set, Optional, Self
-from carnot import Id, Committee
-from overlay import EntropyOverlay
+from carnot.carnot import Id, Committee
+from carnot.overlay import EntropyOverlay
 import random
 
 

@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from tree_overlay import CarnotOverlay, CarnotTree
+from carnot.tree_overlay import CarnotOverlay, CarnotTree
 
 
 class TestCarnotTree(TestCase):

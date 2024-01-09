@@ -16,4 +16,4 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run tests
-        run: cd carnot && python -m unittest
+        run: python -m unittest
