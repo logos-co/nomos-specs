@@ -1,8 +1,8 @@
 from typing import Set
 
-from carnot import Carnot, Block, TimeoutQc, Vote, Event, Send, Quorum
-from beacon import *
-from overlay import EntropyOverlay
+from carnot.carnot import Carnot, Block, TimeoutQc, Vote, Event, Send, Quorum
+from carnot.beacon import *
+from carnot.overlay import EntropyOverlay
 
 @dataclass
 class BeaconizedBlock(Block):

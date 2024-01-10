@@ -5,11 +5,11 @@ from itertools import chain
 
 from blspy import PrivateKey
 
-from carnot import Id, Carnot, Block, Overlay, Vote, StandardQc, NewView
-from beacon import generate_random_sk, RandomBeacon, NormalMode, RecoveryMode
-from beaconized_carnot import BeaconizedCarnot, BeaconizedBlock
-from overlay import FlatOverlay, EntropyOverlay
-from test_unhappy_path import parents_from_childs
+from carnot.carnot import Id, Carnot, Block, Overlay, Vote, StandardQc, NewView
+from carnot.beacon import generate_random_sk, RandomBeacon, NormalMode, RecoveryMode
+from carnot.beaconized_carnot import BeaconizedCarnot, BeaconizedBlock
+from carnot.overlay import FlatOverlay, EntropyOverlay
+from carnot.test_unhappy_path import parents_from_childs
 
 
 def gen_node(sk: PrivateKey, overlay: Overlay, entropy: bytes = b""):
