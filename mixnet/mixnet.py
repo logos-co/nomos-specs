@@ -47,18 +47,15 @@ class MixNode:
     encryption_public_key: X25519PublicKey
     addr: NodeAddress
 
-    @classmethod
-    def build(
-        cls,
+    def __init__(
+        self,
         identity_private_key: BlsPrivateKey,
         encryption_private_key: X25519PrivateKey,
         addr: NodeAddress,
-    ) -> Self:
-        return cls(
-            identity_private_key.get_g1(),
-            encryption_private_key.public_key(),
-            addr,
-        )
+    ):
+        self.identity_public_key = identity_private_key.get_g1()
+        self.encryption_public_key = encryption_private_key.public_key()
+        self.addr = addr
 
 
 @dataclass

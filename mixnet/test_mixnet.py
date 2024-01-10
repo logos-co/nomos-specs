@@ -10,8 +10,8 @@ from mixnet.utils import random_bytes
 class TestMixnet(TestCase):
     def test_build_topology(self):
         nodes = [
-            MixNode.build(generate_bls(), X25519PrivateKey.generate(), random_bytes(32))
-            for i in range(12)
+            MixNode(generate_bls(), X25519PrivateKey.generate(), random_bytes(32))
+            for _ in range(12)
         ]
         mixnet = Mixnet(nodes)
 
