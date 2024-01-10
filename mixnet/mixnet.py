@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Self, TypeAlias
+from typing import List, TypeAlias
 
-from cryptography.hazmat.primitives.asymmetric.x25519 import (X25519PrivateKey,
-                                                              X25519PublicKey)
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
 
 from mixnet.bls import BlsPrivateKey, BlsPublicKey
 from mixnet.fisheryates import FisherYates
@@ -32,7 +34,8 @@ class Mixnet:
         num_nodes = n_nodes_per_layer * n_layers
         assert num_nodes < len(self.mix_nodes)
 
-        sampled = FisherYates.sample(self.mix_nodes, num_nodes, entropy)
+        shuffled = FisherYates.shuffle(self.mix_nodes, entropy)
+        sampled = shuffled[:num_nodes]
         layers = []
         for l in range(n_layers):
             start = l * n_nodes_per_layer
