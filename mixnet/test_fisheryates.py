@@ -8,14 +8,16 @@ class TestFisherYates(TestCase):
         entropy = b"hello"
         elems = [1, 2, 3, 4, 5]
 
-        shuffled1 = FisherYates.shuffle(elems, entropy)
-        self.assertEqual(sorted(elems), sorted(shuffled1))
+        sampled1 = FisherYates.sample(elems, 3, entropy)
+        self.assertEqual(len(sampled1), 3)
+        self.assertEqual(
+            len(set(sampled1)), len(sampled1)
+        )  # check if sampled elements are unique
 
-        # shuffle again with the same entropy
-        shuffled2 = FisherYates.shuffle(elems, entropy)
-        self.assertEqual(shuffled1, shuffled2)
+        # sample again with the same entropy
+        sampled2 = FisherYates.sample(elems, 3, entropy)
+        self.assertEqual(sampled1, sampled2)
 
-        # shuffle with a different entropy
-        shuffled3 = FisherYates.shuffle(elems, b"world")
-        self.assertNotEqual(shuffled1, shuffled3)
-        self.assertEqual(sorted(elems), sorted(shuffled3))
+        # sample with a different entropy
+        sampled3 = FisherYates.sample(elems, 3, b"world")
+        self.assertNotEqual(sampled1, sampled3)

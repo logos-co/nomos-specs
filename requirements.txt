@@ -3,5 +3,4 @@ cffi==1.16.0
 cryptography==41.0.7
 numpy==1.26.2
 pycparser==2.21
-randomgen==1.26.0
 scipy==1.10.1

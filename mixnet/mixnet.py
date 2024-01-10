@@ -29,10 +29,10 @@ class Mixnet:
         n_layers: int,
         n_nodes_per_layer: int,
     ) -> MixnetTopology:
-        assert n_nodes_per_layer * n_layers < len(self.mix_nodes)
+        num_nodes = n_nodes_per_layer * n_layers
+        assert num_nodes < len(self.mix_nodes)
 
-        shuffled = FisherYates.shuffle(self.mix_nodes, entropy)
-        sampled = shuffled[: n_nodes_per_layer * n_layers]
+        sampled = FisherYates.sample(self.mix_nodes, num_nodes, entropy)
         layers = []
         for l in range(n_layers):
             start = l * n_nodes_per_layer
