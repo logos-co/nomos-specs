@@ -85,16 +85,10 @@ class FragmentSet:
         assert len(chunked_messages) <= self.max_fragments()
 
         set_id = uuid.uuid4().bytes
-        fragments = []
-        for i, chunk in enumerate(chunked_messages):
-            fragments.append(
-                Fragment(
-                    FragmentHeader(set_id, len(chunked_messages), i),
-                    chunk,
-                )
-            )
-
-        self.fragments = fragments
+        self.fragments = [
+            Fragment(FragmentHeader(set_id, len(chunked_messages), i), chunk)
+            for i, chunk in enumerate(chunked_messages)
+        ]
 
     @staticmethod
     def max_fragments() -> int:
