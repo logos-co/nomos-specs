@@ -61,65 +61,19 @@ class PacketBuilder:
     @staticmethod
     def parse_msg_and_flag(data: bytes) -> Tuple[MessageFlag, bytes]:
         """Remove a MessageFlag from data"""
-        assert len(data) >= 1
+        if len(data) < 1:
+            raise ValueError("data is too short")
+
         return (data[0:1], data[1:])
-
-
-@dataclass
-class FragmentSet:
-    """
-    Represent a set of Fragments that can be reconstructed to a single original message.
-
-    Note that the maximum number of fragments in a FragmentSet is limited for now.
-    """
-
-    fragments: List[Fragment]
-
-    def __init__(self, message: bytes):
-        """
-        Build a FragmentSet by chunking a message into Fragments.
-        """
-        chunked_messages = chunks(message, Fragment.max_payload_size())
-        # For now, we don't support more than max_fragments() fragments.
-        # If needed, we can devise the FragmentSet chaining to support larger messages, like Nym.
-        assert len(chunked_messages) <= self.max_fragments()
-
-        set_id = uuid.uuid4().bytes
-        self.fragments = [
-            Fragment(FragmentHeader(set_id, len(chunked_messages), i), chunk)
-            for i, chunk in enumerate(chunked_messages)
-        ]
-
-    @staticmethod
-    def max_fragments() -> int:
-        return FragmentHeader.max_total_fragments()
-
-
-@dataclass
-class Fragment:
-    """Represent a piece of data that can be transformed to a single SphinxPacket"""
-
-    header: FragmentHeader
-    body: bytes
-
-    @staticmethod
-    def max_payload_size() -> int:
-        return Payload.max_plain_payload_size() - FragmentHeader.size()
-
-    def bytes(self) -> bytes:
-        return self.header.bytes() + self.body
-
-    @classmethod
-    def from_bytes(cls, data: bytes) -> Self:
-        header = FragmentHeader.from_bytes(data[: FragmentHeader.size()])
-        body = data[FragmentHeader.size() :]
-        return cls(header, body)
 
 
 # Unlikely, Nym uses i32 for FragmentSetId, which may cause more collisions.
 # We will use UUID until figuring out why Nym uses i32.
 FragmentSetId: TypeAlias = bytes  # 128bit UUID v4
 FragmentId: TypeAlias = int  # unsigned 8bit int in big endian
+
+FRAGMENT_SET_ID_LENGTH: int = 16
+FRAGMENT_ID_LENGTH: int = 1
 
 
 @dataclass
@@ -132,9 +86,7 @@ class FragmentHeader:
     total_fragments: FragmentId
     fragment_id: FragmentId
 
-    @staticmethod
-    def size() -> int:
-        return 16 + 1 + 1
+    SIZE: int = FRAGMENT_SET_ID_LENGTH + FRAGMENT_ID_LENGTH * 2
 
     @staticmethod
     def max_total_fragments() -> int:
@@ -149,21 +101,70 @@ class FragmentHeader:
 
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
-        assert len(data) == cls.size()
+        if len(data) != cls.SIZE:
+            raise ValueError("Invalid data length", len(data))
+
         return cls(data[:16], int.from_bytes(data[16:17]), int.from_bytes(data[17:18]))
+
+
+@dataclass
+class FragmentSet:
+    """
+    Represent a set of Fragments that can be reconstructed to a single original message.
+
+    Note that the maximum number of fragments in a FragmentSet is limited for now.
+    """
+
+    fragments: List[Fragment]
+
+    MAX_FRAGMENTS: int = FragmentHeader.max_total_fragments()
+
+    def __init__(self, message: bytes):
+        """
+        Build a FragmentSet by chunking a message into Fragments.
+        """
+        chunked_messages = chunks(message, Fragment.MAX_PAYLOAD_SIZE)
+        # For now, we don't support more than max_fragments() fragments.
+        # If needed, we can devise the FragmentSet chaining to support larger messages, like Nym.
+        if len(chunked_messages) > self.MAX_FRAGMENTS:
+            raise ValueError(f"Too long message: {len(chunked_messages)} chunks")
+
+        set_id = uuid.uuid4().bytes
+        self.fragments = [
+            Fragment(FragmentHeader(set_id, len(chunked_messages), i), chunk)
+            for i, chunk in enumerate(chunked_messages)
+        ]
+
+
+@dataclass
+class Fragment:
+    """Represent a piece of data that can be transformed to a single SphinxPacket"""
+
+    header: FragmentHeader
+    body: bytes
+
+    MAX_PAYLOAD_SIZE: int = Payload.max_plain_payload_size() - FragmentHeader.SIZE
+
+    def bytes(self) -> bytes:
+        return self.header.bytes() + self.body
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        header = FragmentHeader.from_bytes(data[: FragmentHeader.SIZE])
+        body = data[FragmentHeader.SIZE :]
+        return cls(header, body)
 
 
 @dataclass
 class MessageReconstructor:
     fragmentSets: Dict[FragmentSetId, FragmentSetReconstructor]
 
-    @classmethod
-    def new(cls) -> Self:
-        return cls({})
+    def __init__(self):
+        self.fragmentSets = {}
 
     def add(self, fragment: Fragment) -> bytes | None:
         if fragment.header.set_id not in self.fragmentSets:
-            self.fragmentSets[fragment.header.set_id] = FragmentSetReconstructor.new(
+            self.fragmentSets[fragment.header.set_id] = FragmentSetReconstructor(
                 fragment.header.total_fragments
             )
 
@@ -178,9 +179,9 @@ class FragmentSetReconstructor:
     total_fragments: FragmentId
     fragments: Dict[FragmentId, Fragment]
 
-    @classmethod
-    def new(cls, total_fragments: FragmentId) -> Self:
-        return cls(total_fragments, {})
+    def __init__(self, total_fragments: FragmentId):
+        self.total_fragments = total_fragments
+        self.fragments = {}
 
     def add(self, fragment: Fragment) -> bytes | None:
         self.fragments[fragment.header.fragment_id] = fragment

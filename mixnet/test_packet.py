@@ -25,7 +25,7 @@ class TestPacket(TestCase):
         self.assertEqual(len(packets), 4)
         self.assertEqual(len(packets), len(routes))
 
-        reconstructor = MessageReconstructor.new()
+        reconstructor = MessageReconstructor()
         self.assertIsNone(
             reconstructor.add(self.process_packet(packets[1], routes[1])),
         )
@@ -46,7 +46,7 @@ class TestPacket(TestCase):
 
         packet, route = PacketBuilder.build_drop_cover_packet(mixnet, topology)
 
-        reconstructor = MessageReconstructor.new()
+        reconstructor = MessageReconstructor()
         msg_with_flag = reconstructor.add(self.process_packet(packet, route))
         assert msg_with_flag is not None
         self.assertEqual(
