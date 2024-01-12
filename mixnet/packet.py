@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from enum import Enum
+from itertools import batched
 from typing import Dict, Iterator, List, Self, Tuple, TypeAlias
 
 from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
@@ -196,4 +197,4 @@ class FragmentSetReconstructor:
 
 
 def chunks(data: bytes, size: int) -> List[bytes]:
-    return [data[i : i + size] for i in range(0, len(data), size)]
+    return list(map(bytes, batched(data, size)))
