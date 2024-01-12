@@ -185,12 +185,15 @@ class FragmentSetReconstructor:
     def add(self, fragment: Fragment) -> bytes | None:
         self.fragments[fragment.header.fragment_id] = fragment
         if len(self.fragments) == self.total_fragments:
-            message = b""
-            for i in range(self.total_fragments):
-                message += self.fragments[FragmentId(i)].body
-            return message
+            return self.build_message()
         else:
             return None
+
+    def build_message(self) -> bytes:
+        message = b""
+        for i in range(self.total_fragments):
+            message += self.fragments[FragmentId(i)].body
+        return message
 
 
 def chunks(data: bytes, size: int) -> List[bytes]:
