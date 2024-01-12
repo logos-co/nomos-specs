@@ -6,9 +6,8 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from mixnet.bls import generate_bls
 from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
 from mixnet.packet import (
-    MESSAGE_FLAG_DROP_COVER,
-    MESSAGE_FLAG_REAL,
     Fragment,
+    MessageFlag,
     MessageReconstructor,
     PacketBuilder,
 )
@@ -21,37 +20,44 @@ class TestPacket(TestCase):
         mixnet, topology = self.init()
 
         msg = random_bytes(3500)
-        packets, routes = PacketBuilder.build_real_packets(msg, mixnet, topology)
-        self.assertEqual(len(packets), 4)
-        self.assertEqual(len(packets), len(routes))
+        builder = PacketBuilder.real(msg, mixnet, topology)
+        packet0, route0 = builder.next()
+        packet1, route1 = builder.next()
+        packet2, route2 = builder.next()
+        packet3, route3 = builder.next()
+        self.assertRaises(StopIteration, builder.next)
 
         reconstructor = MessageReconstructor()
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packets[1], routes[1])),
+            reconstructor.add(self.process_packet(packet1, route1)),
         )
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packets[3], routes[3])),
+            reconstructor.add(self.process_packet(packet3, route3)),
         )
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packets[2], routes[2])),
+            reconstructor.add(self.process_packet(packet2, route2)),
         )
-        msg_with_flag = reconstructor.add(self.process_packet(packets[0], routes[0]))
+        msg_with_flag = reconstructor.add(self.process_packet(packet0, route0))
         assert msg_with_flag is not None
         self.assertEqual(
-            PacketBuilder.parse_msg_and_flag(msg_with_flag), (MESSAGE_FLAG_REAL, msg)
+            PacketBuilder.parse_msg_and_flag(msg_with_flag),
+            (MessageFlag.MESSAGE_FLAG_REAL, msg),
         )
 
     def test_cover_packet(self):
         mixnet, topology = self.init()
 
-        packet, route = PacketBuilder.build_drop_cover_packet(mixnet, topology)
+        msg = b"cover"
+        builder = PacketBuilder.drop_cover(msg, mixnet, topology)
+        packet, route = builder.next()
+        self.assertRaises(StopIteration, builder.next)
 
         reconstructor = MessageReconstructor()
         msg_with_flag = reconstructor.add(self.process_packet(packet, route))
         assert msg_with_flag is not None
         self.assertEqual(
             PacketBuilder.parse_msg_and_flag(msg_with_flag),
-            (MESSAGE_FLAG_DROP_COVER, b""),
+            (MessageFlag.MESSAGE_FLAG_DROP_COVER, msg),
         )
 
     @staticmethod

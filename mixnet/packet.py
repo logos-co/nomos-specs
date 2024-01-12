@@ -2,61 +2,59 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Self, Tuple, TypeAlias
+from enum import Enum
+from typing import Dict, Iterator, List, Self, Tuple, TypeAlias
 
 from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
 from mixnet.sphinx.payload import Payload
 from mixnet.sphinx.sphinx import SphinxPacket
 
-MessageFlag: TypeAlias = bytes  # 1byte
 
-MESSAGE_FLAG_REAL: MessageFlag = b"\x00"
-MESSAGE_FLAG_DROP_COVER: MessageFlag = b"\x01"
+class MessageFlag(Enum):
+    MESSAGE_FLAG_REAL = b"\x00"
+    MESSAGE_FLAG_DROP_COVER = b"\x01"
+
+    def bytes(self) -> bytes:
+        return bytes(self.value)
 
 
 class PacketBuilder:
-    """Build a real packet or a drop cover packet."""
+    iter: Iterator[Tuple[SphinxPacket, List[MixNode]]]
 
-    @staticmethod
-    def build_real_packets(
-        message: bytes, mixnet: Mixnet, topology: MixnetTopology
-    ) -> Tuple[List[SphinxPacket], List[List[MixNode]]]:
-        """Build real SphinxPackets and return them with a list of mix routes chosen for each SphinxPacket respectively."""
+    def __init__(
+        self,
+        flag: MessageFlag,
+        message: bytes,
+        mixnet: Mixnet,
+        topology: MixnetTopology,
+    ):
         destination = mixnet.choose_mixnode()
 
-        msg_with_flag = MESSAGE_FLAG_REAL + message
+        msg_with_flag = flag.bytes() + message
         # NOTE: We don't encrypt msg_with_flag for destination.
         # If encryption is needed, a shared secret must be appended in front of the message along with the MessageFlag.
         fragment_set = FragmentSet(msg_with_flag)
 
-        packets = []
-        routes = []
+        packets_and_routes = []
         for fragment in fragment_set.fragments:
             route = topology.generate_route()
-            packets.append(SphinxPacket.build(fragment.bytes(), route, destination))
-            routes.append(route)
-        return packets, routes
+            packet = SphinxPacket.build(fragment.bytes(), route, destination)
+            packets_and_routes.append((packet, route))
 
-    @staticmethod
-    def build_drop_cover_packet(
-        mixnet: Mixnet, topology: MixnetTopology
-    ) -> Tuple[SphinxPacket, List[MixNode]]:
-        """Bulid a drop cover SphinxPacket and return it with a mix route chosen"""
-        destination = mixnet.choose_mixnode()
+        self.iter = iter(packets_and_routes)
 
-        msg_with_flag = MESSAGE_FLAG_DROP_COVER + b""
-        # NOTE: We don't encrypt msg_with_flag for destination.
-        # If encryption is needed, a shared secret must be appended in front of the message along with the MessageFlag.
-        fragment_set = FragmentSet(msg_with_flag)
-        # Since a drop cover message is very small (1byte + padding),
-        # it should fit in a single fragment.
-        assert len(fragment_set.fragments) == 1
+    @classmethod
+    def real(cls, message: bytes, mixnet: Mixnet, topology: MixnetTopology) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, mixnet, topology)
 
-        route = topology.generate_route()
-        return (
-            SphinxPacket.build(fragment_set.fragments[0].bytes(), route, destination),
-            route,
-        )
+    @classmethod
+    def drop_cover(
+        cls, message: bytes, mixnet: Mixnet, topology: MixnetTopology
+    ) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, mixnet, topology)
+
+    def next(self) -> Tuple[SphinxPacket, List[MixNode]]:
+        return next(self.iter)
 
     @staticmethod
     def parse_msg_and_flag(data: bytes) -> Tuple[MessageFlag, bytes]:
@@ -64,7 +62,7 @@ class PacketBuilder:
         if len(data) < 1:
             raise ValueError("data is too short")
 
-        return (data[0:1], data[1:])
+        return (MessageFlag(data[0:1]), data[1:])
 
 
 # Unlikely, Nym uses i32 for FragmentSetId, which may cause more collisions.
