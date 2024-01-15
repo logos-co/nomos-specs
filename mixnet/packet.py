@@ -6,9 +6,10 @@ from enum import Enum
 from itertools import batched
 from typing import Dict, Iterator, List, Self, Tuple, TypeAlias
 
+from pysphinx.payload import Payload
+from pysphinx.sphinx import SphinxPacket
+
 from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
-from mixnet.sphinx.payload import Payload
-from mixnet.sphinx.sphinx import SphinxPacket
 
 
 class MessageFlag(Enum):
@@ -39,7 +40,11 @@ class PacketBuilder:
         packets_and_routes = []
         for fragment in fragment_set.fragments:
             route = topology.generate_route()
-            packet = SphinxPacket.build(fragment.bytes(), route, destination)
+            packet = SphinxPacket.build(
+                fragment.bytes(),
+                [mixnode.sphinx_node() for mixnode in route],
+                destination.sphinx_node(),
+            )
             packets_and_routes.append((packet, route))
 
         self.iter = iter(packets_and_routes)

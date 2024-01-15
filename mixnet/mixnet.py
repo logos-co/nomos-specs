@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PrivateKey,
     X25519PublicKey,
 )
+from pysphinx.node import Node
 
 from mixnet.bls import BlsPrivateKey, BlsPublicKey
 from mixnet.fisheryates import FisherYates
@@ -59,6 +60,9 @@ class MixNode:
 
     def encryption_public_key(self) -> X25519PublicKey:
         return self.encryption_private_key.public_key()
+
+    def sphinx_node(self) -> Node:
+        return Node(self.encryption_private_key, self.addr)
 
 
 @dataclass

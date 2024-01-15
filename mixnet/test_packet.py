@@ -2,6 +2,7 @@ from typing import List, Tuple
 from unittest import TestCase
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
 from mixnet.bls import generate_bls
 from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
@@ -11,7 +12,6 @@ from mixnet.packet import (
     MessageReconstructor,
     PacketBuilder,
 )
-from mixnet.sphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 from mixnet.utils import random_bytes
 
 
