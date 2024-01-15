@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import threading
 import time
 from dataclasses import dataclass
 from threading import Thread
@@ -50,7 +51,7 @@ class MixNode:
         delay_rate_per_min: int,
         inbound_socket: InboundSocket,
         outbound_socket: OutboundSocket,
-    ):
+    ) -> MixNodeRunner:
         thread = MixNodeRunner(
             self.encryption_private_key,
             delay_rate_per_min,
@@ -59,6 +60,7 @@ class MixNode:
         )
         thread.daemon = True
         thread.start()
+        return thread
 
 
 class MixNodeRunner(Thread):
@@ -80,6 +82,7 @@ class MixNodeRunner(Thread):
         self.delay_rate_per_min = delay_rate_per_min
         self.inbound_socket = inbound_socket
         self.outbound_socket = outbound_socket
+        self.num_processing = AtomicInt(0)
 
     def run(self) -> None:
         # Here in Python, this thread is implemented in synchronous manner.
@@ -92,9 +95,20 @@ class MixNodeRunner(Thread):
                 self.encryption_private_key,
                 self.delay_rate_per_min,
                 self.outbound_socket,
+                self.num_processing,
             )
             thread.daemon = True
+            self.num_processing.add(1)
             thread.start()
+
+    def num_jobs(self) -> int:
+        """
+        Return the number of packets that are being processed or still in the inbound socket.
+
+        If this thread works as a M/M/inf queue completely,
+        the number of packets that are still in the inbound socket must be always 0.
+        """
+        return self.num_processing.get() + self.inbound_socket.qsize()
 
 
 class MixNodePacketProcessor(Thread):
@@ -111,12 +125,14 @@ class MixNodePacketProcessor(Thread):
         encryption_private_key: X25519PrivateKey,
         delay_rate_per_min: int,  # Poisson rate parameter: mu
         outbound_socket: OutboundSocket,
+        num_processing: AtomicInt,
     ):
         super().__init__()
         self.packet = packet
         self.encryption_private_key = encryption_private_key
         self.delay_rate_per_min = delay_rate_per_min
         self.outbound_socket = outbound_socket
+        self.num_processing = num_processing
 
     def run(self) -> None:
         delay_sec = poisson_interval_sec(self.delay_rate_per_min)
@@ -134,3 +150,23 @@ class MixNodePacketProcessor(Thread):
                 )
             case _:
                 raise UnknownHeaderTypeError
+
+        self.num_processing.sub(1)
+
+
+class AtomicInt:
+    def __init__(self, initial: int) -> None:
+        self.lock = threading.Lock()
+        self.value = initial
+
+    def add(self, v: int):
+        with self.lock:
+            self.value += v
+
+    def sub(self, v: int):
+        with self.lock:
+            self.value -= v
+
+    def get(self) -> int:
+        with self.lock:
+            return self.value
