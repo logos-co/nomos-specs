@@ -3,5 +3,7 @@ cffi==1.16.0
 cryptography==41.0.7
 numpy==1.26.3
 pycparser==2.21
+pysphinx==0.0.1
 scipy==1.11.4
 setuptools==69.0.3
+wheel==0.42.0
