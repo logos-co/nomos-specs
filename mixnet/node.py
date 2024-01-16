@@ -27,8 +27,10 @@ NodeId: TypeAlias = BlsPublicKey
 # 32-byte that represents an IP address and a port of a mix node.
 NodeAddress: TypeAlias = bytes
 
-InboundSocket: TypeAlias = "queue.Queue[SphinxPacket]"
-OutboundSocket: TypeAlias = "queue.Queue[Tuple[NodeAddress, SphinxPacket | Payload]]"
+PacketQueue: TypeAlias = "queue.Queue[Tuple[NodeAddress, SphinxPacket]]"
+PacketPayloadQueue: TypeAlias = (
+    "queue.Queue[Tuple[NodeAddress, SphinxPacket | Payload]]"
+)
 
 
 @dataclass
@@ -49,8 +51,8 @@ class MixNode:
     def start(
         self,
         delay_rate_per_min: int,
-        inbound_socket: InboundSocket,
-        outbound_socket: OutboundSocket,
+        inbound_socket: PacketQueue,
+        outbound_socket: PacketPayloadQueue,
     ) -> MixNodeRunner:
         thread = MixNodeRunner(
             self.encryption_private_key,
@@ -74,8 +76,8 @@ class MixNodeRunner(Thread):
         self,
         encryption_private_key: X25519PrivateKey,
         delay_rate_per_min: int,  # Poisson rate parameter: mu
-        inbound_socket: InboundSocket,
-        outbound_socket: OutboundSocket,
+        inbound_socket: PacketQueue,
+        outbound_socket: PacketPayloadQueue,
     ):
         super().__init__()
         self.encryption_private_key = encryption_private_key
@@ -89,7 +91,7 @@ class MixNodeRunner(Thread):
         # In the real implementation, consider implementing this in asynchronous if possible,
         # to approximate a M/M/inf queue
         while True:
-            packet = self.inbound_socket.get()
+            _, packet = self.inbound_socket.get()
             thread = MixNodePacketProcessor(
                 packet,
                 self.encryption_private_key,
@@ -124,7 +126,7 @@ class MixNodePacketProcessor(Thread):
         packet: SphinxPacket,
         encryption_private_key: X25519PrivateKey,
         delay_rate_per_min: int,  # Poisson rate parameter: mu
-        outbound_socket: OutboundSocket,
+        outbound_socket: PacketPayloadQueue,
         num_processing: AtomicInt,
     ):
         super().__init__()

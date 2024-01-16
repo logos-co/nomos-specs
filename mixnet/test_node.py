@@ -12,7 +12,7 @@ from pysphinx.sphinx import SphinxPacket
 
 from mixnet.bls import generate_bls
 from mixnet.mixnet import Mixnet, MixnetTopology
-from mixnet.node import InboundSocket, MixNode, OutboundSocket
+from mixnet.node import MixNode, NodeAddress, PacketPayloadQueue, PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec, poisson_mean_interval_sec
 from mixnet.utils import random_bytes
@@ -29,8 +29,8 @@ class TestMixNodeRunner(TestCase):
         the rate of outputs should be `lambda`.
         """
         mixnet, topology = self.init()
-        inbound_socket: InboundSocket = queue.Queue()
-        outbound_socket: OutboundSocket = queue.Queue()
+        inbound_socket: PacketQueue = queue.Queue()
+        outbound_socket: PacketPayloadQueue = queue.Queue()
 
         packet, route = PacketBuilder.real(b"msg", mixnet, topology).next()
 
@@ -43,7 +43,13 @@ class TestMixNodeRunner(TestCase):
         emission_rate_per_min = 120  # lambda (= 2msg/sec)
         sender = threading.Thread(
             target=self.send_packets,
-            args=(inbound_socket, packet, packet_count, emission_rate_per_min),
+            args=(
+                inbound_socket,
+                packet,
+                route[0].addr,
+                packet_count,
+                emission_rate_per_min,
+            ),
         )
         sender.daemon = True
         sender.start()
@@ -82,14 +88,15 @@ class TestMixNodeRunner(TestCase):
 
     @staticmethod
     def send_packets(
-        inbound_socket: InboundSocket,
+        inbound_socket: PacketQueue,
         packet: SphinxPacket,
+        node_addr: NodeAddress,
         cnt: int,
         rate_per_min: int,
     ):
         for _ in range(cnt):
             time.sleep(poisson_interval_sec(rate_per_min))
-            inbound_socket.put(packet)
+            inbound_socket.put((node_addr, packet))
 
     @staticmethod
     def init() -> Tuple[Mixnet, MixnetTopology]:
