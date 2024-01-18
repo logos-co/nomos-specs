@@ -1,25 +1,21 @@
 import queue
 from datetime import datetime
-from typing import Tuple
-from unittest import TestCase
 
 import numpy
 import timeout_decorator
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
-from mixnet.bls import generate_bls
 from mixnet.client import MixClientRunner
-from mixnet.mixnet import Mixnet, MixnetTopology
-from mixnet.node import MixNode, PacketQueue
+from mixnet.node import PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_mean_interval_sec
+from mixnet.test_mixnet import MixnetTestCase
 from mixnet.utils import random_bytes
 
 
-class TestMixClientRunner(TestCase):
+class TestMixClientRunner(MixnetTestCase):
     @timeout_decorator.timeout(180)
     def test_mixclient_runner_emission_rate(self):
-        mixnet, topology = self.init()
+        mixnet = self.init(12, 3, 3, 300, 60)
         real_packet_queue: PacketQueue = queue.Queue()
         outbound_socket: PacketQueue = queue.Queue()
 
@@ -27,7 +23,7 @@ class TestMixClientRunner(TestCase):
         redundancy = 3
         client = MixClientRunner(
             mixnet,
-            topology,
+            mixnet.current_topology(),
             emission_rate_per_min,
             redundancy,
             real_packet_queue,
@@ -37,7 +33,7 @@ class TestMixClientRunner(TestCase):
         client.start()
 
         # Create packets. At least two packets are expected to be generated from a 3500-byte msg
-        builder = PacketBuilder.real(random_bytes(3500), mixnet, topology)
+        builder = PacketBuilder.real(random_bytes(3500), mixnet)
         # Schedule two packets to the mix client without any interval
         packet, route = builder.next()
         real_packet_queue.put((route[0].addr, packet))
@@ -61,18 +57,3 @@ class TestMixClientRunner(TestCase):
             poisson_mean_interval_sec(emission_rate_per_min),
             delta=1.0,
         )
-
-    @staticmethod
-    def init() -> Tuple[Mixnet, MixnetTopology]:
-        mixnet = Mixnet(
-            [
-                MixNode(
-                    generate_bls(),
-                    X25519PrivateKey.generate(),
-                    random_bytes(32),
-                )
-                for _ in range(12)
-            ]
-        )
-        topology = mixnet.build_topology(b"entropy", 3, 3)
-        return mixnet, topology

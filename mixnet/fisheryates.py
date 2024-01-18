@@ -4,7 +4,11 @@ from typing import List
 
 class FisherYates:
     @staticmethod
-    def shuffle(elements: List, entropy: bytes) -> List:
+    def set_seed(seed: bytes) -> None:
+        random.seed(a=seed, version=2)
+
+    @staticmethod
+    def shuffle(elements: List) -> List:
         """
         Fisher-Yates shuffling algorithm.
         In Python, random.shuffle implements the Fisher-Yates shuffling.
@@ -14,8 +18,5 @@ class FisherYates:
         :param entropy: a seed for deterministic sampling
         """
         out = elements.copy()
-        random.seed(a=entropy, version=2)
         random.shuffle(out)
-        # reset seed
-        random.seed()
         return out

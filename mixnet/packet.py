@@ -9,7 +9,7 @@ from typing import Dict, Iterator, List, Self, Tuple, TypeAlias
 from pysphinx.payload import Payload
 from pysphinx.sphinx import SphinxPacket
 
-from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
+from mixnet.mixnet import Mixnet, MixNode
 
 
 class MessageFlag(Enum):
@@ -28,8 +28,8 @@ class PacketBuilder:
         flag: MessageFlag,
         message: bytes,
         mixnet: Mixnet,
-        topology: MixnetTopology,
     ):
+        topology = mixnet.current_topology()
         destination = mixnet.choose_mixnode()
 
         msg_with_flag = flag.bytes() + message
@@ -50,14 +50,12 @@ class PacketBuilder:
         self.iter = iter(packets_and_routes)
 
     @classmethod
-    def real(cls, message: bytes, mixnet: Mixnet, topology: MixnetTopology) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, mixnet, topology)
+    def real(cls, message: bytes, mixnet: Mixnet) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, mixnet)
 
     @classmethod
-    def drop_cover(
-        cls, message: bytes, mixnet: Mixnet, topology: MixnetTopology
-    ) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, mixnet, topology)
+    def drop_cover(cls, message: bytes, mixnet: Mixnet) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, mixnet)
 
     def next(self) -> Tuple[SphinxPacket, List[MixNode]]:
         return next(self.iter)

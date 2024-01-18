@@ -69,7 +69,5 @@ class MixClientRunner(Thread):
                     self.redundant_real_packet_queue.put((addr, packet))
                 self.outbound_socket.put((addr, packet))
 
-            packet, route = PacketBuilder.drop_cover(
-                b"drop cover", self.mixnet, self.topology
-            ).next()
+            packet, route = PacketBuilder.drop_cover(b"drop cover", self.mixnet).next()
             self.outbound_socket.put((route[0].addr, packet))
