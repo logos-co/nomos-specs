@@ -15,7 +15,7 @@ from mixnet.utils import random_bytes
 
 class TestPacket(MixnetTestCase):
     def test_real_packet(self):
-        mixnet = self.init(12, 3, 3, 300, 60)
+        mixnet = self.init(12, 3, 3, 60)
 
         msg = random_bytes(3500)
         builder = PacketBuilder.real(msg, mixnet)
@@ -43,7 +43,7 @@ class TestPacket(MixnetTestCase):
         )
 
     def test_cover_packet(self):
-        mixnet = self.init(12, 3, 3, 300, 60)
+        mixnet = self.init(12, 3, 3, 60)
 
         msg = b"cover"
         builder = PacketBuilder.drop_cover(msg, mixnet)

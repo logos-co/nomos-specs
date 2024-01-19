@@ -3,13 +3,17 @@ from __future__ import annotations
 import random
 import threading
 import time
+import queue
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import Thread
-from typing import List
+from typing import List, TypeAlias
 
 from mixnet.fisheryates import FisherYates
 from mixnet.node import MixNode
+
+
+EntropyQueue: TypeAlias = "queue.Queue[bytes]"
 
 
 @dataclass
@@ -21,36 +25,31 @@ class Mixnet:
         mix_nodes: List[MixNode],
         n_layers: int,
         n_nodes_per_layer: int,
-        mixnet_epoch_sec: int,
-        proactive_sec: int,
-        initial_entropy: bytes,
+        current_entropy: bytes,
+        entropy_delay_sec: int,
     ):
         self.mix_nodes = mix_nodes
 
-        self.set_entropy(initial_entropy)
-
+        self.entropy_queue: EntropyQueue = queue.Queue()
         self.topology_updater = MixnetTopologyUpdater(
-            mix_nodes, n_layers, n_nodes_per_layer, mixnet_epoch_sec, proactive_sec
+            mix_nodes,
+            n_layers,
+            n_nodes_per_layer,
+            current_entropy,
+            entropy_delay_sec,
+            self.entropy_queue,
         )
         self.topology_updater.daemon = True
         self.topology_updater.start()
-
-    def set_entropy(self, entropy: bytes) -> None:
-        """
-        Set entropy (seed) to the Fisher-Yates shuffler
-        that is going to be used for deterministic topology construction.
-
-        This method is expected to be called periodically by the user.
-        Until the next entropy is provides, Fisher-Yates shuffler continues to works
-        based on this entropy set once.
-        """
-        FisherYates.set_seed(entropy)
 
     def choose_mixnode(self) -> MixNode:
         return random.choice(self.mix_nodes)
 
     def current_topology(self) -> MixnetTopology:
         return self.topology_updater.current_topology()
+
+    def inject_entropy(self, entropy: bytes) -> None:
+        self.entropy_queue.put(entropy)
 
 
 class MixnetTopologyUpdater(Thread):
@@ -59,52 +58,42 @@ class MixnetTopologyUpdater(Thread):
         mix_nodes: List[MixNode],
         n_layers: int,
         n_nodes_per_layer: int,
-        mixnet_epoch_sec: int,
-        proactive_sec: int,
+        current_entropy: bytes,
+        entropy_delay_sec: int,
+        entropy_queue: EntropyQueue,
     ):
         super().__init__()
         self.mix_nodes = mix_nodes
         self.n_layers = n_layers
         self.n_nodes_per_layer = n_nodes_per_layer
-        self.mixnet_epoch_sec = mixnet_epoch_sec
-        self.proactive_sec = proactive_sec
+        self.entropy_delay_sec = entropy_delay_sec
+        self.entropy_queue = entropy_queue
 
         self.lock = threading.Lock()
-        self.topology = self.build_topology()
-        self.next_topology = None
+        self.topology = self.build_topology(current_entropy)
+        self.establish_conections(self.topology)
 
     def run(self) -> None:
-        next_epoch_ts = datetime.now() + timedelta(seconds=self.mixnet_epoch_sec)
-
         while True:
-            time.sleep(1 / 1000)
+            new_entropy = self.entropy_queue.get(block=True)
+            ts = datetime.now() + timedelta(seconds=self.entropy_delay_sec)
 
-            now = datetime.now()
-            if now < next_epoch_ts - timedelta(seconds=self.proactive_sec):
-                continue
+            next_topology = self.build_topology(new_entropy)
+            self.establish_conections(next_topology)
 
-            if self.next_topology is None:
-                self.next_topology = self.build_topology()
-
-            if now < next_epoch_ts:
-                continue
-
+            time.sleep((ts - datetime.now()).total_seconds())
             with self.lock:
-                self.topology = self.next_topology
-                self.next_topology = None
-            next_epoch_ts = now + timedelta(seconds=self.mixnet_epoch_sec)
+                self.topology = next_topology
 
     def current_topology(self):
         with self.lock:
             return self.topology
 
-    def build_topology(
-        self,
-    ) -> MixnetTopology:
+    def build_topology(self, entropy: bytes) -> MixnetTopology:
         num_nodes = self.n_nodes_per_layer * self.n_layers
         assert num_nodes <= len(self.mix_nodes)
 
-        shuffled = FisherYates.shuffle(self.mix_nodes)
+        shuffled = FisherYates.shuffle(self.mix_nodes, entropy)
         sampled = shuffled[:num_nodes]
         layers = []
         for l in range(self.n_layers):
@@ -112,9 +101,15 @@ class MixnetTopologyUpdater(Thread):
             layer = sampled[start : start + self.n_nodes_per_layer]
             layers.append(layer)
 
-        # With this new topology, network connections with the adjacent mix layer should be established.
-        # In this specification, we skip implementing connections for simplicity.
         return MixnetTopology(layers)
+
+    def establish_conections(self, _: MixnetTopology) -> None:
+        """
+        Establish connections with mix nodes in the adjacent mix layer.
+
+        In this spec, the actual implementation is skipped for simplicity.
+        """
+        pass
 
 
 @dataclass

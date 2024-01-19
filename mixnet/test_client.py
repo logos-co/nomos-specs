@@ -15,7 +15,7 @@ from mixnet.utils import random_bytes
 class TestMixClientRunner(MixnetTestCase):
     @timeout_decorator.timeout(180)
     def test_mixclient_runner_emission_rate(self):
-        mixnet = self.init(12, 3, 3, 300, 60)
+        mixnet = self.init(12, 3, 3, 60)
         real_packet_queue: PacketQueue = queue.Queue()
         outbound_socket: PacketQueue = queue.Queue()
 

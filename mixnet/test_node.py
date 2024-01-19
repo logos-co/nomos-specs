@@ -23,7 +23,7 @@ class TestMixNodeRunner(MixnetTestCase):
         and if processing is delayed according to an exponential distribution with a rate `mu`,
         the rate of outputs should be `lambda`.
         """
-        mixnet = self.init(12, 3, 3, 300, 60)
+        mixnet = self.init(12, 3, 3, 60)
         inbound_socket: PacketQueue = queue.Queue()
         outbound_socket: PacketPayloadQueue = queue.Queue()
 
