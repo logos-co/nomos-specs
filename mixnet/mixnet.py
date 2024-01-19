@@ -102,7 +102,7 @@ class MixnetTopologyUpdater(Thread):
         self,
     ) -> MixnetTopology:
         num_nodes = self.n_nodes_per_layer * self.n_layers
-        assert num_nodes < len(self.mix_nodes)
+        assert num_nodes <= len(self.mix_nodes)
 
         shuffled = FisherYates.shuffle(self.mix_nodes)
         sampled = shuffled[:num_nodes]
