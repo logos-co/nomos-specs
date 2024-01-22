@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import queue
 import random
 import threading
 import time
-import queue
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from threading import Thread
@@ -11,7 +11,6 @@ from typing import List, TypeAlias
 
 from mixnet.fisheryates import FisherYates
 from mixnet.node import MixNode
-
 
 EntropyQueue: TypeAlias = "queue.Queue[bytes]"
 
@@ -26,7 +25,7 @@ class Mixnet:
         n_layers: int,
         n_nodes_per_layer: int,
         current_entropy: bytes,
-        entropy_delay_sec: int,
+        topology_update_delay_sec: int,
     ):
         self.mix_nodes = mix_nodes
 
@@ -36,7 +35,7 @@ class Mixnet:
             n_layers,
             n_nodes_per_layer,
             current_entropy,
-            entropy_delay_sec,
+            topology_update_delay_sec,
             self.entropy_queue,
         )
         self.topology_updater.daemon = True
@@ -59,14 +58,14 @@ class MixnetTopologyUpdater(Thread):
         n_layers: int,
         n_nodes_per_layer: int,
         current_entropy: bytes,
-        entropy_delay_sec: int,
+        topology_update_delay_sec: int,
         entropy_queue: EntropyQueue,
     ):
         super().__init__()
         self.mix_nodes = mix_nodes
         self.n_layers = n_layers
         self.n_nodes_per_layer = n_nodes_per_layer
-        self.entropy_delay_sec = entropy_delay_sec
+        self.topology_update_delay_sec = topology_update_delay_sec
         self.entropy_queue = entropy_queue
 
         self.lock = threading.Lock()
@@ -76,12 +75,15 @@ class MixnetTopologyUpdater(Thread):
     def run(self) -> None:
         while True:
             new_entropy = self.entropy_queue.get(block=True)
-            ts = datetime.now() + timedelta(seconds=self.entropy_delay_sec)
+            ts = datetime.now() + timedelta(seconds=self.topology_update_delay_sec)
 
             next_topology = self.build_topology(new_entropy)
             self.establish_conections(next_topology)
 
-            time.sleep((ts - datetime.now()).total_seconds())
+            remain = (ts - datetime.now()).total_seconds()
+            if remain > 0:
+                time.sleep(remain)
+
             with self.lock:
                 self.topology = next_topology
 
