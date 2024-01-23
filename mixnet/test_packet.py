@@ -5,7 +5,8 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
 from mixnet.bls import generate_bls
-from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
+from mixnet.mixnet import Mixnet, MixnetTopology
+from mixnet.node import MixNode
 from mixnet.packet import (
     Fragment,
     MessageFlag,
