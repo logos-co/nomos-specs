@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import queue
-import threading
-import time
+import asyncio
 from dataclasses import dataclass
-from threading import Thread
 from typing import Tuple, TypeAlias
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
@@ -27,9 +24,9 @@ NodeId: TypeAlias = BlsPublicKey
 # 32-byte that represents an IP address and a port of a mix node.
 NodeAddress: TypeAlias = bytes
 
-PacketQueue: TypeAlias = "queue.Queue[Tuple[NodeAddress, SphinxPacket]]"
+PacketQueue: TypeAlias = "asyncio.Queue[Tuple[NodeAddress, SphinxPacket]]"
 PacketPayloadQueue: TypeAlias = (
-    "queue.Queue[Tuple[NodeAddress, SphinxPacket | Payload]]"
+    "asyncio.Queue[Tuple[NodeAddress, SphinxPacket | Payload]]"
 )
 
 
@@ -48,28 +45,28 @@ class MixNode:
     def sphinx_node(self) -> Node:
         return Node(self.encryption_private_key, self.addr)
 
-    def start(
+    async def start(
         self,
-        delay_rate_per_min: int,
+        delay_rate_per_min: int,  # Poisson rate parameter: mu
         inbound_socket: PacketQueue,
         outbound_socket: PacketPayloadQueue,
-    ) -> MixNodeRunner:
-        thread = MixNodeRunner(
+    ) -> Tuple[MixNodeRunner, asyncio.Task]:
+        runner = MixNodeRunner(
             self.encryption_private_key,
             delay_rate_per_min,
             inbound_socket,
             outbound_socket,
         )
-        thread.daemon = True
-        thread.start()
-        return thread
+        task = asyncio.create_task(runner.run())
+        return runner, task
 
 
-class MixNodeRunner(Thread):
+class MixNodeRunner:
     """
-    Read SphinxPackets from inbound socket and spawn a thread for each packet to process it.
+    A class handling incoming packets with delays
 
-    This thread approximates a M/M/inf queue.
+    This class is defined separated with the MixNode class,
+    in order to define the MixNode as a simple dataclass for clarity.
     """
 
     def __init__(
@@ -79,96 +76,59 @@ class MixNodeRunner(Thread):
         inbound_socket: PacketQueue,
         outbound_socket: PacketPayloadQueue,
     ):
-        super().__init__()
         self.encryption_private_key = encryption_private_key
         self.delay_rate_per_min = delay_rate_per_min
         self.inbound_socket = inbound_socket
         self.outbound_socket = outbound_socket
-        self.num_processing = AtomicInt(0)
+        self.packet_processing_tasks = set()
 
-    def run(self) -> None:
-        # Here in Python, this thread is implemented in synchronous manner.
-        # In the real implementation, consider implementing this in asynchronous if possible,
-        # to approximate a M/M/inf queue
+    async def run(self):
+        """
+        Read SphinxPackets from inbound socket and spawn a thread for each packet to process it.
+
+        This thread approximates a M/M/inf queue.
+        """
         while True:
-            _, packet = self.inbound_socket.get()
-            thread = MixNodePacketProcessor(
-                packet,
-                self.encryption_private_key,
-                self.delay_rate_per_min,
-                self.outbound_socket,
-                self.num_processing,
+            _, packet = await self.inbound_socket.get()
+            task = asyncio.create_task(
+                self.process_packet(
+                    packet,
+                )
             )
-            thread.daemon = True
-            self.num_processing.add(1)
-            thread.start()
+            self.packet_processing_tasks.add(task)
+            task.add_done_callback(self.packet_processing_tasks.discard)
 
-    def num_jobs(self) -> int:
+    async def process_packet(
+        self,
+        packet: SphinxPacket,
+    ):
+        """
+        Process a single packet with a delay that follows exponential distribution,
+        and forward it to the next mix node or the mix destination
+
+        This thread is a single server (worker) in a M/M/inf queue that MixNodeRunner approximates.
+        """
+        delay_sec = poisson_interval_sec(self.delay_rate_per_min)
+        await asyncio.sleep(delay_sec)
+
+        processed = packet.process(self.encryption_private_key)
+        match processed:
+            case ProcessedForwardHopPacket():
+                await self.outbound_socket.put(
+                    (processed.next_node_address, processed.next_packet)
+                )
+            case ProcessedFinalHopPacket():
+                await self.outbound_socket.put(
+                    (processed.destination_node_address, processed.payload)
+                )
+            case _:
+                raise UnknownHeaderTypeError
+
+    async def num_jobs(self) -> int:
         """
         Return the number of packets that are being processed or still in the inbound socket.
 
         If this thread works as a M/M/inf queue completely,
         the number of packets that are still in the inbound socket must be always 0.
         """
-        return self.num_processing.get() + self.inbound_socket.qsize()
-
-
-class MixNodePacketProcessor(Thread):
-    """
-    Process a single packet with a delay that follows exponential distribution,
-    and forward it to the next mix node or the mix destination
-
-    This thread is a single server (worker) in a M/M/inf queue that MixNodeRunner approximates.
-    """
-
-    def __init__(
-        self,
-        packet: SphinxPacket,
-        encryption_private_key: X25519PrivateKey,
-        delay_rate_per_min: int,  # Poisson rate parameter: mu
-        outbound_socket: PacketPayloadQueue,
-        num_processing: AtomicInt,
-    ):
-        super().__init__()
-        self.packet = packet
-        self.encryption_private_key = encryption_private_key
-        self.delay_rate_per_min = delay_rate_per_min
-        self.outbound_socket = outbound_socket
-        self.num_processing = num_processing
-
-    def run(self) -> None:
-        delay_sec = poisson_interval_sec(self.delay_rate_per_min)
-        time.sleep(delay_sec)
-
-        processed = self.packet.process(self.encryption_private_key)
-        match processed:
-            case ProcessedForwardHopPacket():
-                self.outbound_socket.put(
-                    (processed.next_node_address, processed.next_packet)
-                )
-            case ProcessedFinalHopPacket():
-                self.outbound_socket.put(
-                    (processed.destination_node_address, processed.payload)
-                )
-            case _:
-                raise UnknownHeaderTypeError
-
-        self.num_processing.sub(1)
-
-
-class AtomicInt:
-    def __init__(self, initial: int) -> None:
-        self.lock = threading.Lock()
-        self.value = initial
-
-    def add(self, v: int):
-        with self.lock:
-            self.value += v
-
-    def sub(self, v: int):
-        with self.lock:
-            self.value -= v
-
-    def get(self) -> int:
-        with self.lock:
-            return self.value
+        return self.inbound_socket.qsize() + len(self.packet_processing_tasks)
