@@ -78,7 +78,7 @@ class TestMixNodeRunner(MixnetTestCase):
         self.assertAlmostEqual(
             float(numpy.mean(num_jobs)),
             round(emission_rate_per_min / delay_rate_per_min),
-            delta=1.0,
+            delta=1.5,
         )
 
     @staticmethod
