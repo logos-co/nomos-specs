@@ -34,11 +34,13 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
 
         delay_rate_per_min = 30  # mu (= 2s delay on average)
         # Start only the first mix node for testing
-        runner, _ = route[0].start(delay_rate_per_min, inbound_socket, outbound_socket)
+        _ = route[0].start(delay_rate_per_min, inbound_socket, outbound_socket)
 
         # Send packets to the first mix node in a Poisson distribution
         packet_count = 100
         emission_rate_per_min = 120  # lambda (= 2msg/sec)
+        # This queue is just for counting how many packets have been sent so far.
+        sent_packet_queue: PacketQueue = asyncio.Queue()
         _ = asyncio.create_task(
             self.send_packets(
                 inbound_socket,
@@ -46,6 +48,7 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
                 route[0].addr,
                 packet_count,
                 emission_rate_per_min,
+                sent_packet_queue,
             )
         )
 
@@ -57,8 +60,16 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
             _ = await outbound_socket.get()
             now = datetime.now()
             intervals.append((now - ts).total_seconds())
-            num_jobs.append(await runner.num_jobs())
+
+            # Calculate the current # of jobs staying in the mix node
+            num_packets_emitted_from_mixnode = len(intervals)
+            num_packets_sent_to_mixnode = sent_packet_queue.qsize()
+            num_jobs.append(
+                num_packets_sent_to_mixnode - num_packets_emitted_from_mixnode
+            )
+
             ts = now
+
         # Remove the first interval that would be much larger than other intervals,
         # because of the delay in mix node.
         intervals = intervals[1:]
@@ -88,11 +99,14 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
         node_addr: NodeAddress,
         cnt: int,
         rate_per_min: int,
+        # For testing purpose, to inform the caller how many packets have been sent to the inbound_socket
+        sent_packet_queue: PacketQueue,
     ):
         for _ in range(cnt):
             # Since the task is not heavy, just sleep for seconds instead of using emission_notifier
             await asyncio.sleep(poisson_interval_sec(rate_per_min))
             await inbound_socket.put((node_addr, packet))
+            await sent_packet_queue.put((node_addr, packet))
 
     @staticmethod
     def init() -> Tuple[Mixnet, MixnetTopology]:

@@ -50,15 +50,15 @@ class MixNode:
         delay_rate_per_min: int,  # Poisson rate parameter: mu
         inbound_socket: PacketQueue,
         outbound_socket: PacketPayloadQueue,
-    ) -> Tuple[MixNodeRunner, asyncio.Task]:
-        runner = MixNodeRunner(
-            self.encryption_private_key,
-            delay_rate_per_min,
-            inbound_socket,
-            outbound_socket,
+    ) -> asyncio.Task:
+        return asyncio.create_task(
+            MixNodeRunner(
+                self.encryption_private_key,
+                delay_rate_per_min,
+                inbound_socket,
+                outbound_socket,
+            ).run()
         )
-        task = asyncio.create_task(runner.run())
-        return runner, task
 
 
 class MixNodeRunner:
@@ -80,9 +80,6 @@ class MixNodeRunner:
         self.delay_rate_per_min = delay_rate_per_min
         self.inbound_socket = inbound_socket
         self.outbound_socket = outbound_socket
-        # This field is just for testing how many packets are being waited/processed in a mix node
-        # In real implementations, this field is not necessary.
-        self.packet_processing_tasks = set()
 
     async def run(self):
         """
@@ -90,6 +87,11 @@ class MixNodeRunner:
 
         This thread approximates a M/M/inf queue.
         """
+
+        # A set just for gathering a reference of tasks to prevent them from being garbage collected.
+        # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+        self.tasks = set()
+
         while True:
             _, packet = await self.inbound_socket.get()
             task = asyncio.create_task(
@@ -97,8 +99,9 @@ class MixNodeRunner:
                     packet,
                 )
             )
-            self.packet_processing_tasks.add(task)
-            task.add_done_callback(self.packet_processing_tasks.discard)
+            self.tasks.add(task)
+            # To discard the task from the set automatically when it is done.
+            task.add_done_callback(self.tasks.discard)
 
     async def process_packet(
         self,
@@ -125,12 +128,3 @@ class MixNodeRunner:
                 )
             case _:
                 raise UnknownHeaderTypeError
-
-    async def num_jobs(self) -> int:
-        """
-        Return the number of packets that are being processed or still in the inbound socket.
-
-        If this thread works as a M/M/inf queue completely,
-        the number of packets that are still in the inbound socket must be always 0.
-        """
-        return self.inbound_socket.qsize() + len(self.packet_processing_tasks)
