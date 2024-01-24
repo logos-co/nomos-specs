@@ -34,9 +34,7 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
 
         delay_rate_per_min = 30  # mu (= 2s delay on average)
         # Start only the first mix node for testing
-        runner, _ = await route[0].start(
-            delay_rate_per_min, inbound_socket, outbound_socket
-        )
+        runner, _ = route[0].start(delay_rate_per_min, inbound_socket, outbound_socket)
 
         # Send packets to the first mix node in a Poisson distribution
         packet_count = 100

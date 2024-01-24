@@ -45,7 +45,7 @@ class MixNode:
     def sphinx_node(self) -> Node:
         return Node(self.encryption_private_key, self.addr)
 
-    async def start(
+    def start(
         self,
         delay_rate_per_min: int,  # Poisson rate parameter: mu
         inbound_socket: PacketQueue,
