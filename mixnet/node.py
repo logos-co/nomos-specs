@@ -80,6 +80,8 @@ class MixNodeRunner:
         self.delay_rate_per_min = delay_rate_per_min
         self.inbound_socket = inbound_socket
         self.outbound_socket = outbound_socket
+        # This field is just for testing how many packets are being waited/processed in a mix node
+        # In real implementations, this field is not necessary.
         self.packet_processing_tasks = set()
 
     async def run(self):
