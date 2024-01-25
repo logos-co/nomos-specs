@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import queue
-import time
-from datetime import datetime, timedelta
-from threading import Thread
+import asyncio
 
 from mixnet.mixnet import Mixnet, MixnetTopology
 from mixnet.node import PacketQueue
@@ -11,7 +8,14 @@ from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec
 
 
-class MixClientRunner(Thread):
+async def mixclient_emitter(
+    mixnet: Mixnet,
+    topology: MixnetTopology,
+    emission_rate_per_min: int,  # Poisson rate parameter: lambda in the spec
+    redundancy: int,  # b in the spec
+    real_packet_queue: PacketQueue,
+    outbound_socket: PacketQueue,
+):
     """
     Emit packets at the Poisson emission_rate_per_min.
 
@@ -21,55 +25,55 @@ class MixClientRunner(Thread):
     If no real packet is not scheduled, this thread emits a cover packet according to the emission_rate_per_min.
     """
 
-    def __init__(
-        self,
-        mixnet: Mixnet,
-        topology: MixnetTopology,
-        emission_rate_per_min: int,  # Poisson rate parameter: lambda in the spec
-        redundancy: int,  # b in the spec
-        real_packet_queue: PacketQueue,
-        outbound_socket: PacketQueue,
-    ):
-        super().__init__()
-        self.mixnet = mixnet
-        self.topology = topology
-        self.emission_rate_per_min = emission_rate_per_min
-        self.redundancy = redundancy
-        self.real_packet_queue = real_packet_queue
-        self.redundant_real_packet_queue: PacketQueue = queue.Queue()
-        self.outbound_socket = outbound_socket
+    redundant_real_packet_queue: PacketQueue = asyncio.Queue()
 
-    def run(self) -> None:
-        # Here in Python, this thread is implemented in synchronous manner.
-        # In the real implementation, consider implementing this in asynchronous if possible.
+    emission_notifier_queue = asyncio.Queue()
+    _ = asyncio.create_task(
+        emission_notifier(emission_rate_per_min, emission_notifier_queue)
+    )
 
-        next_emission_ts = datetime.now() + timedelta(
-            seconds=poisson_interval_sec(self.emission_rate_per_min)
-        )
-
-        while True:
-            time.sleep(1 / 1000)
-
-            if datetime.now() < next_emission_ts:
-                continue
-
-            next_emission_ts += timedelta(
-                seconds=poisson_interval_sec(self.emission_rate_per_min)
+    while True:
+        # Wait until the next emission time
+        _ = await emission_notifier_queue.get()
+        try:
+            await emit(
+                mixnet,
+                topology,
+                redundancy,
+                real_packet_queue,
+                redundant_real_packet_queue,
+                outbound_socket,
             )
+        finally:
+            # Python convention: indicate that the previously enqueued task has been processed
+            emission_notifier_queue.task_done()
 
-            if not self.redundant_real_packet_queue.empty():
-                addr, packet = self.redundant_real_packet_queue.get()
-                self.outbound_socket.put((addr, packet))
-                continue
 
-            if not self.real_packet_queue.empty():
-                addr, packet = self.real_packet_queue.get()
-                # Schedule redundant real packets
-                for _ in range(self.redundancy - 1):
-                    self.redundant_real_packet_queue.put((addr, packet))
-                self.outbound_socket.put((addr, packet))
+async def emit(
+    mixnet: Mixnet,
+    topology: MixnetTopology,
+    redundancy: int,  # b in the spec
+    real_packet_queue: PacketQueue,
+    redundant_real_packet_queue: PacketQueue,
+    outbound_socket: PacketQueue,
+):
+    if not redundant_real_packet_queue.empty():
+        addr, packet = redundant_real_packet_queue.get_nowait()
+        await outbound_socket.put((addr, packet))
+        return
 
-            packet, route = PacketBuilder.drop_cover(
-                b"drop cover", self.mixnet, self.topology
-            ).next()
-            self.outbound_socket.put((route[0].addr, packet))
+    if not real_packet_queue.empty():
+        addr, packet = real_packet_queue.get_nowait()
+        # Schedule redundant real packets
+        for _ in range(redundancy - 1):
+            redundant_real_packet_queue.put_nowait((addr, packet))
+            await outbound_socket.put((addr, packet))
+
+    packet, route = PacketBuilder.drop_cover(b"drop cover", mixnet, topology).next()
+    await outbound_socket.put((route[0].addr, packet))
+
+
+async def emission_notifier(emission_rate_per_min: int, queue: asyncio.Queue):
+    while True:
+        await asyncio.sleep(poisson_interval_sec(emission_rate_per_min))
+        queue.put_nowait(None)
