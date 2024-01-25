@@ -143,7 +143,7 @@ class LedgerState:
     A snapshot of the ledger state up to some height
     """
 
-    height: int = None
+    block: Id = None
     nonce: bytes = None
     total_stake: int = None
 
@@ -216,8 +216,7 @@ class Leader:
         return r < MOCK_LEADER_VRF.ORDER * phi(f, relative_stake)
 
     def propose_block(self, slot: Slot, parent: BlockHeader) -> BlockHeader:
-        assert self.is_leader_at(slot)
-        return BlockHeader(parent=parent.id(), slot=slot, _id=Id(b"TODO"))
+        return BlockHeader(parent=parent.id(), slot=slot)
 
 
 if __name__ == "__main__":
