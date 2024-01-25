@@ -1,5 +1,4 @@
-from typing import Tuple
-from unittest import IsolatedAsyncioTestCase
+from unittest import TestCase
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
@@ -9,10 +8,8 @@ from mixnet.robustness import Robustness
 from mixnet.utils import random_bytes
 
 
-class TestMixnet(IsolatedAsyncioTestCase):
-    @staticmethod
-    def init() -> Tuple[Mixnet, Robustness]:
-        mixnet = Mixnet()
+class TestRobustness(TestCase):
+    def test_build_topology(self):
         robustness = Robustness(
             [
                 MixNode(
@@ -23,18 +20,14 @@ class TestMixnet(IsolatedAsyncioTestCase):
                 for _ in range(12)
             ],
             MixnetTopologySize(3, 3),
-            mixnet,
+            Mixnet(),
         )
-        robustness.set_entropy(b"entropy")
 
-        return (mixnet, robustness)
-
-    def test_topology_from_robustness(self):
-        mixnet, robustness = self.init()
-
-        topology1 = mixnet.topology
-
-        robustness.set_entropy(b"new entropy")
-        topology2 = mixnet.topology
-
-        self.assertNotEqual(topology1, topology2)
+        topology = robustness.build_topology(b"entropy")
+        self.assertEqual(
+            len(topology.layers), robustness.mixnet_topology_size.num_layers
+        )
+        for layer in topology.layers:
+            self.assertEqual(
+                len(layer), robustness.mixnet_topology_size.num_mixnodes_per_layer
+            )

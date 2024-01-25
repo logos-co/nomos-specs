@@ -1,22 +1,17 @@
 import asyncio
 from datetime import datetime
-from typing import Tuple
-from unittest import IsolatedAsyncioTestCase
 
 import numpy
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from pysphinx.sphinx import SphinxPacket
 
-from mixnet.bls import generate_bls
-from mixnet.mixnet import Mixnet, MixnetTopology
-from mixnet.node import MixNode, NodeAddress, PacketPayloadQueue, PacketQueue
+from mixnet.node import NodeAddress, PacketPayloadQueue, PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec, poisson_mean_interval_sec
+from mixnet.test_mixnet import TestMixnet
 from mixnet.test_utils import with_test_timeout
-from mixnet.utils import random_bytes
 
 
-class TestMixNodeRunner(IsolatedAsyncioTestCase):
+class TestMixNodeRunner(TestMixnet):
     @with_test_timeout(180)
     async def test_mixnode_runner_emission_rate(self):
         """
@@ -26,11 +21,11 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
         and if processing is delayed according to an exponential distribution with a rate `mu`,
         the rate of outputs should be `lambda`.
         """
-        mixnet, topology = self.init()
+        mixnet, _ = self.init()
         inbound_socket: PacketQueue = asyncio.Queue()
         outbound_socket: PacketPayloadQueue = asyncio.Queue()
 
-        packet, route = PacketBuilder.real(b"msg", mixnet, topology).next()
+        packet, route = PacketBuilder.real(b"msg", mixnet).next()
 
         delay_rate_per_min = 30  # mu (= 2s delay on average)
         # Start only the first mix node for testing
@@ -107,18 +102,3 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
             await asyncio.sleep(poisson_interval_sec(rate_per_min))
             await inbound_socket.put((node_addr, packet))
             await sent_packet_queue.put((node_addr, packet))
-
-    @staticmethod
-    def init() -> Tuple[Mixnet, MixnetTopology]:
-        mixnet = Mixnet(
-            [
-                MixNode(
-                    generate_bls(),
-                    X25519PrivateKey.generate(),
-                    random_bytes(32),
-                )
-                for _ in range(12)
-            ]
-        )
-        topology = mixnet.build_topology(b"entropy", 3, 3)
-        return mixnet, topology

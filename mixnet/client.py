@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from mixnet.mixnet import Mixnet, MixnetTopology
+from mixnet.mixnet import Mixnet
 from mixnet.node import PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec
@@ -10,7 +10,6 @@ from mixnet.poisson import poisson_interval_sec
 
 async def mixclient_emitter(
     mixnet: Mixnet,
-    topology: MixnetTopology,
     emission_rate_per_min: int,  # Poisson rate parameter: lambda in the spec
     redundancy: int,  # b in the spec
     real_packet_queue: PacketQueue,
@@ -38,7 +37,6 @@ async def mixclient_emitter(
         try:
             await emit(
                 mixnet,
-                topology,
                 redundancy,
                 real_packet_queue,
                 redundant_real_packet_queue,
@@ -51,7 +49,6 @@ async def mixclient_emitter(
 
 async def emit(
     mixnet: Mixnet,
-    topology: MixnetTopology,
     redundancy: int,  # b in the spec
     real_packet_queue: PacketQueue,
     redundant_real_packet_queue: PacketQueue,
@@ -69,7 +66,7 @@ async def emit(
             redundant_real_packet_queue.put_nowait((addr, packet))
             await outbound_socket.put((addr, packet))
 
-    packet, route = PacketBuilder.drop_cover(b"drop cover", mixnet, topology).next()
+    packet, route = PacketBuilder.drop_cover(b"drop cover", mixnet).next()
     await outbound_socket.put((route[0].addr, packet))
 
 

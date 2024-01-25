@@ -28,9 +28,9 @@ class PacketBuilder:
         flag: MessageFlag,
         message: bytes,
         mixnet: Mixnet,
-        topology: MixnetTopology,
     ):
-        destination = mixnet.choose_mixnode()
+        topology = mixnet.get_topology()
+        destination = topology.choose_mix_destionation()
 
         msg_with_flag = flag.bytes() + message
         # NOTE: We don't encrypt msg_with_flag for destination.
@@ -50,14 +50,12 @@ class PacketBuilder:
         self.iter = iter(packets_and_routes)
 
     @classmethod
-    def real(cls, message: bytes, mixnet: Mixnet, topology: MixnetTopology) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, mixnet, topology)
+    def real(cls, message: bytes, mixnet: Mixnet) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, mixnet)
 
     @classmethod
-    def drop_cover(
-        cls, message: bytes, mixnet: Mixnet, topology: MixnetTopology
-    ) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, mixnet, topology)
+    def drop_cover(cls, message: bytes, mixnet: Mixnet) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, mixnet)
 
     def next(self) -> Tuple[SphinxPacket, List[MixNode]]:
         return next(self.iter)

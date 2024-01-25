@@ -1,11 +1,7 @@
-from typing import List, Tuple
-from unittest import TestCase
+from typing import List
 
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
-from mixnet.bls import generate_bls
-from mixnet.mixnet import Mixnet, MixnetTopology
 from mixnet.node import MixNode
 from mixnet.packet import (
     Fragment,
@@ -13,15 +9,16 @@ from mixnet.packet import (
     MessageReconstructor,
     PacketBuilder,
 )
+from mixnet.test_mixnet import TestMixnet
 from mixnet.utils import random_bytes
 
 
-class TestPacket(TestCase):
+class TestPacket(TestMixnet):
     def test_real_packet(self):
-        mixnet, topology = self.init()
+        mixnet, _ = self.init()
 
         msg = random_bytes(3500)
-        builder = PacketBuilder.real(msg, mixnet, topology)
+        builder = PacketBuilder.real(msg, mixnet)
         packet0, route0 = builder.next()
         packet1, route1 = builder.next()
         packet2, route2 = builder.next()
@@ -49,7 +46,7 @@ class TestPacket(TestCase):
         mixnet, topology = self.init()
 
         msg = b"cover"
-        builder = PacketBuilder.drop_cover(msg, mixnet, topology)
+        builder = PacketBuilder.drop_cover(msg, mixnet)
         packet, route = builder.next()
         self.assertRaises(StopIteration, builder.next)
 
@@ -60,21 +57,6 @@ class TestPacket(TestCase):
             PacketBuilder.parse_msg_and_flag(msg_with_flag),
             (MessageFlag.MESSAGE_FLAG_DROP_COVER, msg),
         )
-
-    @staticmethod
-    def init() -> Tuple[Mixnet, MixnetTopology]:
-        mixnet = Mixnet(
-            [
-                MixNode(
-                    generate_bls(),
-                    X25519PrivateKey.generate(),
-                    random_bytes(32),
-                )
-                for _ in range(12)
-            ]
-        )
-        topology = mixnet.build_topology(b"entropy", 3, 3)
-        return mixnet, topology
 
     @staticmethod
     def process_packet(packet: SphinxPacket, route: List[MixNode]) -> Fragment:
