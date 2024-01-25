@@ -159,7 +159,7 @@ class EpochState:
     # The nonce snapshot is taken 7k/f slots into the previous epoch
     nonce_snapshot: LedgerState
 
-    def stake_distribution(self) -> int:
+    def total_stake(self) -> int:
         """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
         return self.stake_distribution_snapshot.total_stake
 
@@ -208,8 +208,7 @@ class Leader:
 
     def is_slot_leader(self, epoch: EpochState, slot: Slot) -> bool:
         f = self.config.active_slot_coeff
-        total_stake = epoch.stake_distribution()
-        relative_stake = self.coin.value / total_stake
+        relative_stake = self.coin.value / epoch.total_stake()
 
         r = MOCK_LEADER_VRF.vrf(self.coin.pk, epoch.nonce(), slot)
 
