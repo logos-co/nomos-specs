@@ -19,15 +19,14 @@ class Mixnet:
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
         self.topology = topology
-        self.establish_connections(topology)
+        self.establish_connections()
 
     def get_topology(self) -> MixnetTopology:
         if self.topology is None:
             raise RuntimeError("topology is not set yet")
         return self.topology
 
-    @staticmethod
-    def establish_connections(_: MixnetTopology) -> None:
+    def establish_connections(self) -> None:
         """
         Establish network connections in advance based on the topology received.
 
