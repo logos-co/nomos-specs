@@ -8,3 +8,4 @@ scipy==1.11.4
 setuptools==69.0.3
 timeout-decorator==0.5.0
 wheel==0.42.0
+black==23.12.1
