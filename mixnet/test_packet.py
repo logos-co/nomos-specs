@@ -43,7 +43,7 @@ class TestPacket(TestMixnet):
         )
 
     def test_cover_packet(self):
-        mixnet, topology = self.init()
+        mixnet, _ = self.init()
 
         msg = b"cover"
         builder = PacketBuilder.drop_cover(msg, mixnet)

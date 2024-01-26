@@ -7,26 +7,27 @@ from typing import List
 from mixnet.node import MixNode
 
 
-@dataclass
 class Mixnet:
-    topology: MixnetTopology | None = None
+    __topology: MixnetTopology | None = None
 
-    def set_topology(self, topology: MixnetTopology) -> None:
+    @property
+    def topology(self) -> MixnetTopology:
+        if self.__topology is None:
+            raise RuntimeError("topology is not set yet")
+        return self.__topology
+
+    @topology.setter
+    def topology(self, topology: MixnetTopology) -> None:
         """
         Replace the old topology with the new topology received, and start establishing new network connections in background.
 
         In real implementations, this method should be a long-running task, accepting topologies periodically.
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
-        self.topology = topology
-        self.establish_connections()
+        self.__topology = topology
+        self.__establish_connections()
 
-    def get_topology(self) -> MixnetTopology:
-        if self.topology is None:
-            raise RuntimeError("topology is not set yet")
-        return self.topology
-
-    def establish_connections(self) -> None:
+    def __establish_connections(self) -> None:
         """
         Establish network connections in advance based on the topology received.
 

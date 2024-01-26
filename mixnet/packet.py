@@ -9,7 +9,7 @@ from typing import Dict, Iterator, List, Self, Tuple, TypeAlias
 from pysphinx.payload import Payload
 from pysphinx.sphinx import SphinxPacket
 
-from mixnet.mixnet import Mixnet, MixnetTopology, MixNode
+from mixnet.mixnet import Mixnet, MixNode
 
 
 class MessageFlag(Enum):
@@ -29,7 +29,7 @@ class PacketBuilder:
         message: bytes,
         mixnet: Mixnet,
     ):
-        topology = mixnet.get_topology()
+        topology = mixnet.topology
         destination = topology.choose_mix_destionation()
 
         msg_with_flag = flag.bytes() + message
