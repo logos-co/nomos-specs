@@ -3,12 +3,8 @@ from __future__ import annotations
 from typing import List
 
 from mixnet.fisheryates import FisherYates
-from mixnet.mixnet import (
-    Mixnet,
-    MixnetTopology,
-    MixnetTopologySize,
-)
-from mixnet.node import MixNode
+from mixnet.mixnet import Mixnet
+from mixnet.topology import MixnetTopology, MixnetTopologySize, MixNodeInfo
 
 
 class Robustness:
@@ -27,7 +23,7 @@ class Robustness:
 
     def __init__(
         self,
-        mixnode_candidates: List[MixNode],
+        mixnode_candidates: List[MixNodeInfo],
         mixnet_topology_size: MixnetTopologySize,
         mixnet: Mixnet,
     ) -> None:
@@ -43,21 +39,26 @@ class Robustness:
         In real implementations, this method should be a long-running task, consuming entropy periodically.
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
-        topology = self.build_topology(entropy)
+        topology = self.build_topology(
+            self.mixnode_candidates, self.mixnet_topology_size, entropy
+        )
         self.mixnet.set_topology(topology)
 
-    def build_topology(self, entropy: bytes) -> MixnetTopology:
+    @staticmethod
+    def build_topology(
+        mixnode_candidates: List[MixNodeInfo],
+        mixnet_topology_size: MixnetTopologySize,
+        entropy: bytes,
+    ) -> MixnetTopology:
         """
         Build a new topology deterministically using an entropy and a given set of candidates.
         """
-        shuffled = FisherYates.shuffle(self.mixnode_candidates, entropy)
-        sampled = shuffled[: self.mixnet_topology_size.num_total_mixnodes()]
+        shuffled = FisherYates.shuffle(mixnode_candidates, entropy)
+        sampled = shuffled[: mixnet_topology_size.num_total_mixnodes()]
 
         layers = []
-        for layer_id in range(self.mixnet_topology_size.num_layers):
-            start = layer_id * self.mixnet_topology_size.num_mixnodes_per_layer
-            layer = sampled[
-                start : start + self.mixnet_topology_size.num_mixnodes_per_layer
-            ]
+        for layer_id in range(mixnet_topology_size.num_layers):
+            start = layer_id * mixnet_topology_size.num_mixnodes_per_layer
+            layer = sampled[start : start + mixnet_topology_size.num_mixnodes_per_layer]
             layers.append(layer)
         return MixnetTopology(layers)

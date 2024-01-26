@@ -1,19 +1,44 @@
 from __future__ import annotations
 
-import random
-from dataclasses import dataclass
-from typing import List
+import asyncio
+from typing import Self
 
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+)
+
+from mixnet.client import MixClient
 from mixnet.node import MixNode
+from mixnet.topology import MixnetTopology
 
 
 class Mixnet:
-    __topology: MixnetTopology | None = None
+    __mixclient: MixClient
+    __mixnode: MixNode
 
-    def get_topology(self) -> MixnetTopology:
-        if self.__topology is None:
-            raise RuntimeError("topology is not set yet")
-        return self.__topology
+    @classmethod
+    async def new(
+        cls,
+        initial_topology: MixnetTopology,
+        emission_rate_per_min: int,  # Poisson rate parameter: lambda
+        redundancy: int,
+        encryption_private_key: X25519PrivateKey,
+        delay_rate_per_min: int,  # Poisson rate parameter: mu
+    ) -> Self:
+        self = cls()
+        self.__mixclient = await MixClient.new(
+            initial_topology, emission_rate_per_min, redundancy
+        )
+        self.__mixnode = await MixNode.new(
+            initial_topology, encryption_private_key, delay_rate_per_min
+        )
+        return self
+
+    async def publish_message(self, msg: bytes) -> None:
+        await self.__mixclient.send_message(msg)
+
+    def subscribe_messages(self) -> "asyncio.Queue[bytes]":
+        return self.__mixclient.subscribe_messages()
 
     def set_topology(self, topology: MixnetTopology) -> None:
         """
@@ -22,39 +47,12 @@ class Mixnet:
         In real implementations, this method should be a long-running task, accepting topologies periodically.
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
-        self.__topology = topology
-        self.__establish_connections()
+        self.__mixclient.set_topology(topology)
+        self.__mixnode.set_topology(topology)
 
-    def __establish_connections(self) -> None:
-        """
-        Establish network connections in advance based on the topology received.
+    def get_topology(self) -> MixnetTopology:
+        return self.__mixclient.topology
 
-        This is just a preparation to forward subsequent packets as quickly as possible,
-        but this is not a strict requirement.
-
-        In real implementations, this should be a background task.
-        """
-        pass
-
-
-@dataclass
-class MixnetTopology:
-    # In production, this can be a 1-D array, which is accessible by indexes.
-    # Here, we use a 2-D array for readability.
-    layers: List[List[MixNode]]
-
-    def generate_route(self) -> list[MixNode]:
-        return [random.choice(layer) for layer in self.layers]
-
-    def choose_mix_destionation(self) -> MixNode:
-        all_mixnodes = [mixnode for layer in self.layers for mixnode in layer]
-        return random.choice(all_mixnodes)
-
-
-@dataclass
-class MixnetTopologySize:
-    num_layers: int
-    num_mixnodes_per_layer: int
-
-    def num_total_mixnodes(self) -> int:
-        return self.num_layers * self.num_mixnodes_per_layer
+    async def cancel(self) -> None:
+        await self.__mixclient.cancel()
+        await self.__mixnode.cancel()

@@ -9,7 +9,7 @@ from typing import Dict, Iterator, List, Self, Tuple, TypeAlias
 from pysphinx.payload import Payload
 from pysphinx.sphinx import SphinxPacket
 
-from mixnet.mixnet import Mixnet, MixNode
+from mixnet.topology import MixnetTopology, MixNodeInfo
 
 
 class MessageFlag(Enum):
@@ -21,15 +21,9 @@ class MessageFlag(Enum):
 
 
 class PacketBuilder:
-    iter: Iterator[Tuple[SphinxPacket, List[MixNode]]]
+    iter: Iterator[Tuple[SphinxPacket, List[MixNodeInfo]]]
 
-    def __init__(
-        self,
-        flag: MessageFlag,
-        message: bytes,
-        mixnet: Mixnet,
-    ):
-        topology = mixnet.get_topology()
+    def __init__(self, flag: MessageFlag, message: bytes, topology: MixnetTopology):
         destination = topology.choose_mix_destionation()
 
         msg_with_flag = flag.bytes() + message
@@ -50,14 +44,14 @@ class PacketBuilder:
         self.iter = iter(packets_and_routes)
 
     @classmethod
-    def real(cls, message: bytes, mixnet: Mixnet) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, mixnet)
+    def real(cls, message: bytes, topology: MixnetTopology) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, topology)
 
     @classmethod
-    def drop_cover(cls, message: bytes, mixnet: Mixnet) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, mixnet)
+    def drop_cover(cls, message: bytes, topology: MixnetTopology) -> Self:
+        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, topology)
 
-    def next(self) -> Tuple[SphinxPacket, List[MixNode]]:
+    def next(self) -> Tuple[SphinxPacket, List[MixNodeInfo]]:
         return next(self.iter)
 
     @staticmethod

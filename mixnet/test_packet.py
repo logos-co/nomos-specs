@@ -1,24 +1,24 @@
 from typing import List
+from unittest import TestCase
 
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
-from mixnet.node import MixNode
 from mixnet.packet import (
     Fragment,
     MessageFlag,
     MessageReconstructor,
     PacketBuilder,
 )
-from mixnet.test_mixnet import TestMixnet
+from mixnet.test_utils import initial_topology
+from mixnet.topology import MixNodeInfo
 from mixnet.utils import random_bytes
 
 
-class TestPacket(TestMixnet):
+class TestPacket(TestCase):
     def test_real_packet(self):
-        mixnet, _ = self.init()
-
+        topology = initial_topology()
         msg = random_bytes(3500)
-        builder = PacketBuilder.real(msg, mixnet)
+        builder = PacketBuilder.real(msg, topology)
         packet0, route0 = builder.next()
         packet1, route1 = builder.next()
         packet2, route2 = builder.next()
@@ -43,10 +43,9 @@ class TestPacket(TestMixnet):
         )
 
     def test_cover_packet(self):
-        mixnet, _ = self.init()
-
+        topology = initial_topology()
         msg = b"cover"
-        builder = PacketBuilder.drop_cover(msg, mixnet)
+        builder = PacketBuilder.drop_cover(msg, topology)
         packet, route = builder.next()
         self.assertRaises(StopIteration, builder.next)
 
@@ -59,7 +58,7 @@ class TestPacket(TestMixnet):
         )
 
     @staticmethod
-    def process_packet(packet: SphinxPacket, route: List[MixNode]) -> Fragment:
+    def process_packet(packet: SphinxPacket, route: List[MixNodeInfo]) -> Fragment:
         processed = packet.process(route[0].encryption_private_key)
         if isinstance(processed, ProcessedFinalHopPacket):
             return Fragment.from_bytes(processed.payload.recover_plain_playload())
