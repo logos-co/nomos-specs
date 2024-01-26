@@ -10,14 +10,12 @@ from mixnet.node import MixNode
 class Mixnet:
     __topology: MixnetTopology | None = None
 
-    @property
-    def topology(self) -> MixnetTopology:
+    def get_topology(self) -> MixnetTopology:
         if self.__topology is None:
             raise RuntimeError("topology is not set yet")
         return self.__topology
 
-    @topology.setter
-    def topology(self, topology: MixnetTopology) -> None:
+    def set_topology(self, topology: MixnetTopology) -> None:
         """
         Replace the old topology with the new topology received, and start establishing new network connections in background.
 

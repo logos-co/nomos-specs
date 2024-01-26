@@ -44,7 +44,7 @@ class Robustness:
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
         topology = self.build_topology(entropy)
-        self.mixnet.topology = topology
+        self.mixnet.set_topology(topology)
 
     def build_topology(self, entropy: bytes) -> MixnetTopology:
         """

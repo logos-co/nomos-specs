@@ -32,9 +32,9 @@ class TestMixnet(IsolatedAsyncioTestCase):
     def test_topology_from_robustness(self):
         mixnet, robustness = self.init()
 
-        topology1 = mixnet.topology
+        topology1 = mixnet.get_topology()
 
         robustness.set_entropy(b"new entropy")
-        topology2 = mixnet.topology
+        topology2 = mixnet.get_topology()
 
         self.assertNotEqual(topology1, topology2)

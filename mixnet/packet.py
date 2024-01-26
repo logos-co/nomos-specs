@@ -29,7 +29,7 @@ class PacketBuilder:
         message: bytes,
         mixnet: Mixnet,
     ):
-        topology = mixnet.topology
+        topology = mixnet.get_topology()
         destination = topology.choose_mix_destionation()
 
         msg_with_flag = flag.bytes() + message
