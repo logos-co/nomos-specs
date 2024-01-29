@@ -4,14 +4,14 @@ import asyncio
 from contextlib import suppress
 from typing import Self
 
+from mixnet.config import MixnetConfig
 from mixnet.node import PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec
-from mixnet.topology import MixnetTopology
 
 
 class MixClient:
-    __topology: MixnetTopology
+    __config: MixnetConfig
 
     __real_packet_queue: PacketQueue
     __outbound_socket: PacketQueue
@@ -20,28 +20,29 @@ class MixClient:
     @classmethod
     async def new(
         cls,
-        initial_topology: MixnetTopology,
-        emission_rate_per_min: int,  # Poisson rate parameter: lambda in the spec
-        redundancy: int,  # b in the spec
+        config: MixnetConfig,
     ) -> Self:
         self = cls()
-        self.__topology = initial_topology
+        self.__config = config
         self.__real_packet_queue = asyncio.Queue()
         self.__outbound_socket = asyncio.Queue()
-        self.__task = asyncio.create_task(self.__run(emission_rate_per_min, redundancy))
+        self.__task = asyncio.create_task(self.__run())
         return self
 
-    def set_topology(self, topology: MixnetTopology) -> None:
+    def set_config(self, config: MixnetConfig) -> None:
         """
-        Replace the old topology with the new topology received
+        Replace the old config with the new config received
 
         In real implementations, this method may be integrated in a long-running task.
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
-        self.__topology = topology
+        self.__config = config
+
+    def get_config(self) -> MixnetConfig:
+        return self.__config
 
     async def send_message(self, msg: bytes) -> None:
-        builder = PacketBuilder.real(msg, self.__topology)
+        builder = PacketBuilder.real(msg, self.__config.topology)
         for packet, route in builder.iter:
             await self.__real_packet_queue.put((route[0].addr, packet))
 
@@ -52,18 +53,10 @@ class MixClient:
         return asyncio.Queue()
 
     @property
-    def topology(self) -> MixnetTopology:
-        return self.__topology
-
-    @property
     def outbound_socket(self) -> PacketQueue:
         return self.__outbound_socket
 
-    async def __run(
-        self,
-        emission_rate_per_min: int,  # Poisson rate parameter: lambda in the spec
-        redundancy: int,  # b in the spec
-    ):
+    async def __run(self):
         """
         Emit packets at the Poisson emission_rate_per_min.
 
@@ -77,14 +70,16 @@ class MixClient:
 
         emission_notifier_queue = asyncio.Queue()
         _ = asyncio.create_task(
-            self.__emission_notifier(emission_rate_per_min, emission_notifier_queue)
+            self.__emission_notifier(
+                self.__config.emission_rate_per_min, emission_notifier_queue
+            )
         )
 
         while True:
             # Wait until the next emission time
             _ = await emission_notifier_queue.get()
             try:
-                await self.__emit(redundancy, redundant_real_packet_queue)
+                await self.__emit(self.__config.redundancy, redundant_real_packet_queue)
             finally:
                 # Python convention: indicate that the previously enqueued task has been processed
                 emission_notifier_queue.task_done()
@@ -106,7 +101,9 @@ class MixClient:
                 redundant_real_packet_queue.put_nowait((addr, packet))
                 await self.__outbound_socket.put((addr, packet))
 
-        packet, route = PacketBuilder.drop_cover(b"drop cover", self.__topology).next()
+        packet, route = PacketBuilder.drop_cover(
+            b"drop cover", self.__config.topology
+        ).next()
         await self.__outbound_socket.put((route[0].addr, packet))
 
     async def __emission_notifier(

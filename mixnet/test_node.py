@@ -8,7 +8,10 @@ from pysphinx.sphinx import SphinxPacket
 from mixnet.node import MixNode, NodeAddress, PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec, poisson_mean_interval_sec
-from mixnet.test_utils import initial_topology, with_test_timeout
+from mixnet.test_utils import (
+    init_robustness_mixnet_config,
+    with_test_timeout,
+)
 
 
 class TestMixNodeRunner(IsolatedAsyncioTestCase):
@@ -21,19 +24,17 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
         and if processing is delayed according to an exponential distribution with a rate `mu`,
         the rate of outputs should be `lambda`.
         """
-        topology = initial_topology()
+        config = init_robustness_mixnet_config().mixnet_layer_config
+        config.emission_rate_per_min = 120  # lambda (= 2msg/sec)
+        config.delay_rate_per_min = 30  # mu (= 2s delay on average)
 
-        packet, route = PacketBuilder.real(b"msg", topology).next()
+        packet, route = PacketBuilder.real(b"msg", config.topology).next()
 
-        delay_rate_per_min = 30  # mu (= 2s delay on average)
         # Start only the first mix node for testing
-        mixnode = await MixNode.new(
-            topology, route[0].encryption_private_key, delay_rate_per_min
-        )
+        mixnode = await MixNode.new(route[0].encryption_private_key, config)
         try:
             # Send packets to the first mix node in a Poisson distribution
             packet_count = 100
-            emission_rate_per_min = 120  # lambda (= 2msg/sec)
             # This queue is just for counting how many packets have been sent so far.
             sent_packet_queue: PacketQueue = asyncio.Queue()
             sender_task = asyncio.create_task(
@@ -42,7 +43,7 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
                     packet,
                     route[0].addr,
                     packet_count,
-                    emission_rate_per_min,
+                    config.emission_rate_per_min,
                     sent_packet_queue,
                 )
             )
@@ -76,14 +77,14 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
                 # a mean interval between outputs must be `1/lambda`.
                 self.assertAlmostEqual(
                     float(numpy.mean(intervals)),
-                    poisson_mean_interval_sec(emission_rate_per_min),
+                    poisson_mean_interval_sec(config.emission_rate_per_min),
                     delta=1.0,
                 )
                 # If runner is a M/M/inf queue,
                 # a mean number of jobs being processed/scheduled in the runner must be `lambda/mu`.
                 self.assertAlmostEqual(
                     float(numpy.mean(num_jobs)),
-                    round(emission_rate_per_min / delay_rate_per_min),
+                    round(config.emission_rate_per_min / config.delay_rate_per_min),
                     delta=1.5,
                 )
             finally:

@@ -3,20 +3,20 @@ from unittest import TestCase
 
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
+from mixnet.config import MixNodeInfo
 from mixnet.packet import (
     Fragment,
     MessageFlag,
     MessageReconstructor,
     PacketBuilder,
 )
-from mixnet.test_utils import initial_topology
-from mixnet.topology import MixNodeInfo
+from mixnet.test_utils import init_robustness_mixnet_config
 from mixnet.utils import random_bytes
 
 
 class TestPacket(TestCase):
     def test_real_packet(self):
-        topology = initial_topology()
+        topology = init_robustness_mixnet_config().mixnet_layer_config.topology
         msg = random_bytes(3500)
         builder = PacketBuilder.real(msg, topology)
         packet0, route0 = builder.next()
@@ -43,7 +43,7 @@ class TestPacket(TestCase):
         )
 
     def test_cover_packet(self):
-        topology = initial_topology()
+        topology = init_robustness_mixnet_config().mixnet_layer_config.topology
         msg = b"cover"
         builder = PacketBuilder.drop_cover(msg, topology)
         packet, route = builder.next()

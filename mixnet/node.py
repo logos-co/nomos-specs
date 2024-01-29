@@ -15,8 +15,8 @@ from pysphinx.sphinx import (
     UnknownHeaderTypeError,
 )
 
+from mixnet.config import MixnetConfig, NodeAddress
 from mixnet.poisson import poisson_interval_sec
-from mixnet.topology import MixnetTopology, NodeAddress
 
 PacketQueue: TypeAlias = "asyncio.Queue[Tuple[NodeAddress, SphinxPacket]]"
 PacketPayloadQueue: TypeAlias = (
@@ -32,7 +32,7 @@ class MixNode:
     in order to define the MixNode as a simple dataclass for clarity.
     """
 
-    __topology: MixnetTopology
+    __config: MixnetConfig
 
     inbound_socket: PacketQueue
     outbound_socket: PacketPayloadQueue
@@ -41,23 +41,20 @@ class MixNode:
     @classmethod
     async def new(
         cls,
-        initial_topology: MixnetTopology,
         encryption_private_key: X25519PrivateKey,
-        delay_rate_per_min: int,  # Poisson rate parameter: mu
+        config: MixnetConfig,
     ) -> Self:
         self = cls()
-        self.set_topology(initial_topology)
+        self.__config = config
+        self.__establish_connections()
         self.inbound_socket = asyncio.Queue()
         self.outbound_socket = asyncio.Queue()
-        self.__task = asyncio.create_task(
-            self.__run(encryption_private_key, delay_rate_per_min)
-        )
+        self.__task = asyncio.create_task(self.__run(encryption_private_key))
         return self
 
     async def __run(
         self,
         encryption_private_key: X25519PrivateKey,
-        delay_rate_per_min: int,  # Poisson rate parameter: mu
     ):
         """
         Read SphinxPackets from inbound socket and spawn a thread for each packet to process it.
@@ -73,7 +70,7 @@ class MixNode:
             _, packet = await self.inbound_socket.get()
             task = asyncio.create_task(
                 self.__process_packet(
-                    packet, encryption_private_key, delay_rate_per_min
+                    packet, encryption_private_key, self.__config.delay_rate_per_min
                 )
             )
             self.tasks.add(task)
@@ -108,15 +105,17 @@ class MixNode:
             case _:
                 raise UnknownHeaderTypeError
 
-    def set_topology(self, topology: MixnetTopology) -> None:
+    def set_config(self, config: MixnetConfig) -> None:
         """
-        Replace the old topology with the new topology received, and start establishing new network connections in background.
+        Replace the old config with the new config received.
+        If topology has been changed, start establishing new network connections in background.
 
         In real implementations, this method may be integrated in a long-running task.
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
-        self.__topology = topology
-        self.__establish_connections()
+        if self.__config.topology != config.topology:
+            self.__establish_connections()
+        self.__config = config
 
     def __establish_connections(self) -> None:
         """

@@ -14,6 +14,14 @@ from mixnet.bls import BlsPrivateKey, BlsPublicKey
 
 
 @dataclass
+class MixnetConfig:
+    emission_rate_per_min: int  # Poisson rate parameter: lambda
+    redundancy: int
+    delay_rate_per_min: int  # Poisson rate parameter: mu
+    topology: MixnetTopology
+
+
+@dataclass
 class MixnetTopology:
     # In production, this can be a 1-D array, which is accessible by indexes.
     # Here, we use a 2-D array for readability.
@@ -25,15 +33,6 @@ class MixnetTopology:
     def choose_mix_destionation(self) -> MixNodeInfo:
         all_mixnodes = [mixnode for layer in self.layers for mixnode in layer]
         return random.choice(all_mixnodes)
-
-
-@dataclass
-class MixnetTopologySize:
-    num_layers: int
-    num_mixnodes_per_layer: int
-
-    def num_total_mixnodes(self) -> int:
-        return self.num_layers * self.num_mixnodes_per_layer
 
 
 # 32-byte that represents an IP address and a port of a mix node.
