@@ -1,5 +1,6 @@
 ; VERSION 0.1
-
+; ------------ BLOCK ----------------------
+BLOCK            = HEADER CONTENT
 ; ------------ HEADER ---------------------
 VERSION          = %x01
 HEADER           = VERSION HEADER-UNSIGNED
