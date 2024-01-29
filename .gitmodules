@@ -1,4 +1,4 @@
 [submodule "consensus-specs"]
-	path = consensus-specs
+	path = eth-specs
 	url = git@github.com:ethereum/consensus-specs.git
 	branch = dev
