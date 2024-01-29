@@ -46,13 +46,8 @@ class Config:
 class BlockHeader:
     slot: Slot
     parent: Id
-
-    def parent(self) -> Id:
-        return self.parent
-
-    def id(self) -> Id:
-        # TODO: spec out the block id
-        raise NotImplemented()
+    # TODO: spec out the block id, this is just a placeholder to unblock tests
+    id: Id
 
 
 @dataclass
@@ -124,8 +119,9 @@ class Follower:
         # in that case, just ignore the block
 
     # Evaluate the fork choice rule and return the block header of the block that should be the head of the chain
-    def fork_choice(local_chain: Chain, forks: List[Chain]) -> BlockHeader:
-        pass
+    def fork_choice(local_chain: Chain, forks: List[Chain]) -> Chain:
+        # TODO: define k and s
+        return maxvalid_bg(local_chain, forks, 0, 0)
 
     def tip(self) -> BlockHeader:
         return self.fork_choice()
@@ -216,6 +212,49 @@ class Leader:
 
     def propose_block(self, slot: Slot, parent: BlockHeader) -> BlockHeader:
         return BlockHeader(parent=parent.id(), slot=slot)
+
+
+def common_prefix_len(a: Chain, b: Chain) -> int:
+    for i, (x, y) in enumerate(zip(a.blocks, b.blocks)):
+        if x.id != y.id:
+            return i
+    return min(len(a.blocks), len(b.blocks))
+
+
+def chain_density(chain: Chain, slot: Slot) -> int:
+    return len(
+        [
+            block
+            for block in chain.blocks
+            if block.slot.absolute_slot < slot.absolute_slot
+        ]
+    )
+
+
+# Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
+# k defines the forking depth of chain we accept without more analysis
+# s defines the length of time after the fork happened we will inspect for chain density
+def maxvalid_bg(local_chain: Chain, forks: List[Chain], k: int, s: int) -> Chain:
+    cmax = local_chain
+    for chain in forks:
+        lowest_common_ancestor = common_prefix_len(cmax, chain)
+        m = cmax.length() - lowest_common_ancestor
+        if m <= k:
+            # Classic longest chain rule with parameter k
+            if cmax.length() < chain.length():
+                cmax = chain
+        else:
+            # The chain is forking too much, we need to pay a bit more attention
+            # In particular, select the chain that is the densest after the fork
+            forking_slot = Slot(
+                cmax.blocks[lowest_common_ancestor].slot.absolute_slot + s
+            )
+            cmax_density = chain_density(cmax, forking_slot)
+            candidate_density = chain_density(chain, forking_slot)
+            if cmax_density < candidate_density:
+                cmax = chain
+
+    return cmax
 
 
 if __name__ == "__main__":
