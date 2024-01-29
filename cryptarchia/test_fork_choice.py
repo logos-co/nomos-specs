@@ -4,7 +4,7 @@ import numpy as np
 import hashlib
 
 from copy import deepcopy
-from cryptarchia import maxvalid_bg, Chain, BlockHeader, Slot, Id
+from cryptarchia.cryptarchia import maxvalid_bg, Chain, BlockHeader, Slot, Id
 
 
 def make_block(parent_id: Id, slot: Slot, block_id: Id) -> BlockHeader:
