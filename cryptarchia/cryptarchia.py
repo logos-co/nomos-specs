@@ -46,13 +46,8 @@ class Config:
 class BlockHeader:
     slot: Slot
     parent: Id
-
-    def parent(self) -> Id:
-        return self.parent
-
-    def id(self) -> Id:
-        # TODO: spec out the block id
-        raise NotImplemented()
+    # TODO: spec out the block id, this is just a placeholder to unblock tests
+    id: Id
 
 
 @dataclass
@@ -221,13 +216,19 @@ class Leader:
 
 def common_prefix_len(a: Chain, b: Chain) -> int:
     for i, (x, y) in enumerate(zip(a.blocks, b.blocks)):
-        if x.id() != y.id():
+        if x.id != y.id:
             return i
     return min(len(a.blocks), len(b.blocks))
 
 
 def chain_density(chain: Chain, slot: Slot) -> int:
-    return count(block for block in chain.blocks if block.slot < slot)
+    return len(
+        [
+            block
+            for block in chain.blocks
+            if block.slot.absolute_slot < slot.absolute_slot
+        ]
+    )
 
 
 # Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
@@ -245,10 +246,12 @@ def maxvalid_bg(local_chain: Chain, forks: List[Chain], k: int, s: int) -> Chain
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
-            forking_slot = cmax.blocks[lowest_common_ancestor].slot
-            cmax_density = chain_density(cmax, forking_slot + s)
-            chain_density = chain_density(chain, forking_slot + s)
-            if cmax_density < chain_density:
+            forking_slot = Slot(
+                cmax.blocks[lowest_common_ancestor].slot.absolute_slot + s
+            )
+            cmax_density = chain_density(cmax, forking_slot)
+            candidate_density = chain_density(chain, forking_slot)
+            if cmax_density < candidate_density:
                 cmax = chain
 
     return cmax
