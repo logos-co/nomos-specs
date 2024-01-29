@@ -125,7 +125,8 @@ class Follower:
 
     # Evaluate the fork choice rule and return the block header of the block that should be the head of the chain
     def fork_choice(local_chain: Chain, forks: List[Chain]) -> Chain:
-        return maxvalid_bg(local_chain, forks)
+        # TODO: define k and s
+        return maxvalid_bg(local_chain, forks, 0, 0)
 
     def tip(self) -> BlockHeader:
         return self.fork_choice()
@@ -228,6 +229,10 @@ def common_prefix_len(a: Chain, b: Chain) -> int:
 def chain_density(chain: Chain, slot: Slot) -> int:
     return count(block for block in chain.blocks if block.slot < slot)
 
+
+# Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
+# k defines the forking depth of chain we accept without more analysis
+# s defines the length of time after the fork happened we will inspect for chain density
 def maxvalid_bg(local_chain: Chain, forks: List[Chain], k: int, s: int) -> Chain:
     cmax = local_chain
     for chain in forks:
@@ -247,6 +252,7 @@ def maxvalid_bg(local_chain: Chain, forks: List[Chain], k: int, s: int) -> Chain
                 cmax = chain
 
     return cmax
+
 
 if __name__ == "__main__":
     pass
