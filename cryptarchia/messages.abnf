@@ -7,9 +7,8 @@ HEADER           = VERSION HEADER-UNSIGNED
 HEADER-UNSIGNED  = %x00 HEADER-COMMON
 HEADER-COMMON    = CONTENT-SIZE CONTENT-ID BLOCK-DATE PARENT-ID
 CONTENT-SIZE     = U32
-BLOCK-DATE       = BLOCK-EPOCH BLOCK-SLOT
-BLOCK-EPOCH      = U32
-BLOCK-SLOT       = U32
+BLOCK-DATE       = BLOCK-SLOT
+BLOCK-SLOT       = U64
 PARENT-ID        = HEADER-ID
 
 ; ------------ CONTENT --------------------
@@ -17,5 +16,6 @@ CONTENT          = *OCTET
 
 ; ------------- MISC ----------------------
 U32              = 4OCTET  ; unsigned integer 32 bit (BE)
+U64              = 8OCTET  ; unsigned integer 32 bit (BE)
 HEADER-ID        = 32OCTET
 CONTENT-ID       = 32OCTET
