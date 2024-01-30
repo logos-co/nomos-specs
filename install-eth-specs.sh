@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
-pip install -r ./eth-specs/requirements_preinstallation.txt
-python ./eth-specs/setup.py sdist bdist_wheel
-pip install ./eth-specs/dist/*.whl
+cd ./eth-specs
+pip install -r requirements_preinstallation.txt
+python setup.py sdist bdist_wheel
+pip install dist/*.whl
