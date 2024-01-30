@@ -29,7 +29,7 @@ class Slot:
     absolute_slot: int
 
     def from_unix_timestamp_s(config: TimeConfig, timestamp_s: int) -> "Slot":
-        absolute_slot = timestamp_s // config.slot_duration
+        absolute_slot = (timestamp_s - config.chain_start_time) // config.slot_duration
         return Slot(absolute_slot)
 
     def epoch(self, config: TimeConfig) -> Epoch:
@@ -233,7 +233,7 @@ def chain_density(chain: Chain, slot: Slot) -> int:
 
 # Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
 # k defines the forking depth of chain we accept without more analysis
-# s defines the length of time after the fork happened we will inspect for chain density
+# s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
 def maxvalid_bg(local_chain: Chain, forks: List[Chain], k: int, s: int) -> Chain:
     cmax = local_chain
     for chain in forks:
