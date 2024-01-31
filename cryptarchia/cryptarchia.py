@@ -56,20 +56,21 @@ class BlockHeader:
     # The following code is to be considered as a reference implementation, mostly to be used for testing.
     def id(self) -> Id:
         # version byte
-        bytes = bytearray(b"\x01")
+        h = blake2b(digest_size=32)
+        h.update(b"\x01")
         # header type
-        bytes += b"\x00"
+        h.update(b"\x00")
         # content size
-        bytes += int.to_bytes(self.content_size, length=4, byteorder="big")
+        h.update(int.to_bytes(self.content_size, length=4, byteorder="big"))
         # content id
         assert len(self.content_id) == 32
-        bytes += self.content_id
+        h.update(self.content_id)
         # slot
-        bytes += int.to_bytes(self.slot.absolute_slot, length=8, byteorder="big")
+        h.update(int.to_bytes(self.slot.absolute_slot, length=8, byteorder="big"))
         # parent
-        assert len(self.content_id) == 32
-        bytes += self.parent
-        return blake2b(bytes, digest_size=32).digest()
+        assert len(self.parent) == 32
+        h.update(self.parent)
+        return h.digest()
 
 
 @dataclass
