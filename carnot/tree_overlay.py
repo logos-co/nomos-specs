@@ -8,7 +8,7 @@ import random
 
 def blake2b_hash(committee: Committee) -> bytes:
     hasher = blake2b(digest_size=32)
-    for member in committee:
+    for member in sorted(committee):
         hasher.update(member)
     return hasher.digest()
 
