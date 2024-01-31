@@ -4,14 +4,14 @@ import asyncio
 from contextlib import suppress
 from typing import Self
 
-from mixnet.config import MixnetConfig
+from mixnet.config import MixClientConfig, MixnetTopology
 from mixnet.node import PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec
 
 
 class MixClient:
-    __config: MixnetConfig
+    __config: MixClientConfig
 
     __real_packet_queue: PacketQueue
     __outbound_socket: PacketQueue
@@ -20,7 +20,7 @@ class MixClient:
     @classmethod
     async def new(
         cls,
-        config: MixnetConfig,
+        config: MixClientConfig,
     ) -> Self:
         self = cls()
         self.__config = config
@@ -29,17 +29,18 @@ class MixClient:
         self.__task = asyncio.create_task(self.__run())
         return self
 
-    def set_config(self, config: MixnetConfig) -> None:
+    def set_topology(self, topology: MixnetTopology) -> None:
         """
-        Replace the old config with the new config received
+        Replace the old topology with the new topology received
 
         In real implementations, this method may be integrated in a long-running task.
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
-        self.__config = config
+        self.__config.topology = topology
 
-    def get_config(self) -> MixnetConfig:
-        return self.__config
+    # Only for testing
+    def get_topology(self) -> MixnetTopology:
+        return self.__config.topology
 
     async def send_message(self, msg: bytes) -> None:
         packets_and_routes = PacketBuilder.build_real_packets(

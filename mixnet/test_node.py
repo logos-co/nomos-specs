@@ -9,7 +9,7 @@ from mixnet.node import MixNode, NodeAddress, PacketQueue
 from mixnet.packet import PacketBuilder
 from mixnet.poisson import poisson_interval_sec, poisson_mean_interval_sec
 from mixnet.test_utils import (
-    init_robustness_mixnet_config,
+    init_mixnet_config,
     with_test_timeout,
 )
 
@@ -24,14 +24,17 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
         and if processing is delayed according to an exponential distribution with a rate `mu`,
         the rate of outputs should be `lambda`.
         """
-        config = init_robustness_mixnet_config().mixnet_layer_config
-        config.emission_rate_per_min = 120  # lambda (= 2msg/sec)
-        config.delay_rate_per_min = 30  # mu (= 2s delay on average)
+        config = init_mixnet_config()
+        config.mixclient_config.emission_rate_per_min = 120  # lambda (= 2msg/sec)
+        config.mixnode_config.delay_rate_per_min = 30  # mu (= 2s delay on average)
 
-        packet, route = PacketBuilder.build_real_packets(b"msg", config.topology)[0]
+        packet, route = PacketBuilder.build_real_packets(
+            b"msg", config.mixclient_config.topology
+        )[0]
 
         # Start only the first mix node for testing
-        mixnode = await MixNode.new(route[0].encryption_private_key, config)
+        config.mixnode_config.encryption_private_key = route[0].encryption_private_key
+        mixnode = await MixNode.new(config.mixnode_config)
         try:
             # Send packets to the first mix node in a Poisson distribution
             packet_count = 100
@@ -43,7 +46,7 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
                     packet,
                     route[0].addr,
                     packet_count,
-                    config.emission_rate_per_min,
+                    config.mixclient_config.emission_rate_per_min,
                     sent_packet_queue,
                 )
             )
@@ -77,14 +80,19 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
                 # a mean interval between outputs must be `1/lambda`.
                 self.assertAlmostEqual(
                     float(numpy.mean(intervals)),
-                    poisson_mean_interval_sec(config.emission_rate_per_min),
+                    poisson_mean_interval_sec(
+                        config.mixclient_config.emission_rate_per_min
+                    ),
                     delta=1.0,
                 )
                 # If runner is a M/M/inf queue,
                 # a mean number of jobs being processed/scheduled in the runner must be `lambda/mu`.
                 self.assertAlmostEqual(
                     float(numpy.mean(num_jobs)),
-                    round(config.emission_rate_per_min / config.delay_rate_per_min),
+                    round(
+                        config.mixclient_config.emission_rate_per_min
+                        / config.mixnode_config.delay_rate_per_min
+                    ),
                     delta=1.5,
                 )
             finally:

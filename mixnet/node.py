@@ -15,7 +15,7 @@ from pysphinx.sphinx import (
     UnknownHeaderTypeError,
 )
 
-from mixnet.config import MixnetConfig, NodeAddress
+from mixnet.config import MixNodeConfig, NodeAddress
 from mixnet.poisson import poisson_interval_sec
 
 PacketQueue: TypeAlias = "asyncio.Queue[Tuple[NodeAddress, SphinxPacket]]"
@@ -32,7 +32,7 @@ class MixNode:
     in order to define the MixNode as a simple dataclass for clarity.
     """
 
-    __config: MixnetConfig
+    __config: MixNodeConfig
 
     inbound_socket: PacketQueue
     outbound_socket: PacketPayloadQueue
@@ -41,21 +41,16 @@ class MixNode:
     @classmethod
     async def new(
         cls,
-        encryption_private_key: X25519PrivateKey,
-        config: MixnetConfig,
+        config: MixNodeConfig,
     ) -> Self:
         self = cls()
         self.__config = config
-        self.__establish_connections()
         self.inbound_socket = asyncio.Queue()
         self.outbound_socket = asyncio.Queue()
-        self.__task = asyncio.create_task(self.__run(encryption_private_key))
+        self.__task = asyncio.create_task(self.__run())
         return self
 
-    async def __run(
-        self,
-        encryption_private_key: X25519PrivateKey,
-    ):
+    async def __run(self):
         """
         Read SphinxPackets from inbound socket and spawn a thread for each packet to process it.
 
@@ -70,7 +65,9 @@ class MixNode:
             _, packet = await self.inbound_socket.get()
             task = asyncio.create_task(
                 self.__process_packet(
-                    packet, encryption_private_key, self.__config.delay_rate_per_min
+                    packet,
+                    self.__config.encryption_private_key,
+                    self.__config.delay_rate_per_min,
                 )
             )
             self.tasks.add(task)
@@ -104,29 +101,6 @@ class MixNode:
                 )
             case _:
                 raise UnknownHeaderTypeError
-
-    def set_config(self, config: MixnetConfig) -> None:
-        """
-        Replace the old config with the new config received.
-        If topology has been changed, start establishing new network connections in background.
-
-        In real implementations, this method may be integrated in a long-running task.
-        Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
-        """
-        if self.__config.topology != config.topology:
-            self.__establish_connections()
-        self.__config = config
-
-    def __establish_connections(self) -> None:
-        """
-        Establish network connections in advance based on the topology received.
-
-        This is just a preparation to forward subsequent packets as quickly as possible,
-        but this is not a strict requirement.
-
-        In real implementations, this should be a background task.
-        """
-        pass
 
     async def cancel(self) -> None:
         self.__task.cancel()
