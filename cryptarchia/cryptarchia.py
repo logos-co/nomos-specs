@@ -1,5 +1,5 @@
 from typing import TypeAlias, List, Optional
-from hashlib import sha256
+from hashlib import sha256, blake2b
 
 # Please note this is still a work in progress
 from dataclasses import dataclass
@@ -46,8 +46,31 @@ class Config:
 class BlockHeader:
     slot: Slot
     parent: Id
-    # TODO: spec out the block id, this is just a placeholder to unblock tests
-    id: Id
+    content_size: int
+    content_id: Id
+
+    # **Attention**:
+    # The ID of a block header is defined as the 32byte blake2b hash of its fields
+    # as serialized in the format specified by the 'HEADER' rule in 'messages.abnf'.
+    #
+    # The following code is to be considered as a reference implementation, mostly to be used for testing.
+    def id(self) -> Id:
+        # version byte
+        h = blake2b(digest_size=32)
+        h.update(b"\x01")
+        # header type
+        h.update(b"\x00")
+        # content size
+        h.update(int.to_bytes(self.content_size, length=4, byteorder="big"))
+        # content id
+        assert len(self.content_id) == 32
+        h.update(self.content_id)
+        # slot
+        h.update(int.to_bytes(self.slot.absolute_slot, length=8, byteorder="big"))
+        # parent
+        assert len(self.parent) == 32
+        h.update(self.parent)
+        return h.digest()
 
 
 @dataclass
@@ -216,7 +239,7 @@ class Leader:
 
 def common_prefix_len(a: Chain, b: Chain) -> int:
     for i, (x, y) in enumerate(zip(a.blocks, b.blocks)):
-        if x.id != y.id:
+        if x.id() != y.id():
             return i
     return min(len(a.blocks), len(b.blocks))
 
