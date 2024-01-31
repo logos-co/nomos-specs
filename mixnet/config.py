@@ -27,12 +27,22 @@ class MixnetTopology:
     # Here, we use a 2-D array for readability.
     layers: List[List[MixNodeInfo]]
 
-    def generate_route(self) -> list[MixNodeInfo]:
-        return [random.choice(layer) for layer in self.layers]
+    def generate_route(self, mix_destination: MixNodeInfo) -> list[MixNodeInfo]:
+        """
+        Generate a mix route for a Sphinx packet.
+        The pre-selected mix_destination is used as a last mix node in the route,
+        so that associated packets can be merged together into a original message.
+        """
+        route = [random.choice(layer) for layer in self.layers[:-1]]
+        route.append(mix_destination)
+        return route
 
-    def choose_mix_destionation(self) -> MixNodeInfo:
-        all_mixnodes = [mixnode for layer in self.layers for mixnode in layer]
-        return random.choice(all_mixnodes)
+    def choose_mix_destination(self) -> MixNodeInfo:
+        """
+        Choose a mix node from the last mix layer as a mix destination
+        that will reconstruct a message from Sphinx packets.
+        """
+        return random.choice(self.layers[-1])
 
 
 # 32-byte that represents an IP address and a port of a mix node.

@@ -24,7 +24,7 @@ class PacketBuilder:
     iter: Iterator[Tuple[SphinxPacket, List[MixNodeInfo]]]
 
     def __init__(self, flag: MessageFlag, message: bytes, topology: MixnetTopology):
-        destination = topology.choose_mix_destionation()
+        destination = topology.choose_mix_destination()
 
         msg_with_flag = flag.bytes() + message
         # NOTE: We don't encrypt msg_with_flag for destination.
@@ -33,7 +33,7 @@ class PacketBuilder:
 
         packets_and_routes = []
         for fragment in fragment_set.fragments:
-            route = topology.generate_route()
+            route = topology.generate_route(destination)
             packet = SphinxPacket.build(
                 fragment.bytes(),
                 [mixnode.sphinx_node() for mixnode in route],
