@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from itertools import batched
-from typing import Dict, Iterator, List, Self, Tuple, TypeAlias
+from typing import Dict, List, Self, Tuple, TypeAlias
 
 from pysphinx.payload import Payload
 from pysphinx.sphinx import SphinxPacket
@@ -21,9 +21,26 @@ class MessageFlag(Enum):
 
 
 class PacketBuilder:
-    iter: Iterator[Tuple[SphinxPacket, List[MixNodeInfo]]]
+    @staticmethod
+    def build_real_packets(
+        message: bytes, topology: MixnetTopology
+    ) -> List[Tuple[SphinxPacket, List[MixNodeInfo]]]:
+        return PacketBuilder.__build_packets(
+            MessageFlag.MESSAGE_FLAG_REAL, message, topology
+        )
 
-    def __init__(self, flag: MessageFlag, message: bytes, topology: MixnetTopology):
+    @staticmethod
+    def build_drop_cover_packets(
+        message: bytes, topology: MixnetTopology
+    ) -> List[Tuple[SphinxPacket, List[MixNodeInfo]]]:
+        return PacketBuilder.__build_packets(
+            MessageFlag.MESSAGE_FLAG_DROP_COVER, message, topology
+        )
+
+    @staticmethod
+    def __build_packets(
+        flag: MessageFlag, message: bytes, topology: MixnetTopology
+    ) -> List[Tuple[SphinxPacket, List[MixNodeInfo]]]:
         destination = topology.choose_mix_destination()
 
         msg_with_flag = flag.bytes() + message
@@ -31,7 +48,7 @@ class PacketBuilder:
         # If encryption is needed, a shared secret must be appended in front of the message along with the MessageFlag.
         fragment_set = FragmentSet(msg_with_flag)
 
-        packets_and_routes = []
+        out = []
         for fragment in fragment_set.fragments:
             route = topology.generate_route(destination)
             packet = SphinxPacket.build(
@@ -39,20 +56,9 @@ class PacketBuilder:
                 [mixnode.sphinx_node() for mixnode in route],
                 destination.sphinx_node(),
             )
-            packets_and_routes.append((packet, route))
+            out.append((packet, route))
 
-        self.iter = iter(packets_and_routes)
-
-    @classmethod
-    def real(cls, message: bytes, topology: MixnetTopology) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_REAL, message, topology)
-
-    @classmethod
-    def drop_cover(cls, message: bytes, topology: MixnetTopology) -> Self:
-        return cls(MessageFlag.MESSAGE_FLAG_DROP_COVER, message, topology)
-
-    def next(self) -> Tuple[SphinxPacket, List[MixNodeInfo]]:
-        return next(self.iter)
+        return out
 
     @staticmethod
     def parse_msg_and_flag(data: bytes) -> Tuple[MessageFlag, bytes]:

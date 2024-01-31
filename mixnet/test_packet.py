@@ -18,24 +18,28 @@ class TestPacket(TestCase):
     def test_real_packet(self):
         topology = init_robustness_mixnet_config().mixnet_layer_config.topology
         msg = random_bytes(3500)
-        builder = PacketBuilder.real(msg, topology)
-        packet0, route0 = builder.next()
-        packet1, route1 = builder.next()
-        packet2, route2 = builder.next()
-        packet3, route3 = builder.next()
-        self.assertRaises(StopIteration, builder.next)
+        packets_and_routes = PacketBuilder.build_real_packets(msg, topology)
+        self.assertEqual(4, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packet1, route1)),
+            reconstructor.add(
+                self.process_packet(packets_and_routes[1][0], packets_and_routes[1][1])
+            ),
         )
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packet3, route3)),
+            reconstructor.add(
+                self.process_packet(packets_and_routes[3][0], packets_and_routes[3][1])
+            ),
         )
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packet2, route2)),
+            reconstructor.add(
+                self.process_packet(packets_and_routes[2][0], packets_and_routes[2][1])
+            ),
         )
-        msg_with_flag = reconstructor.add(self.process_packet(packet0, route0))
+        msg_with_flag = reconstructor.add(
+            self.process_packet(packets_and_routes[0][0], packets_and_routes[0][1])
+        )
         assert msg_with_flag is not None
         self.assertEqual(
             PacketBuilder.parse_msg_and_flag(msg_with_flag),
@@ -45,12 +49,13 @@ class TestPacket(TestCase):
     def test_cover_packet(self):
         topology = init_robustness_mixnet_config().mixnet_layer_config.topology
         msg = b"cover"
-        builder = PacketBuilder.drop_cover(msg, topology)
-        packet, route = builder.next()
-        self.assertRaises(StopIteration, builder.next)
+        packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, topology)
+        self.assertEqual(1, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
-        msg_with_flag = reconstructor.add(self.process_packet(packet, route))
+        msg_with_flag = reconstructor.add(
+            self.process_packet(packets_and_routes[0][0], packets_and_routes[0][1])
+        )
         assert msg_with_flag is not None
         self.assertEqual(
             PacketBuilder.parse_msg_and_flag(msg_with_flag),

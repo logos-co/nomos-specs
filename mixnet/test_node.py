@@ -28,7 +28,7 @@ class TestMixNodeRunner(IsolatedAsyncioTestCase):
         config.emission_rate_per_min = 120  # lambda (= 2msg/sec)
         config.delay_rate_per_min = 30  # mu (= 2s delay on average)
 
-        packet, route = PacketBuilder.real(b"msg", config.topology).next()
+        packet, route = PacketBuilder.build_real_packets(b"msg", config.topology)[0]
 
         # Start only the first mix node for testing
         mixnode = await MixNode.new(route[0].encryption_private_key, config)

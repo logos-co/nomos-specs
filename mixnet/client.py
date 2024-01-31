@@ -42,8 +42,10 @@ class MixClient:
         return self.__config
 
     async def send_message(self, msg: bytes) -> None:
-        builder = PacketBuilder.real(msg, self.__config.topology)
-        for packet, route in builder.iter:
+        packets_and_routes = PacketBuilder.build_real_packets(
+            msg, self.__config.topology
+        )
+        for packet, route in packets_and_routes:
             await self.__real_packet_queue.put((route[0].addr, packet))
 
     def subscribe_messages(self) -> "asyncio.Queue[bytes]":
@@ -101,10 +103,13 @@ class MixClient:
                 redundant_real_packet_queue.put_nowait((addr, packet))
                 await self.__outbound_socket.put((addr, packet))
 
-        packet, route = PacketBuilder.drop_cover(
+        packets_and_routes = PacketBuilder.build_drop_cover_packets(
             b"drop cover", self.__config.topology
-        ).next()
-        await self.__outbound_socket.put((route[0].addr, packet))
+        )
+        # We have a for loop here, but we expect that the total num of packets is 1
+        # because the dummy message is short.
+        for packet, route in packets_and_routes:
+            await self.__outbound_socket.put((route[0].addr, packet))
 
     async def __emission_notifier(
         self, emission_rate_per_min: int, queue: asyncio.Queue
