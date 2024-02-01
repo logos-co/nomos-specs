@@ -7,7 +7,7 @@ from .cryptarchia import Leader, LeaderConfig, EpochState, LedgerState, Coin, ph
 
 class TestLeader(TestCase):
     def test_slot_leader_statistics(self):
-        epoch_state = EpochState(
+        epoch = EpochState(
             stake_distribution_snapshot=LedgerState(
                 total_stake=1000,
             ),
@@ -27,7 +27,10 @@ class TestLeader(TestCase):
         N = int((Z * std / margin_of_error) ** 2)
 
         # After N slots, the measured leader rate should be within the interval `p +- margin_of_error` with high probabiltiy
-        leader_rate = sum(l.is_slot_leader(epoch_state, slot) for slot in range(N)) / N
+        leader_rate = (
+            sum(l.try_prove_slot_leader(epoch, slot) is not None for slot in range(N))
+            / N
+        )
         assert (
             abs(leader_rate - p) < margin_of_error
         ), f"{leader_rate} != {p}, err={abs(leader_rate - p)} > {margin_of_error}"

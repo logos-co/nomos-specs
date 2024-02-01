@@ -2,7 +2,7 @@ from typing import TypeAlias, List, Optional
 from hashlib import sha256, blake2b
 
 # Please note this is still a work in progress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 Id: TypeAlias = bytes
 
@@ -43,11 +43,28 @@ class Config:
 
 
 @dataclass
+class MockLeaderProof:
+    commitment: Id
+    nullifier: Id
+
+    def verify(self):
+        # TODO: verification not implemented
+        return True
+
+    def _id_update(self, hasher):
+        commitment_bytes = int.to_bytes(self.commitment, length=32, byteorder="little")
+        nullifier_bytes = int.to_bytes(self.nullifier, length=32, byteorder="little")
+        hasher.update(commitment_bytes)
+        hasher.update(nullifier_bytes)
+
+
+@dataclass
 class BlockHeader:
     slot: Slot
     parent: Id
     content_size: int
     content_id: Id
+    leader_proof: MockLeaderProof
 
     # **Attention**:
     # The ID of a block header is defined as the 32byte blake2b hash of its fields
@@ -70,6 +87,10 @@ class BlockHeader:
         # parent
         assert len(self.parent) == 32
         h.update(self.parent)
+
+        # TODO: Leader proof component of block id is mocked here until CL is understood
+        self.leader_proof._id_update(h)
+
         return h.digest()
 
 
@@ -93,15 +114,43 @@ class Chain:
                 return i
 
 
+@dataclass
+class LedgerState:
+    """
+    A snapshot of the ledger state up to some block
+    """
+
+    block: Id = None
+    nonce: bytes = None
+    total_stake: int = None
+    commitments: set[Id] = field(default_factory=set)  # set of commitments
+    nullifiers: set[Id] = field(default_factory=set)  # set of nullified
+
+    def is_coin_nullified(self, nullifier: Id) -> bool:
+        return nullifier in self.nullifiers
+
+
 class Follower:
-    def __init__(self, genesis: BlockHeader, config: Config):
+    def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
         self.forks = []
-        self.local_chain = Chain([genesis])
+        self.local_chain = Chain([])
+        self.epoch = EpochState(
+            stake_distribution_snapshot=genesis_state,
+            nonce_snapshot=genesis_state,
+        )
+        self.ledger_state = genesis_state
 
-    # We don't do any validation in the current version
     def validate_header(block: BlockHeader) -> bool:
-        return True
+        # TODO: this is not the full block validation spec, only slot leader is verified
+        return self.verify_slot_leader(block.slot, block.leader_proof)
+
+    def verify_slot_leader(self, slot: Slot, proof: MockLeaderProof) -> bool:
+        return (
+            proof.verify(slot) # verify slot leader proof
+            and self.epoch.is_coin_old_enough_to_lead(proof.coin) # verify coin was not recently created
+            and not self.ledger_state.is_coin_nullified(proof.nullifier) # verify the coin has not already been spent
+        )
 
     # Try appending this block to an existing chain and return whether
     # the operation was successful
@@ -178,36 +227,9 @@ class Coin:
 
 
 @dataclass
-class LedgerState:
-    """
-    A snapshot of the ledger state up to some block
-    """
-
-    block: Id = None
-    nonce: bytes = None
-    total_stake: int = None
-    commitments: set[Id] = set()  # set of commitments
-    nullifiers: set[Id] = set()  # set of nullified
-
-
-@dataclass
-class LeaderProof:
-    epoch: int
-    slot: Slot
-    commitment: Id
-    nullifier: Id
-
-    def verify(self):
-        # TODO: verification not implemented
-        return True
-
-
-@dataclass
 class EpochState:
     # for details of snapshot schedule please see:
     # https://github.com/IntersectMBO/ouroboros-consensus/blob/fe245ac1d8dbfb563ede2fdb6585055e12ce9738/docs/website/contents/for-developers/Glossary.md#epoch-structure
-
-    epoch_number: int
 
     # The stake distribution snapshot is taken at the beginning of the previous epoch
     stake_distribution_snapshot: LedgerState
@@ -217,9 +239,6 @@ class EpochState:
 
     def is_coin_old_enough_to_lead(self, coin: Coin) -> bool:
         return coin in self.stake_distribution.commitments
-
-    def is_nullified(self, nullifier: Id) -> bool:
-        return nullifier in self.stake_distribution.nullifiers
 
     def total_stake(self) -> int:
         """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
@@ -263,39 +282,30 @@ class MOCK_LEADER_VRF:
         raise NotImplemented()
 
 
-def is_slot_leader(
-    config: LeaderConfig, coin: Coin, epoch: EpochState, slot: Slot
-) -> bool:
-    relative_stake = coin.value / epoch.total_stake()
-
-    r = MOCK_LEADER_VRF.vrf(coin.pk, epoch.nonce(), slot)
-
-    return r < MOCK_LEADER_VRF.ORDER * phi(config.active_slot_coeff, relative_stake)
-
-
 @dataclass
 class Leader:
     config: LeaderConfig
     coin: Coin
 
-    def try_slot_leader_proof(
+    def try_prove_slot_leader(
         self, epoch: EpochState, slot: Slot
-    ) -> LeaderProof | None:
-        if is_slot_leader(self.config, self.coin, epoch, slot):
-            return LeaderProof(epoch.epoch_number, slot, self.coin)
-
-    def verify_slot_leader_proof(
-        self, epoch: EpochState, slot: Slot, proof: LeaderProof
-    ) -> bool:
-        return (
-            proof.verify()
-            and epoch.is_coin_old_enough_to_lead(proof.coin)
-            and not epoch.is_coin_nullified(proof.nullifier)
-            and is_slot_leader(self.config, proof.coin, epoch, slot)
-        )
+    ) -> MockLeaderProof | None:
+        if self._is_slot_leader(epoch, slot):
+            return MockLeaderProof(
+                commitment=self.coin.commitment(), nullifier=self.coin.nullifier()
+            )
 
     def propose_block(self, slot: Slot, parent: BlockHeader) -> BlockHeader:
         return BlockHeader(parent=parent.id(), slot=slot)
+
+    def _is_slot_leader(self, epoch: EpochState, slot: Slot):
+        relative_stake = self.coin.value / epoch.total_stake()
+
+        r = MOCK_LEADER_VRF.vrf(self.coin.pk, epoch.nonce(), slot)
+
+        return r < MOCK_LEADER_VRF.ORDER * phi(
+            self.config.active_slot_coeff, relative_stake
+        )
 
 
 def common_prefix_len(a: Chain, b: Chain) -> int:
