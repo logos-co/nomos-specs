@@ -26,7 +26,12 @@ class TimeConfig:
 @dataclass
 class Config:
     k: int
+    active_slot_coeff: float  # 'f', the rate of occupied slots
     time: TimeConfig
+
+    @property
+    def s(self):
+        return int(3 * self.k / self.active_slot_coeff)
 
 
 # An absolute unique indentifier of a slot, counting incrementally from 0
@@ -158,6 +163,15 @@ class LedgerState:
     commitments: set[Id] = field(default_factory=set)  # set of commitments
     nullifiers: set[Id] = field(default_factory=set)  # set of nullified
 
+    def copy(self):
+        return LedgerState(
+            block=self.block,
+            nonce=self.nonce,
+            total_stake=self.total_stake,
+            commitments=self.commitments.copy(),
+            nullifiers=self.nullifiers.copy(),
+        )
+
     def verify_committed(self, commitment: Id) -> bool:
         return commitment in self.commitments
 
@@ -180,7 +194,7 @@ class Follower:
             nonce_snapshot=genesis_state,
         )
         self.genesis_state = genesis_state
-        self.ledger_state = genesis_state
+        self.ledger_state = genesis_state.copy()
 
     def validate_header(self, block: BlockHeader) -> bool:
         # TODO: this is not the full block validation spec, only slot leader is verified
@@ -201,16 +215,20 @@ class Follower:
             return True
 
         for chain in self.forks:
-            if chain.tip().id() == block.parent():
+            if chain.tip().id() == block.parent:
                 chain.blocks.append(block)
                 return True
 
         return False
 
     def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
+        if self.genesis_state.block == block.parent:
+            # this block is forking off the genesis state
+            return Chain(blocks=[block])
+
         chains = self.forks + [self.local_chain]
         for chain in chains:
-            if self.chain.contains_block(block):
+            if chain.contains_block(block):
                 block_position = chain.block_position(block)
                 return Chain(blocks=chain.blocks[:block_position] + [block])
 
@@ -234,7 +252,7 @@ class Follower:
                 return
 
         # We may need to switch forks, lets run the fork choice rule to check.
-        new_chain = Follower.fork_choice(self.local_chain, self.forks)
+        new_chain = self.fork_choice()
 
         if new_chain == self.local_chain:
             # we have not re-org'd therefore we can simply update our ledger state
@@ -252,14 +270,14 @@ class Follower:
             self.local_chain = new_chain
 
     # Evaluate the fork choice rule and return the block header of the block that should be the head of the chain
-    @staticmethod
-    def fork_choice(local_chain: Chain, forks: List[Chain]) -> Chain:
-        # TODO: define k and s
-        return maxvalid_bg(local_chain, forks, 0, 0)
+    def fork_choice(self) -> Chain:
+        return maxvalid_bg(
+            self.local_chain, self.forks, k=self.config.k, s=self.config.s
+        )
 
     def tip_id(self) -> Id:
         if self.local_chain.length() > 0:
-            return self.local_chain.tip().id
+            return self.local_chain.tip().id()
         else:
             return self.ledger_state.block
 
@@ -284,11 +302,6 @@ class EpochState:
 
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
-
-
-@dataclass
-class LeaderConfig:
-    active_slot_coeff: float = 0.05  # 'f', the rate of occupied slots
 
 
 def phi(f: float, alpha: float) -> float:
@@ -322,7 +335,7 @@ class MOCK_LEADER_VRF:
 
 @dataclass
 class Leader:
-    config: LeaderConfig
+    config: Config
     coin: Coin
 
     def try_prove_slot_leader(

@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import Leader, LeaderConfig, EpochState, LedgerState, Coin, phi
+from .cryptarchia import Leader, Config, EpochState, LedgerState, Coin, phi, TimeConfig
 
 
 class TestLeader(TestCase):
@@ -15,8 +15,12 @@ class TestLeader(TestCase):
         )
 
         f = 0.05
-        leader_config = LeaderConfig(active_slot_coeff=f)
-        l = Leader(config=leader_config, coin=Coin(pk=0, value=10))
+        config = Config(
+            k=10,
+            active_slot_coeff=f,
+            time=TimeConfig(slots_per_epoch=1000, slot_duration=1, chain_start_time=0),
+        )
+        l = Leader(config=config, coin=Coin(pk=0, value=10))
 
         # We'll use the Margin of Error equation to decide how many samples we need.
         # https://en.wikipedia.org/wiki/Margin_of_error
