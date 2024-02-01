@@ -82,7 +82,10 @@ class MockLeaderProof:
         # TODO: verification not implemented
         return True
 
-    def _id_update(self, hasher):
+    def _block_id_update(self, hasher):
+        # TODO: this is used to contribute to the block id, to ensure the id is dependent
+        # on the leader proof, but the details here are not specified yet, we're waiting on
+        # CL specification before we nail this down
         hasher.update(self.commitment)
         hasher.update(self.nullifier)
 
@@ -118,7 +121,7 @@ class BlockHeader:
         h.update(self.parent)
 
         # TODO: Leader proof component of block id is mocked here until CL is understood
-        self.leader_proof._id_update(h)
+        self.leader_proof._block_id_update(h)
 
         return h.digest()
 
@@ -176,7 +179,7 @@ class Follower:
             stake_distribution_snapshot=genesis_state,
             nonce_snapshot=genesis_state,
         )
-        self.ledger_state_snapshot = genesis_state
+        self.genesis_state = genesis_state
         self.ledger_state = genesis_state
 
     def validate_header(self, block: BlockHeader) -> bool:
@@ -241,7 +244,7 @@ class Follower:
         else:
             # we have re-org'd, therefore we must roll back out ledger state and
             # re-apply blocks from the new chain
-            ledger_state = self.ledger_state_snapshot.copy()
+            ledger_state = self.genesis_state.copy()
             for block in new_chain.blocks:
                 ledger_state.apply(block)
 
