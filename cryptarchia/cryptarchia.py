@@ -155,16 +155,51 @@ class Coin:
     pk: int
     value: int
 
+    def commitment(self) -> Id:
+        # TODO: mocked until CL is understood
+        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="little")
+        value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
+
+        h = sha256()
+        h.update(pk_bytes)
+        h.update(value_bytes)
+        return h.digest()
+
+    def nullifier(self) -> Id:
+        # TODO: mocked until CL is understood
+        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="little")
+        value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
+
+        h = sha256()
+        h.update(pk_bytes)
+        h.update(value_bytes)
+        h.update(b"\x00")  # extra 0 byte to differentiate from commitment
+        return h.digest()
+
 
 @dataclass
 class LedgerState:
     """
-    A snapshot of the ledger state up to some height
+    A snapshot of the ledger state up to some block
     """
 
     block: Id = None
     nonce: bytes = None
     total_stake: int = None
+    commitments: set[Id] = set()  # set of commitments
+    nullifiers: set[Id] = set()  # set of nullified
+
+
+@dataclass
+class LeaderProof:
+    epoch: int
+    slot: Slot
+    commitment: Id
+    nullifier: Id
+
+    def verify(self):
+        # TODO: verification not implemented
+        return True
 
 
 @dataclass
@@ -172,11 +207,19 @@ class EpochState:
     # for details of snapshot schedule please see:
     # https://github.com/IntersectMBO/ouroboros-consensus/blob/fe245ac1d8dbfb563ede2fdb6585055e12ce9738/docs/website/contents/for-developers/Glossary.md#epoch-structure
 
+    epoch_number: int
+
     # The stake distribution snapshot is taken at the beginning of the previous epoch
     stake_distribution_snapshot: LedgerState
 
     # The nonce snapshot is taken 7k/f slots into the previous epoch
     nonce_snapshot: LedgerState
+
+    def is_coin_old_enough_to_lead(self, coin: Coin) -> bool:
+        return coin in self.stake_distribution.commitments
+
+    def is_nullified(self, nullifier: Id) -> bool:
+        return nullifier in self.stake_distribution.nullifiers
 
     def total_stake(self) -> int:
         """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
@@ -220,18 +263,36 @@ class MOCK_LEADER_VRF:
         raise NotImplemented()
 
 
+def is_slot_leader(
+    config: LeaderConfig, coin: Coin, epoch: EpochState, slot: Slot
+) -> bool:
+    relative_stake = coin.value / epoch.total_stake()
+
+    r = MOCK_LEADER_VRF.vrf(coin.pk, epoch.nonce(), slot)
+
+    return r < MOCK_LEADER_VRF.ORDER * phi(config.active_slot_coeff, relative_stake)
+
+
 @dataclass
 class Leader:
     config: LeaderConfig
     coin: Coin
 
-    def is_slot_leader(self, epoch: EpochState, slot: Slot) -> bool:
-        f = self.config.active_slot_coeff
-        relative_stake = self.coin.value / epoch.total_stake()
+    def try_slot_leader_proof(
+        self, epoch: EpochState, slot: Slot
+    ) -> LeaderProof | None:
+        if is_slot_leader(self.config, self.coin, epoch, slot):
+            return LeaderProof(epoch.epoch_number, slot, self.coin)
 
-        r = MOCK_LEADER_VRF.vrf(self.coin.pk, epoch.nonce(), slot)
-
-        return r < MOCK_LEADER_VRF.ORDER * phi(f, relative_stake)
+    def verify_slot_leader_proof(
+        self, epoch: EpochState, slot: Slot, proof: LeaderProof
+    ) -> bool:
+        return (
+            proof.verify()
+            and epoch.is_coin_old_enough_to_lead(proof.coin)
+            and not epoch.is_coin_nullified(proof.nullifier)
+            and is_slot_leader(self.config, proof.coin, epoch, slot)
+        )
 
     def propose_block(self, slot: Slot, parent: BlockHeader) -> BlockHeader:
         return BlockHeader(parent=parent.id(), slot=slot)
