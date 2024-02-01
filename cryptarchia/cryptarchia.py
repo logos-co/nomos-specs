@@ -87,13 +87,6 @@ class MockLeaderProof:
         # TODO: verification not implemented
         return True
 
-    def _block_id_update(self, hasher):
-        # TODO: this is used to contribute to the block id, to ensure the id is dependent
-        # on the leader proof, but the details here are not specified yet, we're waiting on
-        # CL specification before we nail this down
-        hasher.update(self.commitment)
-        hasher.update(self.nullifier)
-
 
 @dataclass
 class BlockHeader:
@@ -109,24 +102,30 @@ class BlockHeader:
     #
     # The following code is to be considered as a reference implementation, mostly to be used for testing.
     def id(self) -> Id:
-        # version byte
         h = blake2b(digest_size=32)
+
+        # version byte
         h.update(b"\x01")
-        # header type
-        h.update(b"\x00")
+
         # content size
         h.update(int.to_bytes(self.content_size, length=4, byteorder="big"))
+
         # content id
         assert len(self.content_id) == 32
         h.update(self.content_id)
+
         # slot
         h.update(int.to_bytes(self.slot.absolute_slot, length=8, byteorder="big"))
+
         # parent
         assert len(self.parent) == 32
         h.update(self.parent)
 
-        # TODO: Leader proof component of block id is mocked here until CL is understood
-        self.leader_proof._block_id_update(h)
+        # leader proof
+        assert len(self.leader_proof.commitment) == 32
+        h.update(self.leader_proof.commitment)
+        assert len(self.leader_proof.nullifier) == 32
+        h.update(self.leader_proof.nullifier)
 
         return h.digest()
 
