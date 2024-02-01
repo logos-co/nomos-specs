@@ -30,9 +30,6 @@ class DAEncoder:
     def _rs_encode_rows(self, rows: List[bytearray]) -> List[bytearray]:
         ...
 
-    def _rs_encode_row_commitments(self, rows: List[bytearray], commitments: List[Commitment]) -> List[Commitment]:
-        ...
-
     def _compute_rows_proofs(self, rows: List[bytearray], row_commitments: List[Commitment]) -> List[List[Proof]]:
         ...
 
@@ -48,7 +45,6 @@ class DAEncoder:
         rows = self._chunkify_data()
         row_commitments = self._compute_row_kzg_commitments(rows)
         encoded_rows = self._rs_encode_rows(rows)
-        row_commitments = self._rs_encode_row_commitments(encoded_rows, row_commitments)
         row_proofs = self._compute_rows_proofs(encoded_rows, row_commitments)
         column_commitments = self._compute_column_kzg_commitments(encoded_rows)
         aggregated_column_commitment = self._generate_aggregated_column_commitments(encoded_rows, column_commitments)
