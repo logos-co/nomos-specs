@@ -4,14 +4,26 @@ import numpy as np
 import hashlib
 
 from copy import deepcopy
-from cryptarchia.cryptarchia import maxvalid_bg, Chain, BlockHeader, Slot, Id
+from cryptarchia.cryptarchia import (
+    maxvalid_bg,
+    Chain,
+    BlockHeader,
+    Slot,
+    Id,
+    MockLeaderProof,
+    Coin,
+)
 
 
 def make_block(parent_id: Id, slot: Slot, content: bytes) -> BlockHeader:
     assert len(parent_id) == 32
     content_id = hashlib.sha256(content).digest()
     return BlockHeader(
-        parent=parent_id, content_size=1, slot=slot, content_id=content_id
+        parent=parent_id,
+        content_size=1,
+        slot=slot,
+        content_id=content_id,
+        leader_proof=MockLeaderProof.from_coin(Coin(pk=0, value=10)),
     )
 
 

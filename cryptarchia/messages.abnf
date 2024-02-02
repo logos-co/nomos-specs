@@ -2,14 +2,14 @@
 ; ------------ BLOCK ----------------------
 BLOCK            = HEADER CONTENT
 ; ------------ HEADER ---------------------
-VERSION          = %x01
-HEADER           = VERSION HEADER-UNSIGNED
-HEADER-UNSIGNED  = %x00 HEADER-COMMON
-HEADER-COMMON    = CONTENT-SIZE CONTENT-ID BLOCK-DATE PARENT-ID
-CONTENT-SIZE     = U32
-BLOCK-DATE       = BLOCK-SLOT
-BLOCK-SLOT       = U64
-PARENT-ID        = HEADER-ID
+VERSION           = %x01
+HEADER            = VERSION HEADER-FIELDS MOCK-LEADER-PROOF
+HEADER-FIELDS     = CONTENT-SIZE CONTENT-ID BLOCK-DATE PARENT-ID
+CONTENT-SIZE      = U32
+BLOCK-DATE        = BLOCK-SLOT
+BLOCK-SLOT        = U64
+PARENT-ID         = HEADER-ID
+MOCK-LEADER-PROOF = COMMITMENT NULLIFIER
 
 ; ------------ CONTENT --------------------
 CONTENT          = *OCTET
@@ -19,3 +19,5 @@ U32              = 4OCTET  ; unsigned integer 32 bit (BE)
 U64              = 8OCTET  ; unsigned integer 32 bit (BE)
 HEADER-ID        = 32OCTET
 CONTENT-ID       = 32OCTET
+COMMITMENT       = 32OCTET
+NULLIFIER        = 32OCTET
