@@ -4,44 +4,67 @@ import random
 from dataclasses import dataclass
 from typing import List
 
-from mixnet.fisheryates import FisherYates
 from mixnet.node import MixNode
 
 
-@dataclass
 class Mixnet:
-    mix_nodes: List[MixNode]
+    __topology: MixnetTopology | None = None
 
-    # Build a new topology deterministically using an entropy.
-    # The entropy is expected to be injected from outside.
-    #
-    # TODO: Implement constructing a new topology in advance to minimize the topology transition time.
-    #       https://www.notion.so/Mixnet-Specification-807b624444a54a4b88afa1cc80e100c2?pvs=4#9a7f6089e210454bb11fe1c10fceff68
-    def build_topology(
-        self,
-        entropy: bytes,
-        n_layers: int,
-        n_nodes_per_layer: int,
-    ) -> MixnetTopology:
-        num_nodes = n_nodes_per_layer * n_layers
-        assert num_nodes < len(self.mix_nodes)
+    def get_topology(self) -> MixnetTopology:
+        if self.__topology is None:
+            raise RuntimeError("topology is not set yet")
+        return self.__topology
 
-        shuffled = FisherYates.shuffle(self.mix_nodes, entropy)
-        sampled = shuffled[:num_nodes]
-        layers = []
-        for l in range(n_layers):
-            start = l * n_nodes_per_layer
-            layer = sampled[start : start + n_nodes_per_layer]
-            layers.append(layer)
-        return MixnetTopology(layers)
+    def set_topology(self, topology: MixnetTopology) -> None:
+        """
+        Replace the old topology with the new topology received, and start establishing new network connections in background.
 
-    def choose_mixnode(self) -> MixNode:
-        return random.choice(self.mix_nodes)
+        In real implementations, this method should be a long-running task, accepting topologies periodically.
+        Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
+        """
+        self.__topology = topology
+        self.__establish_connections()
+
+    def __establish_connections(self) -> None:
+        """
+        Establish network connections in advance based on the topology received.
+
+        This is just a preparation to forward subsequent packets as quickly as possible,
+        but this is not a strict requirement.
+
+        In real implementations, this should be a background task.
+        """
+        pass
 
 
 @dataclass
 class MixnetTopology:
+    # In production, this can be a 1-D array, which is accessible by indexes.
+    # Here, we use a 2-D array for readability.
     layers: List[List[MixNode]]
 
-    def generate_route(self) -> list[MixNode]:
-        return [random.choice(layer) for layer in self.layers]
+    def generate_route(self, mix_destination: MixNode) -> list[MixNode]:
+        """
+        Generate a mix route for a Sphinx packet.
+        The pre-selected mix_destination is used as a last mix node in the route,
+        so that associated packets can be merged together into a original message.
+        """
+        route = [random.choice(layer) for layer in self.layers[:-1]]
+        route.append(mix_destination)
+        return route
+
+    def choose_mix_destination(self) -> MixNode:
+        """
+        Choose a mix node from the last mix layer as a mix destination
+        that will reconstruct a message from Sphinx packets.
+        """
+        return random.choice(self.layers[-1])
+
+
+@dataclass
+class MixnetTopologySize:
+    num_layers: int
+    num_mixnodes_per_layer: int
+
+    def num_total_mixnodes(self) -> int:
+        return self.num_layers * self.num_mixnodes_per_layer
