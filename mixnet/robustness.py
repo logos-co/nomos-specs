@@ -1,14 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import List
 
+from mixnet.config import MixnetConfig, MixnetTopology, MixNodeInfo
 from mixnet.fisheryates import FisherYates
-from mixnet.mixnet import (
-    Mixnet,
-    MixnetTopology,
-    MixnetTopologySize,
-)
-from mixnet.node import MixNode
+from mixnet.mixnet import Mixnet
 
 
 class Robustness:
@@ -27,37 +24,77 @@ class Robustness:
 
     def __init__(
         self,
-        mixnode_candidates: List[MixNode],
-        mixnet_topology_size: MixnetTopologySize,
+        config: RobustnessConfig,
         mixnet: Mixnet,
     ) -> None:
-        assert mixnet_topology_size.num_total_mixnodes() <= len(mixnode_candidates)
-        self.mixnode_candidates = mixnode_candidates
-        self.mixnet_topology_size = mixnet_topology_size
-        self.mixnet = mixnet
+        self.__config = config
+        self.__mixnet = mixnet
 
     def set_entropy(self, entropy: bytes) -> None:
         """
         Given a entropy received, build a new topology and send it to mixnet.
+        In v1, this doesn't change any mixnet config except topology.
 
         In real implementations, this method should be a long-running task, consuming entropy periodically.
         Here in the spec, this method has been simplified as a setter, assuming the single-thread test environment.
         """
-        topology = self.build_topology(entropy)
-        self.mixnet.set_topology(topology)
+        self.__config.mixnet.mixnet_layer_config.topology = self.build_topology(
+            self.__config.mixnet.mixnode_candidates,
+            self.__config.mixnet.topology_size,
+            entropy,
+        )
+        self.__mixnet.set_config(self.__config.mixnet.mixnet_layer_config)
 
-    def build_topology(self, entropy: bytes) -> MixnetTopology:
+    @staticmethod
+    def build_topology(
+        mixnode_candidates: List[MixNodeInfo],
+        mixnet_topology_size: MixnetTopologySize,
+        entropy: bytes,
+    ) -> MixnetTopology:
         """
         Build a new topology deterministically using an entropy and a given set of candidates.
         """
-        shuffled = FisherYates.shuffle(self.mixnode_candidates, entropy)
-        sampled = shuffled[: self.mixnet_topology_size.num_total_mixnodes()]
+        shuffled = FisherYates.shuffle(mixnode_candidates, entropy)
+        sampled = shuffled[: mixnet_topology_size.num_total_mixnodes()]
 
         layers = []
-        for layer_id in range(self.mixnet_topology_size.num_layers):
-            start = layer_id * self.mixnet_topology_size.num_mixnodes_per_layer
-            layer = sampled[
-                start : start + self.mixnet_topology_size.num_mixnodes_per_layer
-            ]
+        for layer_id in range(mixnet_topology_size.num_layers):
+            start = layer_id * mixnet_topology_size.num_mixnodes_per_layer
+            layer = sampled[start : start + mixnet_topology_size.num_mixnodes_per_layer]
             layers.append(layer)
         return MixnetTopology(layers)
+
+
+@dataclass
+class RobustnessConfig:
+    """In v1, the robustness layer manages configs only for the mixnet layer."""
+
+    mixnet: RobustnessMixnetConfig
+
+
+class RobustnessMixnetConfig:
+    """
+    Configurations for the mixnet layer
+    These configurations are meant to be changed over time according to other parameters from other layers (e.g. consensus).
+    """
+
+    def __init__(
+        self,
+        mixnode_candidates: List[MixNodeInfo],
+        mixnet_topology_size: MixnetTopologySize,
+        mixnet_layer_config: MixnetConfig,
+    ) -> None:
+        assert mixnet_topology_size.num_total_mixnodes() <= len(mixnode_candidates)
+        self.mixnode_candidates = mixnode_candidates
+        self.topology_size = mixnet_topology_size
+        # A config to be injected to the mixnet layer whenever it is updated
+        self.mixnet_layer_config = mixnet_layer_config
+
+
+@dataclass
+class MixnetTopologySize:
+    num_layers: int
+    num_mixnodes_per_layer: int
+
+    def num_total_mixnodes(self) -> int:
+        return self.num_layers * self.num_mixnodes_per_layer

@@ -1,41 +1,45 @@
 from typing import List
+from unittest import TestCase
 
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
-from mixnet.node import MixNode
+from mixnet.config import MixNodeInfo
 from mixnet.packet import (
     Fragment,
     MessageFlag,
     MessageReconstructor,
     PacketBuilder,
 )
-from mixnet.test_mixnet import TestMixnet
+from mixnet.test_utils import init_robustness_mixnet_config
 from mixnet.utils import random_bytes
 
 
-class TestPacket(TestMixnet):
+class TestPacket(TestCase):
     def test_real_packet(self):
-        mixnet, _ = self.init()
-
+        topology = init_robustness_mixnet_config().mixnet_layer_config.topology
         msg = random_bytes(3500)
-        builder = PacketBuilder.real(msg, mixnet)
-        packet0, route0 = builder.next()
-        packet1, route1 = builder.next()
-        packet2, route2 = builder.next()
-        packet3, route3 = builder.next()
-        self.assertRaises(StopIteration, builder.next)
+        packets_and_routes = PacketBuilder.build_real_packets(msg, topology)
+        self.assertEqual(4, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packet1, route1)),
+            reconstructor.add(
+                self.process_packet(packets_and_routes[1][0], packets_and_routes[1][1])
+            ),
         )
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packet3, route3)),
+            reconstructor.add(
+                self.process_packet(packets_and_routes[3][0], packets_and_routes[3][1])
+            ),
         )
         self.assertIsNone(
-            reconstructor.add(self.process_packet(packet2, route2)),
+            reconstructor.add(
+                self.process_packet(packets_and_routes[2][0], packets_and_routes[2][1])
+            ),
         )
-        msg_with_flag = reconstructor.add(self.process_packet(packet0, route0))
+        msg_with_flag = reconstructor.add(
+            self.process_packet(packets_and_routes[0][0], packets_and_routes[0][1])
+        )
         assert msg_with_flag is not None
         self.assertEqual(
             PacketBuilder.parse_msg_and_flag(msg_with_flag),
@@ -43,15 +47,15 @@ class TestPacket(TestMixnet):
         )
 
     def test_cover_packet(self):
-        mixnet, _ = self.init()
-
+        topology = init_robustness_mixnet_config().mixnet_layer_config.topology
         msg = b"cover"
-        builder = PacketBuilder.drop_cover(msg, mixnet)
-        packet, route = builder.next()
-        self.assertRaises(StopIteration, builder.next)
+        packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, topology)
+        self.assertEqual(1, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
-        msg_with_flag = reconstructor.add(self.process_packet(packet, route))
+        msg_with_flag = reconstructor.add(
+            self.process_packet(packets_and_routes[0][0], packets_and_routes[0][1])
+        )
         assert msg_with_flag is not None
         self.assertEqual(
             PacketBuilder.parse_msg_and_flag(msg_with_flag),
@@ -59,7 +63,7 @@ class TestPacket(TestMixnet):
         )
 
     @staticmethod
-    def process_packet(packet: SphinxPacket, route: List[MixNode]) -> Fragment:
+    def process_packet(packet: SphinxPacket, route: List[MixNodeInfo]) -> Fragment:
         processed = packet.process(route[0].encryption_private_key)
         if isinstance(processed, ProcessedFinalHopPacket):
             return Fragment.from_bytes(processed.payload.recover_plain_playload())

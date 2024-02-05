@@ -1,40 +1,26 @@
-from typing import Tuple
 from unittest import IsolatedAsyncioTestCase
 
-from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
-
-from mixnet.bls import generate_bls
-from mixnet.mixnet import Mixnet, MixnetTopologySize, MixNode
-from mixnet.robustness import Robustness
-from mixnet.utils import random_bytes
+from mixnet.mixnet import Mixnet
+from mixnet.robustness import Robustness, RobustnessConfig
+from mixnet.test_utils import init_robustness_mixnet_config
 
 
 class TestMixnet(IsolatedAsyncioTestCase):
-    @staticmethod
-    def init() -> Tuple[Mixnet, Robustness]:
-        mixnet = Mixnet()
-        robustness = Robustness(
-            [
-                MixNode(
-                    generate_bls(),
-                    X25519PrivateKey.generate(),
-                    random_bytes(32),
-                )
-                for _ in range(12)
-            ],
-            MixnetTopologySize(3, 3),
-            mixnet,
+    async def test_topology_from_robustness(self):
+        robustness_mixnet_config = init_robustness_mixnet_config()
+
+        mixnet = await Mixnet.new(
+            robustness_mixnet_config.mixnode_candidates[0].encryption_private_key,
+            robustness_mixnet_config.mixnet_layer_config,
         )
-        robustness.set_entropy(b"entropy")
+        try:
+            robustness = Robustness(RobustnessConfig(robustness_mixnet_config), mixnet)
+            self.assertEqual(
+                robustness_mixnet_config.mixnet_layer_config, mixnet.get_config()
+            )
 
-        return (mixnet, robustness)
-
-    def test_topology_from_robustness(self):
-        mixnet, robustness = self.init()
-
-        topology1 = mixnet.get_topology()
-
-        robustness.set_entropy(b"new entropy")
-        topology2 = mixnet.get_topology()
-
-        self.assertNotEqual(topology1, topology2)
+            old_topology = robustness_mixnet_config.mixnet_layer_config.topology
+            robustness.set_entropy(b"new entropy")
+            self.assertNotEqual(old_topology, mixnet.get_config().topology)
+        finally:
+            await mixnet.cancel()
