@@ -12,7 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
       - name: Set up Python 3.x
         uses: actions/setup-python@v5
         with:
@@ -20,5 +22,7 @@ jobs:
           python-version: '3.x'
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Build and install eth-specs
+        run: ./install-eth-specs.sh
       - name: Run tests
         run: python -m unittest

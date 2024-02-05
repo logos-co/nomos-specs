@@ -8,9 +8,23 @@ import random
 
 def blake2b_hash(committee: Committee) -> bytes:
     hasher = blake2b(digest_size=32)
-    for member in committee:
+    for member in sorted(committee):
         hasher.update(member)
     return hasher.digest()
+
+
+def fisher_yates_shuffle(nodes: List[Id], entropy: bytes):
+    """
+    Fisher-yates shuffling algorithm
+    It is the one used by python by default
+    https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+    https://softwareengineering.stackexchange.com/a/215780
+    :param nodes:
+    :param entropy:
+    :return:
+    """
+    random.seed(a=entropy, version=2)
+    random.shuffle(nodes)
 
 
 class CarnotTree:
@@ -134,8 +148,7 @@ class CarnotOverlay(EntropyOverlay):
         self.number_of_committees = number_of_committees
         self.nodes = nodes.copy()
         self.current_leader = current_leader
-        random.seed(a=self.entropy, version=2)
-        random.shuffle(self.nodes)
+        fisher_yates_shuffle(self.nodes, self.entropy)
         self.carnot_tree = CarnotTree(nodes, number_of_committees)
 
     def advance(self, entropy: bytes) -> Self:
