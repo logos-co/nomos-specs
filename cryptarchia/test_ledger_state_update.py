@@ -41,7 +41,8 @@ def config() -> Config:
     return Config(
         k=10,
         active_slot_coeff=0.05,
-        time=TimeConfig(slots_per_epoch=1000, slot_duration=1, chain_start_time=0),
+        epoch_length_multiplier=10,
+        time=TimeConfig(slot_duration=1, chain_start_time=0),
     )
 
 
@@ -60,7 +61,10 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.local_chain.tip() == block
 
         # Follower should have updated their ledger state to mark the leader coin as spent
-        assert follower.ledger_state[block.id()].verify_unspent(leader_coin.nullifier()) == False
+        assert (
+            follower.ledger_state[block.id()].verify_unspent(leader_coin.nullifier())
+            == False
+        )
 
         reuse_coin_block = mk_block(slot=1, parent=block.id, coin=leader_coin)
         follower.on_block(block)
@@ -87,7 +91,9 @@ class TestLedgerStateUpdate(TestCase):
 
         follower.on_block(block_1)
         assert follower.tip_id() == block_1.id()
-        assert not follower.ledger_state[block_1.id()].verify_unspent(coin_1.nullifier())
+        assert not follower.ledger_state[block_1.id()].verify_unspent(
+            coin_1.nullifier()
+        )
 
         # 3) then sees block 2, but sticks with block_1 as the tip
 
@@ -104,3 +110,44 @@ class TestLedgerStateUpdate(TestCase):
 
         # and the original coin_1 should now be removed from the spent pool
         assert follower.ledger_state[block_3.id()].verify_unspent(coin_1.nullifier())
+
+    def test_epoch_transition(self):
+        leader_coins = [Coin(pk=i, value=100) for i in range(4)]
+        genesis = mk_genesis_state(leader_coins)
+
+        # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
+        # and nonce snapshot before slot 7
+        config = Config(
+            k=1,
+            active_slot_coeff=1,
+            epoch_length_multiplier=10,
+            time=TimeConfig(slot_duration=1, chain_start_time=0),
+        )
+
+        follower = Follower(genesis, config)
+        block_1 = mk_block(slot=0, parent=genesis.block, coin=leader_coins[0])
+        follower.on_block(block_1)
+        assert follower.tip() == block_1
+        assert follower.tip().slot.epoch(follower.config).epoch == 0
+        block_2 = mk_block(slot=9, parent=block_1.id(), coin=leader_coins[1])
+        follower.on_block(block_2)
+        assert follower.tip() == block_2
+        assert follower.tip().slot.epoch(follower.config).epoch == 0
+        block_3 = mk_block(slot=10, parent=block_2.id(), coin=leader_coins[2])
+        follower.on_block(block_3)
+
+        # when trying to propose a block for epoch 2, the stake distribution snapshot should be taken at the end
+        # of epoch 1, i.e. slot 9
+        # To ensure this is the case, we add a new coin just to the state associated with that slot,
+        # so that the new block can be accepted only if that is the snapshot used
+        # first, verify that if we don't change the state, the block is not accepted
+        block_4 = mk_block(slot=20, parent=block_3.id(), coin=Coin(pk=4, value=100))
+        follower.on_block(block_4)
+        assert follower.tip() == block_3
+        # then we add the coin to the state associated with slot 9
+        follower.ledger_state[block_2.id()].commitments.add(
+            Coin(pk=4, value=100).commitment()
+        )
+        follower.on_block(block_4)
+        assert follower.tip() == block_4
+        assert follower.tip().slot.epoch(follower.config).epoch == 2

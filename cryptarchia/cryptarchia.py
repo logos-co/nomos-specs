@@ -1,6 +1,7 @@
 from typing import TypeAlias, List, Optional
 from hashlib import sha256, blake2b
 from math import floor
+from copy import deepcopy
 import functools
 
 # Please note this is still a work in progress
@@ -17,8 +18,6 @@ class Epoch:
 
 @dataclass
 class TimeConfig:
-    # How many slots in a epoch, all epochs will have the same number of slots
-    slots_per_epoch: int
     # How long a slot lasts in seconds
     slot_duration: int
     # Start of the first epoch, in unix timestamp second precision
@@ -29,11 +28,19 @@ class TimeConfig:
 class Config:
     k: int
     active_slot_coeff: float  # 'f', the rate of occupied slots
+    # The numerator multiplier in the formula used for calculating the number of slots in an epoch.
+    # An epoch is exactly int(floor(epoch_length_multiplier * k / f slots)) long.
+    epoch_length_multiplier: int
     time: TimeConfig
 
     @property
     def s(self):
         return int(3 * self.k / self.active_slot_coeff)
+
+    def epoch_length(self) -> int:
+        return int(
+            floor(self.epoch_length_multiplier * self.k / self.active_slot_coeff)
+        )
 
 
 # An absolute unique indentifier of a slot, counting incrementally from 0
@@ -46,14 +53,14 @@ class Slot:
         absolute_slot = (timestamp_s - config.chain_start_time) // config.slot_duration
         return Slot(absolute_slot)
 
-    def epoch(self, config: TimeConfig) -> Epoch:
-        return Epoch(self.absolute_slot // config.slots_per_epoch)
+    def epoch(self, config: Config) -> Epoch:
+        return Epoch(self.absolute_slot // config.epoch_length())
 
     def __eq__(self, other):
-        self.absolute_slot == other.absolute_slot
+        return self.absolute_slot == other.absolute_slot
 
     def __lt__(self, other):
-        self.absolute_slot < other.absolute_slot
+        return self.absolute_slot < other.absolute_slot
 
 
 @dataclass
@@ -158,6 +165,7 @@ class Chain:
             if b == block:
                 return i
 
+
 @dataclass
 class LedgerState:
     """
@@ -175,8 +183,8 @@ class LedgerState:
             block=self.block,
             nonce=self.nonce,
             total_stake=self.total_stake,
-            commitments=self.commitments.copy(),
-            nullifiers=self.nullifiers.copy(),
+            commitments=deepcopy(self.commitments),
+            nullifiers=deepcopy(self.nullifiers),
         )
 
     def verify_committed(self, commitment: Id) -> bool:
@@ -189,6 +197,7 @@ class LedgerState:
         assert block.parent == self.block
         self.block = block.id()
         self.nullifiers.add(block.leader_proof.nullifier)
+
 
 @dataclass
 class EpochState:
@@ -211,22 +220,31 @@ class EpochState:
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
 
+
 class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
         self.forks = []
         self.local_chain = Chain([])
         self.genesis_state = genesis_state
-        self.ledger_state = { genesis_state.block: genesis_state.copy()} 
+        self.ledger_state = {genesis_state.block: genesis_state.copy()}
 
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
         # TODO: verify blocks are not in the 'future'
         parent_state = self.ledger_state[block.parent]
-        epoch_state = self.compute_epoch_state(block.slot.epoch(self.config.time), chain)
+        epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
         # TODO: this is not the full block validation spec, only slot leader is verified
-        return self.verify_slot_leader(block.slot, block.leader_proof, epoch_state, parent_state)
+        return self.verify_slot_leader(
+            block.slot, block.leader_proof, epoch_state, parent_state
+        )
 
-    def verify_slot_leader(self, slot: Slot, proof: MockLeaderProof, epoch_state: EpochState, ledger_state: LedgerState) -> bool:
+    def verify_slot_leader(
+        self,
+        slot: Slot,
+        proof: MockLeaderProof,
+        epoch_state: EpochState,
+        ledger_state: LedgerState,
+    ) -> bool:
         return (
             proof.verify(slot)  # verify slot leader proof
             and epoch_state.verify_commitment_is_old_enough_to_lead(proof.commitment)
@@ -275,7 +293,7 @@ class Follower:
                 return
 
         if not self.validate_header(block, new_chain):
-            print("Invalid block")
+            new_chain.blocks.pop()
             return
 
         # We may need to switch forks, lets run the fork choice rule to check.
@@ -292,6 +310,9 @@ class Follower:
             self.local_chain, self.forks, k=self.config.k, s=self.config.s
         )
 
+    def tip(self) -> BlockHeader:
+        return self.local_chain.tip()
+
     def tip_id(self) -> Id:
         if self.local_chain.length() > 0:
             return self.local_chain.tip().id()
@@ -299,20 +320,25 @@ class Follower:
             return self.genesis_state.block
 
     def get_last_valid_state(self, chain: Chain, slot: Slot) -> LedgerState:
-        blocks = [block for block in chain.blocks if block.slot < slot]
-        if len(blocks) == 0:
-            return self.genesis_state
-        else:
-            return self.ledger_state[blocks[-1].id()]
+        for block in reversed(chain.blocks):
+            if block.slot < slot:
+                return self.ledger_state[block.id()]
+
+        return self.genesis_state
 
     def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
-        stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.time.slots_per_epoch)
-        stake_distribution_snapshot = self.get_last_valid_state(chain, stake_snapshot_slot)
+        stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.epoch_length())
+        stake_distribution_snapshot = self.get_last_valid_state(
+            chain, stake_snapshot_slot
+        )
         # nonce snapshot is taken 7k/f slots into the previous epoch
         # i.e. for epoch e, the snapshot is taken at the block at slot floor(7k/f) of epoch e-1
-        nonce_slot = Slot(int(floor(7 * self.config.k / self.config.active_slot_coeff)) + stake_snapshot_slot.absolute_slot)
+        nonce_slot = Slot(
+            int(floor(7 * self.config.k / self.config.active_slot_coeff))
+            + stake_snapshot_slot.absolute_slot
+        )
         nonce_snapshot = self.get_last_valid_state(chain, nonce_slot)
 
         return EpochState(
