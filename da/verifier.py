@@ -30,30 +30,21 @@ class DAVerifier:
         pass
 
     @staticmethod
-    def _verify_aggregated_column_commitment(
+    def _verify_column(
+            column: bytearray,
+            column_commitment: Commitment,
             aggregated_column_commitment: Commitment,
             aggregated_column_proof: Proof,
-            column_hash: bytearray,
             # this is temporary and should be removed
             index: int
     ) -> bool:
-        pass
 
-    @staticmethod
-    def _verify_column(
-            column: bytearray,
-            aggregated_column_commitment: Commitment,
-            aggregated_column_proof: Proof,
-            index: int
-    ) -> bool:
-        # TODO: Use a proper hashing scheme
+        # 1. compute commitment for column
+        # 2. If computed column commitment != column commitment, fail
+        # 3. compute column hash
         column_hash: bytearray = bytearray(hash(column))
-        return DAVerifier._verify_aggregated_column_commitment(
-            aggregated_column_commitment,
-            aggregated_column_proof,
-            column_hash,
-            index
-        )
+        # 4. Check proof with commitment and proof over the aggregated column commitment
+        pass
 
     @staticmethod
     def _verify_chunk(chunk: bytearray, commitment: Commitment, proof: Proof) -> bool:
