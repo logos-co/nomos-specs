@@ -157,7 +157,7 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.tip() == block_4
         assert follower.tip().slot.epoch(follower.config).epoch == 2
 
-    def test_evolved_coin_is_elligble_for_leadership(self):
+    def test_evolved_coin_is_eligible_for_leadership(self):
         coin = Coin(sk=0, value=100)
 
         genesis = mk_genesis_state([coin])
@@ -185,7 +185,7 @@ class TestLedgerStateUpdate(TestCase):
 
         assert follower.tip_id() == block_1.id()
 
-        # but the evolved coin is elligible
+        # but the evolved coin is eligible
         block_2_evolve = mk_block(slot=1, parent=block_1.id(), coin=coin.evolve())
         follower.on_block(block_2_evolve)
 

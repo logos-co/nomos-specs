@@ -182,6 +182,8 @@ class BlockHeader:
         h.update(self.leader_proof.commitment)
         assert len(self.leader_proof.nullifier) == 32
         h.update(self.leader_proof.nullifier)
+        assert len(self.leader_proof.evolved_commitment) == 32
+        h.update(self.leader_proof.evolved_commitment)
 
         return h.digest()
 
@@ -219,7 +221,7 @@ class LedgerState:
     # set of commitments
     commitments_spend: set[Id] = field(default_factory=set)
 
-    # set of commitments elligible to lead
+    # set of commitments eligible to lead
     commitments_lead: set[Id] = field(default_factory=set)
 
     # set of nullified coins
@@ -235,10 +237,10 @@ class LedgerState:
             nullifiers=deepcopy(self.nullifiers),
         )
 
-    def verify_elligible_to_spend(self, commitment: Id) -> bool:
+    def verify_eligible_to_spend(self, commitment: Id) -> bool:
         return commitment in self.commitments_spend
 
-    def verify_elligible_to_lead(self, commitment: Id) -> bool:
+    def verify_eligible_to_lead(self, commitment: Id) -> bool:
         return commitment in self.commitments_lead
 
     def verify_unspent(self, nullifier: Id) -> bool:
@@ -263,15 +265,15 @@ class EpochState:
     # The nonce snapshot is taken 7k/f slots into the previous epoch
     nonce_snapshot: LedgerState
 
-    def verify_elligible_to_lead_due_to_age(self, commitment: Id) -> bool:
-        # A coin is elligible to lead if it was committed to before the the stake
+    def verify_eligible_to_lead_due_to_age(self, commitment: Id) -> bool:
+        # A coin is eligible to lead if it was committed to before the the stake
         # distribution snapshot was taken or it was produced by a leader proof since the snapshot was taken.
         #
         # This verification is checking that first condition.
         #
         # NOTE: `ledger_state.commitments_spend` is a super-set of `ledger_state.commitments_lead`
 
-        return self.stake_distribution_snapshot.verify_elligible_to_spend(commitment)
+        return self.stake_distribution_snapshot.verify_eligible_to_spend(commitment)
 
     def total_stake(self) -> int:
         """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
@@ -308,8 +310,8 @@ class Follower:
         return (
             proof.verify(slot)  # verify slot leader proof
             and (
-                ledger_state.verify_elligible_to_lead(proof.commitment)
-                or epoch_state.verify_elligible_to_lead_due_to_age(proof.commitment)
+                ledger_state.verify_eligible_to_lead(proof.commitment)
+                or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
             )
             and ledger_state.verify_unspent(proof.nullifier)
         )
