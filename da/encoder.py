@@ -11,10 +11,13 @@ class DAEncoderParams:
 @dataclass
 class EncodedData:
     data: bytearray
+    columns: List[bytearray]
     row_commitments: List[Commitment]
     row_proofs: List[List[Proof]]
     column_commitments: List[Commitment]
-    aggregated_column_commitments: List[Commitment]
+    column_proofs: List[Proof]
+    aggregated_column_commitment: Commitment
+    aggregated_column_proof: Proof
 
 
 class DAEncoder:
