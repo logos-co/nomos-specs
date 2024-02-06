@@ -23,7 +23,7 @@ def make_block(parent_id: Id, slot: Slot, content: bytes) -> BlockHeader:
         content_size=1,
         slot=slot,
         content_id=content_id,
-        leader_proof=MockLeaderProof.from_coin(Coin(pk=0, value=10)),
+        leader_proof=MockLeaderProof.from_coin(Coin(sk=0, value=10)),
     )
 
 

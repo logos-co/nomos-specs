@@ -23,7 +23,7 @@ class TestLeader(TestCase):
             epoch_period_nonce_stabilization=3,
             time=TimeConfig(slot_duration=1, chain_start_time=0),
         )
-        l = Leader(config=config, coin=Coin(pk=0, value=10))
+        l = Leader(config=config, coin=Coin(sk=0, value=10))
 
         # We'll use the Margin of Error equation to decide how many samples we need.
         # https://en.wikipedia.org/wiki/Margin_of_error

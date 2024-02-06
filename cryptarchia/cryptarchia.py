@@ -79,8 +79,24 @@ class Slot:
 
 @dataclass
 class Coin:
-    pk: int
+    sk: int
     value: int
+    nonce: bytes = bytes(32)
+
+    @property
+    def pk(self):
+        return self.sk
+
+    def evolve(self) -> "Coin":
+        sk_bytes = int.to_bytes(self.sk, length=32, byteorder="little")
+
+        h = blake2b(digest_size=32)
+        h.update(b"coin-evolve")
+        h.update(sk_bytes)
+        h.update(self.nonce)
+        evolved_nonce = h.digest()
+
+        return Coin(nonce=evolved_nonce, sk=self.sk, value=self.value)
 
     def commitment(self) -> Id:
         # TODO: mocked until CL is understood
@@ -88,6 +104,8 @@ class Coin:
         value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
 
         h = sha256()
+        h.update(b"coin-commitment")
+        h.update(self.nonce)
         h.update(pk_bytes)
         h.update(value_bytes)
         return h.digest()
@@ -98,9 +116,10 @@ class Coin:
         value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
 
         h = sha256()
+        h.update(b"coin-nullifier")
+        h.update(self.nonce)
         h.update(pk_bytes)
         h.update(value_bytes)
-        h.update(b"\x00")  # extra 0 byte to differentiate from commitment
         return h.digest()
 
 
@@ -108,10 +127,17 @@ class Coin:
 class MockLeaderProof:
     commitment: Id
     nullifier: Id
+    evolved_commitment: Id
 
     @staticmethod
     def from_coin(coin: Coin):
-        return MockLeaderProof(commitment=coin.commitment(), nullifier=coin.nullifier())
+        evolved_coin = coin.evolve()
+
+        return MockLeaderProof(
+            commitment=coin.commitment(),
+            nullifier=coin.nullifier(),
+            evolved_commitment=evolved_coin.commitment(),
+        )
 
     def verify(self, slot):
         # TODO: verification not implemented
@@ -156,6 +182,8 @@ class BlockHeader:
         h.update(self.leader_proof.commitment)
         assert len(self.leader_proof.nullifier) == 32
         h.update(self.leader_proof.nullifier)
+        assert len(self.leader_proof.evolved_commitment) == 32
+        h.update(self.leader_proof.evolved_commitment)
 
         return h.digest()
 
@@ -192,20 +220,31 @@ class LedgerState:
     # Note that this does not prevent nonce grinding at the last slot before the nonce snapshot
     nonce: Id = None
     total_stake: int = None
-    commitments: set[Id] = field(default_factory=set)  # set of commitments
-    nullifiers: set[Id] = field(default_factory=set)  # set of nullified
+
+    # set of commitments
+    commitments_spend: set[Id] = field(default_factory=set)
+
+    # set of commitments eligible to lead
+    commitments_lead: set[Id] = field(default_factory=set)
+
+    # set of nullified coins
+    nullifiers: set[Id] = field(default_factory=set)
 
     def copy(self):
         return LedgerState(
             block=self.block,
             nonce=self.nonce,
             total_stake=self.total_stake,
-            commitments=deepcopy(self.commitments),
+            commitments_spend=deepcopy(self.commitments_spend),
+            commitments_lead=deepcopy(self.commitments_lead),
             nullifiers=deepcopy(self.nullifiers),
         )
 
-    def verify_committed(self, commitment: Id) -> bool:
-        return commitment in self.commitments
+    def verify_eligible_to_spend(self, commitment: Id) -> bool:
+        return commitment in self.commitments_spend
+
+    def verify_eligible_to_lead(self, commitment: Id) -> bool:
+        return commitment in self.commitments_lead
 
     def verify_unspent(self, nullifier: Id) -> bool:
         return nullifier not in self.nullifiers
@@ -221,6 +260,8 @@ class LedgerState:
         self.nonce = h.digest()
         self.block = block.id()
         self.nullifiers.add(block.leader_proof.nullifier)
+        self.commitments_spend.add(block.leader_proof.evolved_commitment)
+        self.commitments_lead.add(block.leader_proof.evolved_commitment)
 
 
 @dataclass
@@ -234,8 +275,15 @@ class EpochState:
     # The nonce snapshot is taken 7k/f slots into the previous epoch
     nonce_snapshot: LedgerState
 
-    def verify_commitment_is_old_enough_to_lead(self, commitment: Id) -> bool:
-        return self.stake_distribution_snapshot.verify_committed(commitment)
+    def verify_eligible_to_lead_due_to_age(self, commitment: Id) -> bool:
+        # A coin is eligible to lead if it was committed to before the the stake
+        # distribution snapshot was taken or it was produced by a leader proof since the snapshot was taken.
+        #
+        # This verification is checking that first condition.
+        #
+        # NOTE: `ledger_state.commitments_spend` is a super-set of `ledger_state.commitments_lead`
+
+        return self.stake_distribution_snapshot.verify_eligible_to_spend(commitment)
 
     def total_stake(self) -> int:
         """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
@@ -271,7 +319,10 @@ class Follower:
     ) -> bool:
         return (
             proof.verify(slot)  # verify slot leader proof
-            and epoch_state.verify_commitment_is_old_enough_to_lead(proof.commitment)
+            and (
+                ledger_state.verify_eligible_to_lead(proof.commitment)
+                or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
+            )
             and ledger_state.verify_unspent(proof.nullifier)
         )
 

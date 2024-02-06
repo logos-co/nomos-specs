@@ -20,7 +20,8 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
         block=bytes(32),
         nonce=bytes(32),
         total_stake=sum(c.value for c in initial_stake_distribution),
-        commitments={c.commitment() for c in initial_stake_distribution},
+        commitments_spend={c.commitment() for c in initial_stake_distribution},
+        commitments_lead={c.commitment() for c in initial_stake_distribution},
         nullifiers=set(),
     )
 
@@ -50,7 +51,7 @@ def config() -> Config:
 
 class TestLedgerStateUpdate(TestCase):
     def test_ledger_state_prevents_coin_reuse(self):
-        leader_coin = Coin(pk=0, value=100)
+        leader_coin = Coin(sk=0, value=100)
         genesis = mk_genesis_state([leader_coin])
 
         follower = Follower(genesis, config())
@@ -76,9 +77,9 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.local_chain.tip() == block
 
     def test_ledger_state_is_properly_updated_on_reorg(self):
-        coin_1 = Coin(pk=0, value=100)
-        coin_2 = Coin(pk=1, value=100)
-        coin_3 = Coin(pk=2, value=100)
+        coin_1 = Coin(sk=0, value=100)
+        coin_2 = Coin(sk=1, value=100)
+        coin_3 = Coin(sk=2, value=100)
 
         genesis = mk_genesis_state([coin_1, coin_2, coin_3])
 
@@ -114,7 +115,7 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.ledger_state[block_3.id()].verify_unspent(coin_1.nullifier())
 
     def test_epoch_transition(self):
-        leader_coins = [Coin(pk=i, value=100) for i in range(4)]
+        leader_coins = [Coin(sk=i, value=100) for i in range(4)]
         genesis = mk_genesis_state(leader_coins)
 
         # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
@@ -145,13 +146,108 @@ class TestLedgerStateUpdate(TestCase):
         # To ensure this is the case, we add a new coin just to the state associated with that slot,
         # so that the new block can be accepted only if that is the snapshot used
         # first, verify that if we don't change the state, the block is not accepted
-        block_4 = mk_block(slot=20, parent=block_3.id(), coin=Coin(pk=4, value=100))
+        block_4 = mk_block(slot=20, parent=block_3.id(), coin=Coin(sk=4, value=100))
         follower.on_block(block_4)
         assert follower.tip() == block_3
-        # then we add the coin to the state associated with slot 9
-        follower.ledger_state[block_2.id()].commitments.add(
-            Coin(pk=4, value=100).commitment()
+        # then we add the coin to "spendable commitments" associated with slot 9
+        follower.ledger_state[block_2.id()].commitments_spend.add(
+            Coin(sk=4, value=100).commitment()
         )
         follower.on_block(block_4)
         assert follower.tip() == block_4
         assert follower.tip().slot.epoch(follower.config).epoch == 2
+
+    def test_evolved_coin_is_eligible_for_leadership(self):
+        coin = Coin(sk=0, value=100)
+
+        genesis = mk_genesis_state([coin])
+
+        config = Config(
+            k=1,
+            active_slot_coeff=1,
+            epoch_stake_distribution_stabilization=4,
+            epoch_period_nonce_buffer=3,
+            epoch_period_nonce_stabilization=3,
+            time=TimeConfig(slot_duration=1, chain_start_time=0),
+        )
+
+        follower = Follower(genesis, config)
+
+        # coin wins the first slot
+        block_1 = mk_block(slot=0, parent=genesis.block, coin=coin)
+        follower.on_block(block_1)
+        assert follower.tip_id() == block_1.id()
+
+        # coin can't be reused to win following slots:
+        block_2_reuse = mk_block(slot=1, parent=block_1.id(), coin=coin)
+        follower.on_block(block_2_reuse)
+        assert follower.tip_id() == block_1.id()
+
+        # but the evolved coin is eligible
+        block_2_evolve = mk_block(slot=1, parent=block_1.id(), coin=coin.evolve())
+        follower.on_block(block_2_evolve)
+        assert follower.tip_id() == block_2_evolve.id()
+
+    def test_new_coins_becoming_eligible_after_stake_distribution_stabilizes(self):
+        coin = Coin(sk=0, value=100)
+        genesis = mk_genesis_state([coin])
+
+        # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
+        # and nonce snapshot before slot 7
+        config = Config(
+            k=1,
+            active_slot_coeff=1,
+            epoch_stake_distribution_stabilization=4,
+            epoch_period_nonce_buffer=3,
+            epoch_period_nonce_stabilization=3,
+            time=TimeConfig(slot_duration=1, chain_start_time=0),
+        )
+
+        follower = Follower(genesis, config)
+
+        # ---- EPOCH 0 ----
+
+        block_0_0 = mk_block(slot=0, parent=genesis.block, coin=coin)
+        follower.on_block(block_0_0)
+        assert follower.tip() == block_0_0
+
+        # mint a new coin to be used for leader elections in upcoming epochs
+        coin_new = Coin(sk=1, value=10)
+        follower.ledger_state[block_0_0.id()].commitments_spend.add(
+            coin_new.commitment()
+        )
+
+        # the new coin is not yet eligible for elections
+
+        block_0_1_attempt = mk_block(slot=1, parent=block_0_0.id(), coin=coin_new)
+        follower.on_block(block_0_1_attempt)
+        assert follower.tip() == block_0_0
+
+        # whereas the evolved coin from genesis can be spent immediately
+
+        block_0_1 = mk_block(slot=1, parent=block_0_0.id(), coin=coin.evolve())
+        follower.on_block(block_0_1)
+        assert follower.tip() == block_0_1
+
+        # ---- EPOCH 1 ----
+
+        # The newly minted coin is still not eligible in the following epoch since the
+        # stake distribution snapshot is taken at the beginning of the previous epoch
+
+        block_1_0 = mk_block(slot=10, parent=block_0_1.id(), coin=coin_new)
+        follower.on_block(block_1_0)
+        assert follower.tip() == block_0_1
+
+        # ---- EPOCH 2 ----
+
+        # The coin is finally eligible 2 epochs after it was first minted
+
+        block_2_0 = mk_block(slot=20, parent=block_0_1.id(), coin=coin_new)
+        follower.on_block(block_2_0)
+        assert follower.tip() == block_2_0
+
+        # And now the minted coin can freely use the evolved coin for subsequent blocks
+
+        block_2_1 = mk_block(slot=20, parent=block_2_0.id(), coin=coin_new.evolve())
+        follower.on_block(block_2_1)
+        assert follower.tip() == block_2_1
