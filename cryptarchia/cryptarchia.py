@@ -332,7 +332,7 @@ class Follower:
         else:
             return self.genesis_state.block
 
-    def get_last_valid_state(self, chain: Chain, slot: Slot) -> LedgerState:
+    def state_at_slot_beginning(self, chain: Chain, slot: Slot) -> LedgerState:
         for block in reversed(chain.blocks):
             if block.slot < slot:
                 return self.ledger_state[block.id()]
@@ -343,7 +343,7 @@ class Follower:
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
         stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.epoch_length)
-        stake_distribution_snapshot = self.get_last_valid_state(
+        stake_distribution_snapshot = self.state_at_slot_beginning(
             chain, stake_snapshot_slot
         )
 
@@ -355,7 +355,7 @@ class Follower:
             )
             + stake_snapshot_slot.absolute_slot
         )
-        nonce_snapshot = self.get_last_valid_state(chain, nonce_slot)
+        nonce_snapshot = self.state_at_slot_beginning(chain, nonce_slot)
 
         return EpochState(
             stake_distribution_snapshot=stake_distribution_snapshot,
