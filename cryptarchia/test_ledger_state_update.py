@@ -50,7 +50,7 @@ def config() -> Config:
 
 class TestLedgerStateUpdate(TestCase):
     def test_ledger_state_prevents_coin_reuse(self):
-        leader_coin = Coin(pk=0, value=100)
+        leader_coin = Coin(sk=0, value=100)
         genesis = mk_genesis_state([leader_coin])
 
         follower = Follower(genesis, config())
@@ -76,9 +76,9 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.local_chain.tip() == block
 
     def test_ledger_state_is_properly_updated_on_reorg(self):
-        coin_1 = Coin(pk=0, value=100)
-        coin_2 = Coin(pk=1, value=100)
-        coin_3 = Coin(pk=2, value=100)
+        coin_1 = Coin(sk=0, value=100)
+        coin_2 = Coin(sk=1, value=100)
+        coin_3 = Coin(sk=2, value=100)
 
         genesis = mk_genesis_state([coin_1, coin_2, coin_3])
 
@@ -114,7 +114,7 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.ledger_state[block_3.id()].verify_unspent(coin_1.nullifier())
 
     def test_epoch_transition(self):
-        leader_coins = [Coin(pk=i, value=100) for i in range(4)]
+        leader_coins = [Coin(sk=i, value=100) for i in range(4)]
         genesis = mk_genesis_state(leader_coins)
 
         # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
@@ -145,12 +145,12 @@ class TestLedgerStateUpdate(TestCase):
         # To ensure this is the case, we add a new coin just to the state associated with that slot,
         # so that the new block can be accepted only if that is the snapshot used
         # first, verify that if we don't change the state, the block is not accepted
-        block_4 = mk_block(slot=20, parent=block_3.id(), coin=Coin(pk=4, value=100))
+        block_4 = mk_block(slot=20, parent=block_3.id(), coin=Coin(sk=4, value=100))
         follower.on_block(block_4)
         assert follower.tip() == block_3
         # then we add the coin to the state associated with slot 9
         follower.ledger_state[block_2.id()].commitments.add(
-            Coin(pk=4, value=100).commitment()
+            Coin(sk=4, value=100).commitment()
         )
         follower.on_block(block_4)
         assert follower.tip() == block_4

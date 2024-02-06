@@ -79,8 +79,24 @@ class Slot:
 
 @dataclass
 class Coin:
-    pk: int
+    sk: int
     value: int
+    nonce: bytes = bytes(32)
+
+    @property
+    def pk(self):
+        return self.sk
+
+    def evolve(self) -> "Coin":
+        sk_bytes = int.to_bytes(self.sk, length=32, byteorder="little")
+
+        h = blake2b(digest_size=32)
+        h.update(b"coin-evolve")
+        h.update(sk_bytes)
+        h.update(self.nonce)
+        evolved_nonce = h.digest()
+
+        return Coin(nonce=evolved_nonce, sk=self.sk, value=self.value)
 
     def commitment(self) -> Id:
         # TODO: mocked until CL is understood
@@ -88,6 +104,8 @@ class Coin:
         value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
 
         h = sha256()
+        h.update(b"coin-commitment")
+        h.update(self.nonce)
         h.update(pk_bytes)
         h.update(value_bytes)
         return h.digest()
@@ -98,9 +116,10 @@ class Coin:
         value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
 
         h = sha256()
+        h.update(b"coin-nullifier")
+        h.update(self.nonce)
         h.update(pk_bytes)
         h.update(value_bytes)
-        h.update(b"\x00")  # extra 0 byte to differentiate from commitment
         return h.digest()
 
 
@@ -108,10 +127,17 @@ class Coin:
 class MockLeaderProof:
     commitment: Id
     nullifier: Id
+    evolved_commitment: Id
 
     @staticmethod
     def from_coin(coin: Coin):
-        return MockLeaderProof(commitment=coin.commitment(), nullifier=coin.nullifier())
+        evolved_coin = coin.evolve()
+
+        return MockLeaderProof(
+            commitment=coin.commitment(),
+            nullifier=coin.nullifier(),
+            evolved_commitment=evolved_coin.commitment(),
+        )
 
     def verify(self, slot):
         # TODO: verification not implemented
