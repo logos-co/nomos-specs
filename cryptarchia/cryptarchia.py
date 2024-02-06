@@ -215,20 +215,31 @@ class LedgerState:
     block: Id = None
     nonce: Id = None
     total_stake: int = None
-    commitments: set[Id] = field(default_factory=set)  # set of commitments
-    nullifiers: set[Id] = field(default_factory=set)  # set of nullified
+
+    # set of commitments
+    commitments_spend: set[Id] = field(default_factory=set)
+
+    # set of commitments elligible to lead
+    commitments_lead: set[Id] = field(default_factory=set)
+
+    # set of nullified coins
+    nullifiers: set[Id] = field(default_factory=set)
 
     def copy(self):
         return LedgerState(
             block=self.block,
             nonce=self.nonce,
             total_stake=self.total_stake,
-            commitments=deepcopy(self.commitments),
+            commitments_spend=deepcopy(self.commitments_spend),
+            commitments_lead=deepcopy(self.commitments_lead),
             nullifiers=deepcopy(self.nullifiers),
         )
 
-    def verify_committed(self, commitment: Id) -> bool:
-        return commitment in self.commitments
+    def verify_elligible_to_spend(self, commitment: Id) -> bool:
+        return commitment in self.commitments_spend
+
+    def verify_elligible_to_lead(self, commitment: Id) -> bool:
+        return commitment in self.commitments_lead
 
     def verify_unspent(self, nullifier: Id) -> bool:
         return nullifier not in self.nullifiers
@@ -237,6 +248,8 @@ class LedgerState:
         assert block.parent == self.block
         self.block = block.id()
         self.nullifiers.add(block.leader_proof.nullifier)
+        self.commitments_spend.add(block.leader_proof.evolved_commitment)
+        self.commitments_lead.add(block.leader_proof.evolved_commitment)
 
 
 @dataclass
@@ -250,8 +263,15 @@ class EpochState:
     # The nonce snapshot is taken 7k/f slots into the previous epoch
     nonce_snapshot: LedgerState
 
-    def verify_commitment_is_old_enough_to_lead(self, commitment: Id) -> bool:
-        return self.stake_distribution_snapshot.verify_committed(commitment)
+    def verify_elligible_to_lead_due_to_age(self, commitment: Id) -> bool:
+        # A coin is elligible to lead if it was committed to before the the stake
+        # distribution snapshot was taken or it was produced by a leader proof since the snapshot was taken.
+        #
+        # This verification is checking that first condition.
+        #
+        # NOTE: `ledger_state.commitments_spend` is a super-set of `ledger_state.commitments_lead`
+
+        return self.stake_distribution_snapshot.verify_elligible_to_spend(commitment)
 
     def total_stake(self) -> int:
         """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
@@ -287,7 +307,10 @@ class Follower:
     ) -> bool:
         return (
             proof.verify(slot)  # verify slot leader proof
-            and epoch_state.verify_commitment_is_old_enough_to_lead(proof.commitment)
+            and (
+                ledger_state.verify_elligible_to_lead(proof.commitment)
+                or epoch_state.verify_elligible_to_lead_due_to_age(proof.commitment)
+            )
             and ledger_state.verify_unspent(proof.nullifier)
         )
 
