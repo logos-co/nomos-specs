@@ -187,6 +187,9 @@ class LedgerState:
     """
 
     block: Id = None
+    # This nonce is used to derive the seed for the slot leader lottery
+    # It's updated at every block by hashing the previous nonce with the nullifier
+    # Note that this does not prevent nonce grinding at the last slot before the nonce snapshot
     nonce: Id = None
     total_stake: int = None
     commitments: set[Id] = field(default_factory=set)  # set of commitments
@@ -209,7 +212,13 @@ class LedgerState:
 
     def apply(self, block: BlockHeader):
         assert block.parent == self.block
-        self.nonce = blake2b(self.nonce + block.id(), digest_size=32).digest()
+
+        h = blake2b(digest_size=32)
+        h.update("epoch-nonce".encode(encoding="utf-8"))
+        h.update(self.nonce)
+        h.update(block.leader_proof.nullifier)
+
+        self.nonce = h.digest()
         self.block = block.id()
         self.nullifiers.add(block.leader_proof.nullifier)
 
