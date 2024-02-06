@@ -255,12 +255,10 @@ class Follower:
     # the operation was successful
     def try_extend_chains(self, block: BlockHeader) -> Optional[Chain]:
         if self.tip_id() == block.parent:
-            self.local_chain.blocks.append(block)
             return self.local_chain
 
         for chain in self.forks:
             if chain.tip().id() == block.parent:
-                chain.blocks.append(block)
                 return chain
 
         return None
@@ -268,13 +266,13 @@ class Follower:
     def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
         if self.genesis_state.block == block.parent:
             # this block is forking off the genesis state
-            return Chain(blocks=[block])
+            return Chain(blocks=[])
 
         chains = self.forks + [self.local_chain]
         for chain in chains:
             if chain.contains_block(block):
                 block_position = chain.block_position(block)
-                return Chain(blocks=chain.blocks[:block_position] + [block])
+                return Chain(blocks=chain.blocks[:block_position])
 
         return None
 
@@ -293,8 +291,9 @@ class Follower:
                 return
 
         if not self.validate_header(block, new_chain):
-            new_chain.blocks.pop()
             return
+
+        new_chain.blocks.append(block)
 
         # We may need to switch forks, lets run the fork choice rule to check.
         new_chain = self.fork_choice()
