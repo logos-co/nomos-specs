@@ -28,19 +28,33 @@ class TimeConfig:
 class Config:
     k: int
     active_slot_coeff: float  # 'f', the rate of occupied slots
-    # The numerator multiplier in the formula used for calculating the number of slots in an epoch.
-    # An epoch is exactly int(floor(epoch_length_multiplier * k / f slots)) long.
-    epoch_length_multiplier: int
+    # The stake distribution is always taken at the beginning of the previous epoch.
+    # This parameters controls how many slots to wait for it to be stabilized
+    # The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
+    epoch_stake_distribution_stabilization: int
+    # This parameter controls how many slots we wait after the stake distribution
+    # snapshot has stabilized to take the nonce snapshot.
+    epoch_period_nonce_buffer: int
+    # This parameter controls how many slots we wait for the nonce snapshot to be considered
+    # stabilized
+    epoch_period_nonce_stabilization: int
     time: TimeConfig
 
     @property
-    def s(self):
-        return int(3 * self.k / self.active_slot_coeff)
+    def base_period_length(self) -> int:
+        return int(floor(self.k / self.active_slot_coeff))
 
+    @property
     def epoch_length(self) -> int:
-        return int(
-            floor(self.epoch_length_multiplier * self.k / self.active_slot_coeff)
-        )
+        return (
+            self.epoch_stake_distribution_stabilization
+            + self.epoch_period_nonce_buffer
+            + self.epoch_period_nonce_stabilization
+        ) * self.base_period_length
+
+    @property
+    def s(self):
+        return self.base_period_length * self.epoch_period_nonce_stabilization
 
 
 # An absolute unique indentifier of a slot, counting incrementally from 0
@@ -54,7 +68,7 @@ class Slot:
         return Slot(absolute_slot)
 
     def epoch(self, config: Config) -> Epoch:
-        return Epoch(self.absolute_slot // config.epoch_length())
+        return Epoch(self.absolute_slot // config.epoch_length)
 
     def __eq__(self, other):
         return self.absolute_slot == other.absolute_slot
@@ -328,14 +342,17 @@ class Follower:
     def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
-        stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.epoch_length())
+        stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.epoch_length)
         stake_distribution_snapshot = self.get_last_valid_state(
             chain, stake_snapshot_slot
         )
-        # nonce snapshot is taken 7k/f slots into the previous epoch
-        # i.e. for epoch e, the snapshot is taken at the block at slot floor(7k/f) of epoch e-1
+
         nonce_slot = Slot(
-            int(floor(7 * self.config.k / self.config.active_slot_coeff))
+            self.config.base_period_length
+            * (
+                self.config.epoch_stake_distribution_stabilization
+                + self.config.epoch_period_nonce_buffer
+            )
             + stake_snapshot_slot.absolute_slot
         )
         nonce_snapshot = self.get_last_valid_state(chain, nonce_slot)
