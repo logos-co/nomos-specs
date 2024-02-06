@@ -1,5 +1,8 @@
 from typing import TypeAlias, List, Optional
 from hashlib import sha256, blake2b
+from math import floor
+from copy import deepcopy
+import functools
 
 # Please note this is still a work in progress
 from dataclasses import dataclass, field
@@ -15,8 +18,6 @@ class Epoch:
 
 @dataclass
 class TimeConfig:
-    # How many slots in a epoch, all epochs will have the same number of slots
-    slots_per_epoch: int
     # How long a slot lasts in seconds
     slot_duration: int
     # Start of the first epoch, in unix timestamp second precision
@@ -27,15 +28,38 @@ class TimeConfig:
 class Config:
     k: int
     active_slot_coeff: float  # 'f', the rate of occupied slots
+    # The stake distribution is always taken at the beginning of the previous epoch.
+    # This parameters controls how many slots to wait for it to be stabilized
+    # The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
+    epoch_stake_distribution_stabilization: int
+    # This parameter controls how many slots we wait after the stake distribution
+    # snapshot has stabilized to take the nonce snapshot.
+    epoch_period_nonce_buffer: int
+    # This parameter controls how many slots we wait for the nonce snapshot to be considered
+    # stabilized
+    epoch_period_nonce_stabilization: int
     time: TimeConfig
 
     @property
+    def base_period_length(self) -> int:
+        return int(floor(self.k / self.active_slot_coeff))
+
+    @property
+    def epoch_length(self) -> int:
+        return (
+            self.epoch_stake_distribution_stabilization
+            + self.epoch_period_nonce_buffer
+            + self.epoch_period_nonce_stabilization
+        ) * self.base_period_length
+
+    @property
     def s(self):
-        return int(3 * self.k / self.active_slot_coeff)
+        return self.base_period_length * self.epoch_period_nonce_stabilization
 
 
 # An absolute unique indentifier of a slot, counting incrementally from 0
 @dataclass
+@functools.total_ordering
 class Slot:
     absolute_slot: int
 
@@ -43,8 +67,14 @@ class Slot:
         absolute_slot = (timestamp_s - config.chain_start_time) // config.slot_duration
         return Slot(absolute_slot)
 
-    def epoch(self, config: TimeConfig) -> Epoch:
-        return self.absolute_slot // config.slots_per_epoch
+    def epoch(self, config: Config) -> Epoch:
+        return Epoch(self.absolute_slot // config.epoch_length)
+
+    def __eq__(self, other):
+        return self.absolute_slot == other.absolute_slot
+
+    def __lt__(self, other):
+        return self.absolute_slot < other.absolute_slot
 
 
 @dataclass
@@ -167,8 +197,8 @@ class LedgerState:
             block=self.block,
             nonce=self.nonce,
             total_stake=self.total_stake,
-            commitments=self.commitments.copy(),
-            nullifiers=self.nullifiers.copy(),
+            commitments=deepcopy(self.commitments),
+            nullifiers=deepcopy(self.nullifiers),
         )
 
     def verify_committed(self, commitment: Id) -> bool:
@@ -181,104 +211,6 @@ class LedgerState:
         assert block.parent == self.block
         self.block = block.id()
         self.nullifiers.add(block.leader_proof.nullifier)
-
-
-class Follower:
-    def __init__(self, genesis_state: LedgerState, config: Config):
-        self.config = config
-        self.forks = []
-        self.local_chain = Chain([])
-        self.epoch = EpochState(
-            stake_distribution_snapshot=genesis_state,
-            nonce_snapshot=genesis_state,
-        )
-        self.genesis_state = genesis_state
-        self.ledger_state = genesis_state.copy()
-
-    def validate_header(self, block: BlockHeader) -> bool:
-        # TODO: this is not the full block validation spec, only slot leader is verified
-        return self.verify_slot_leader(block.slot, block.leader_proof)
-
-    def verify_slot_leader(self, slot: Slot, proof: MockLeaderProof) -> bool:
-        return (
-            proof.verify(slot)  # verify slot leader proof
-            and self.epoch.verify_commitment_is_old_enough_to_lead(proof.commitment)
-            and self.ledger_state.verify_unspent(proof.nullifier)
-        )
-
-    # Try appending this block to an existing chain and return whether
-    # the operation was successful
-    def try_extend_chains(self, block: BlockHeader) -> bool:
-        if self.tip_id() == block.parent:
-            self.local_chain.blocks.append(block)
-            return True
-
-        for chain in self.forks:
-            if chain.tip().id() == block.parent:
-                chain.blocks.append(block)
-                return True
-
-        return False
-
-    def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
-        if self.genesis_state.block == block.parent:
-            # this block is forking off the genesis state
-            return Chain(blocks=[block])
-
-        chains = self.forks + [self.local_chain]
-        for chain in chains:
-            if chain.contains_block(block):
-                block_position = chain.block_position(block)
-                return Chain(blocks=chain.blocks[:block_position] + [block])
-
-        return None
-
-    def on_block(self, block: BlockHeader):
-        if not self.validate_header(block):
-            return
-
-        # check if the new block extends an existing chain
-        succeeded_in_extending_a_chain = self.try_extend_chains(block)
-        if not succeeded_in_extending_a_chain:
-            # we failed to extend one of the existing chains,
-            # therefore we might need to create a new fork
-            new_chain = self.try_create_fork(block)
-            if new_chain is not None:
-                self.forks.append(new_chain)
-            else:
-                # otherwise, we're missing the parent block
-                # in that case, just ignore the block
-                return
-
-        # We may need to switch forks, lets run the fork choice rule to check.
-        new_chain = self.fork_choice()
-
-        if new_chain == self.local_chain:
-            # we have not re-org'd therefore we can simply update our ledger state
-            # if this block extend our local chain
-            if self.local_chain.tip() == block:
-                self.ledger_state.apply(block)
-        else:
-            # we have re-org'd, therefore we must roll back out ledger state and
-            # re-apply blocks from the new chain
-            ledger_state = self.genesis_state.copy()
-            for block in new_chain.blocks:
-                ledger_state.apply(block)
-
-            self.ledger_state = ledger_state
-            self.local_chain = new_chain
-
-    # Evaluate the fork choice rule and return the block header of the block that should be the head of the chain
-    def fork_choice(self) -> Chain:
-        return maxvalid_bg(
-            self.local_chain, self.forks, k=self.config.k, s=self.config.s
-        )
-
-    def tip_id(self) -> Id:
-        if self.local_chain.length() > 0:
-            return self.local_chain.tip().id()
-        else:
-            return self.ledger_state.block
 
 
 @dataclass
@@ -301,6 +233,134 @@ class EpochState:
 
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
+
+
+class Follower:
+    def __init__(self, genesis_state: LedgerState, config: Config):
+        self.config = config
+        self.forks = []
+        self.local_chain = Chain([])
+        self.genesis_state = genesis_state
+        self.ledger_state = {genesis_state.block: genesis_state.copy()}
+
+    def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
+        # TODO: verify blocks are not in the 'future'
+        parent_state = self.ledger_state[block.parent]
+        epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
+        # TODO: this is not the full block validation spec, only slot leader is verified
+        return self.verify_slot_leader(
+            block.slot, block.leader_proof, epoch_state, parent_state
+        )
+
+    def verify_slot_leader(
+        self,
+        slot: Slot,
+        proof: MockLeaderProof,
+        epoch_state: EpochState,
+        ledger_state: LedgerState,
+    ) -> bool:
+        return (
+            proof.verify(slot)  # verify slot leader proof
+            and epoch_state.verify_commitment_is_old_enough_to_lead(proof.commitment)
+            and ledger_state.verify_unspent(proof.nullifier)
+        )
+
+    # Try appending this block to an existing chain and return whether
+    # the operation was successful
+    def try_extend_chains(self, block: BlockHeader) -> Optional[Chain]:
+        if self.tip_id() == block.parent:
+            return self.local_chain
+
+        for chain in self.forks:
+            if chain.tip().id() == block.parent:
+                return chain
+
+        return None
+
+    def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
+        if self.genesis_state.block == block.parent:
+            # this block is forking off the genesis state
+            return Chain(blocks=[])
+
+        chains = self.forks + [self.local_chain]
+        for chain in chains:
+            if chain.contains_block(block):
+                block_position = chain.block_position(block)
+                return Chain(blocks=chain.blocks[:block_position])
+
+        return None
+
+    def on_block(self, block: BlockHeader):
+        # check if the new block extends an existing chain
+        new_chain = self.try_extend_chains(block)
+        if new_chain is None:
+            # we failed to extend one of the existing chains,
+            # therefore we might need to create a new fork
+            new_chain = self.try_create_fork(block)
+            if new_chain is not None:
+                self.forks.append(new_chain)
+            else:
+                # otherwise, we're missing the parent block
+                # in that case, just ignore the block
+                return
+
+        if not self.validate_header(block, new_chain):
+            return
+
+        new_chain.blocks.append(block)
+
+        # We may need to switch forks, lets run the fork choice rule to check.
+        new_chain = self.fork_choice()
+        self.local_chain = new_chain
+
+        new_state = self.ledger_state[block.parent].copy()
+        new_state.apply(block)
+        self.ledger_state[block.id()] = new_state
+
+    # Evaluate the fork choice rule and return the block header of the block that should be the head of the chain
+    def fork_choice(self) -> Chain:
+        return maxvalid_bg(
+            self.local_chain, self.forks, k=self.config.k, s=self.config.s
+        )
+
+    def tip(self) -> BlockHeader:
+        return self.local_chain.tip()
+
+    def tip_id(self) -> Id:
+        if self.local_chain.length() > 0:
+            return self.local_chain.tip().id()
+        else:
+            return self.genesis_state.block
+
+    def state_at_slot_beginning(self, chain: Chain, slot: Slot) -> LedgerState:
+        for block in reversed(chain.blocks):
+            if block.slot < slot:
+                return self.ledger_state[block.id()]
+
+        return self.genesis_state
+
+    def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
+        # stake distribution snapshot happens at the beginning of the previous epoch,
+        # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
+        stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.epoch_length)
+        stake_distribution_snapshot = self.state_at_slot_beginning(
+            chain, stake_snapshot_slot
+        )
+
+        nonce_slot = Slot(
+            self.config.base_period_length
+            * (
+                self.config.epoch_stake_distribution_stabilization
+                + self.config.epoch_period_nonce_buffer
+            )
+            + stake_snapshot_slot.absolute_slot
+        )
+        nonce_snapshot = self.state_at_slot_beginning(chain, nonce_slot)
+
+        return EpochState(
+            stake_distribution_snapshot=stake_distribution_snapshot,
+            nonce_snapshot=nonce_snapshot,
+        )
 
 
 def phi(f: float, alpha: float) -> float:

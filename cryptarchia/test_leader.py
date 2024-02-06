@@ -18,7 +18,10 @@ class TestLeader(TestCase):
         config = Config(
             k=10,
             active_slot_coeff=f,
-            time=TimeConfig(slots_per_epoch=1000, slot_duration=1, chain_start_time=0),
+            epoch_stake_distribution_stabilization=4,
+            epoch_period_nonce_buffer=3,
+            epoch_period_nonce_stabilization=3,
+            time=TimeConfig(slot_duration=1, chain_start_time=0),
         )
         l = Leader(config=config, coin=Coin(pk=0, value=10))
 
