@@ -209,6 +209,7 @@ class LedgerState:
 
     def apply(self, block: BlockHeader):
         assert block.parent == self.block
+        self.nonce = blake2b(self.nonce + block.id(), digest_size=32).digest()
         self.block = block.id()
         self.nullifiers.add(block.leader_proof.nullifier)
 
