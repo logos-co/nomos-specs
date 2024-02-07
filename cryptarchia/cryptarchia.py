@@ -2,6 +2,7 @@ from typing import TypeAlias, List, Optional
 from hashlib import sha256, blake2b
 from math import floor
 from copy import deepcopy
+from itertools import chain
 import functools
 
 # Please note this is still a work in progress
@@ -133,20 +134,24 @@ class MockLeaderProof:
     commitment: Id
     nullifier: Id
     evolved_commitment: Id
+    slot: Slot
+    parent: Id
 
     @staticmethod
-    def from_coin(coin: Coin):
+    def new(coin: Coin, slot: Slot, parent: Id):
         evolved_coin = coin.evolve()
 
         return MockLeaderProof(
             commitment=coin.commitment(),
             nullifier=coin.nullifier(),
             evolved_commitment=evolved_coin.commitment(),
+            slot=slot,
+            parent=parent,
         )
 
-    def verify(self, slot):
+    def verify(self, slot: Slot, parent: Id):
         # TODO: verification not implemented
-        return True
+        return slot == self.slot and parent == self.parent
 
 
 @dataclass
@@ -156,15 +161,9 @@ class BlockHeader:
     content_size: int
     content_id: Id
     leader_proof: MockLeaderProof
+    orphaned_proofs: List[MockLeaderProof] = field(default_factory=list)
 
-    # **Attention**:
-    # The ID of a block header is defined as the 32byte blake2b hash of its fields
-    # as serialized in the format specified by the 'HEADER' rule in 'messages.abnf'.
-    #
-    # The following code is to be considered as a reference implementation, mostly to be used for testing.
-    def id(self) -> Id:
-        h = blake2b(digest_size=32)
-
+    def update_header_hash(self, h):
         # version byte
         h.update(b"\x01")
 
@@ -190,12 +189,31 @@ class BlockHeader:
         assert len(self.leader_proof.evolved_commitment) == 32
         h.update(self.leader_proof.evolved_commitment)
 
+        # orphaned proofs
+        h.update(int.to_bytes(len(self.orphaned_proofs), length=4, byteorder="big"))
+        for proof in self.orphaned_proofs:
+            proof.update_header_hash(h)
+
+    # **Attention**:
+    # The ID of a block header is defined as the 32byte blake2b hash of its fields
+    # as serialized in the format specified by the 'HEADER' rule in 'messages.abnf'.
+    #
+    # The following code is to be considered as a reference implementation, mostly to be used for testing.
+    def id(self) -> Id:
+        h = blake2b(digest_size=32)
+        self.update_header_hash(h)
         return h.digest()
 
 
 @dataclass
 class Chain:
     blocks: List[BlockHeader]
+    genesis: Id
+
+    def tip_id(self) -> Id:
+        if len(self.blocks) == 0:
+            return self.genesis
+        return self.tip().id()
 
     def tip(self) -> BlockHeader:
         return self.blocks[-1]
@@ -265,9 +283,11 @@ class LedgerState:
 
         self.nonce = h.digest()
         self.block = block.id()
-        self.nullifiers.add(block.leader_proof.nullifier)
-        self.commitments_spend.add(block.leader_proof.evolved_commitment)
-        self.commitments_lead.add(block.leader_proof.evolved_commitment)
+        for proof in chain(block.orphaned_proofs, [block]):
+            proof = proof.leader_proof
+            self.nullifiers.add(proof.nullifier)
+            self.commitments_spend.add(proof.evolved_commitment)
+            self.commitments_lead.add(proof.evolved_commitment)
 
 
 @dataclass
@@ -303,33 +323,59 @@ class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
         self.forks = []
-        self.local_chain = Chain([])
+        self.local_chain = Chain([], genesis=genesis_state.block)
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block: genesis_state.copy()}
 
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
         # TODO: verify blocks are not in the 'future'
-        parent_state = self.ledger_state[block.parent]
+        current_state = self.ledger_state[chain.tip_id()].copy()
+        orphaned_commitments = set()
+        # first, we verify adopted leadership transactions
+        for proof in block.orphaned_proofs:
+            proof = proof.leader_proof
+            # each proof is validated against the last state of the ledger of the chain this block
+            # is being added to before that proof slot
+            parent_state = self.state_at_slot_beginning(chain, proof.slot).copy()
+            # we add effects of previous orphaned proofs to the ledger state
+            parent_state.commitments_lead |= orphaned_commitments
+            epoch_state = self.compute_epoch_state(proof.slot.epoch(self.config), chain)
+            if self.verify_slot_leader(
+                proof.slot, proof, epoch_state, parent_state, current_state
+            ):
+                # if an adopted leadership proof is valid we need to apply its effects to the ledger state
+                orphaned_commitments.add(proof.evolved_commitment)
+                current_state.nullifiers.add(proof.nullifier)
+            else:
+                # otherwise, the whole block is invalid
+                return False
+
+        parent_state = self.ledger_state[block.parent].copy()
+        parent_state.commitments_lead |= orphaned_commitments
         epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
         # TODO: this is not the full block validation spec, only slot leader is verified
         return self.verify_slot_leader(
-            block.slot, block.leader_proof, epoch_state, parent_state
+            block.slot, block.leader_proof, epoch_state, parent_state, current_state
         )
 
     def verify_slot_leader(
         self,
         slot: Slot,
         proof: MockLeaderProof,
+        # coins are old enough if their commitment is in the stake distribution snapshot
         epoch_state: EpochState,
-        ledger_state: LedgerState,
+        # commitments derived from leadership coin evolution are checked in the parent state
+        parent_state: LedgerState,
+        # nullifiers are checked in the current state
+        current_state: LedgerState,
     ) -> bool:
         return (
-            proof.verify(slot)  # verify slot leader proof
+            proof.verify(slot, parent_state.block)  # verify slot leader proof
             and (
-                ledger_state.verify_eligible_to_lead(proof.commitment)
+                parent_state.verify_eligible_to_lead(proof.commitment)
                 or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
             )
-            and ledger_state.verify_unspent(proof.nullifier)
+            and current_state.verify_unspent(proof.nullifier)
         )
 
     # Try appending this block to an existing chain and return whether
@@ -347,13 +393,16 @@ class Follower:
     def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
         if self.genesis_state.block == block.parent:
             # this block is forking off the genesis state
-            return Chain(blocks=[])
+            return Chain(blocks=[], genesis=self.genesis_state.block)
 
         chains = self.forks + [self.local_chain]
         for chain in chains:
             if chain.contains_block(block):
                 block_position = chain.block_position(block)
-                return Chain(blocks=chain.blocks[:block_position])
+                return Chain(
+                    blocks=chain.blocks[:block_position],
+                    genesis=self.genesis_state.block,
+                )
 
         return None
 
@@ -468,13 +517,17 @@ class Leader:
     coin: Coin
 
     def try_prove_slot_leader(
-        self, epoch: EpochState, slot: Slot
+        self, epoch: EpochState, slot: Slot, parent: Id
     ) -> MockLeaderProof | None:
         if self._is_slot_leader(epoch, slot):
-            return MockLeaderProof.from_coin(self.coin)
+            return MockLeaderProof.new(self.coin, slot, parent)
 
-    def propose_block(self, slot: Slot, parent: BlockHeader) -> BlockHeader:
-        return BlockHeader(parent=parent.id(), slot=slot)
+    def propose_block(
+        self, slot: Slot, parent: BlockHeader, orphaned_proofs=[]
+    ) -> BlockHeader:
+        return BlockHeader(
+            parent=parent.id(), slot=slot, orphaned_proofs=orphaned_proofs
+        )
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
         relative_stake = self.coin.value / epoch.total_stake()

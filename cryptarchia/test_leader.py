@@ -45,7 +45,7 @@ class TestLeader(TestCase):
         # After N slots, the measured leader rate should be within the interval `p +- margin_of_error` with high probabiltiy
         leader_rate = (
             sum(
-                l.try_prove_slot_leader(epoch, Slot(slot)) is not None
+                l.try_prove_slot_leader(epoch, Slot(slot), bytes(32)) is not None
                 for slot in range(N)
             )
             / N
