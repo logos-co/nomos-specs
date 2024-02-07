@@ -70,6 +70,9 @@ class Slot:
     def epoch(self, config: Config) -> Epoch:
         return Epoch(self.absolute_slot // config.epoch_length)
 
+    def encode(self) -> bytes:
+        return int.to_bytes(self.absolute_slot, length=8, byteorder="big")
+
     def __eq__(self, other):
         return self.absolute_slot == other.absolute_slot
 
@@ -171,7 +174,7 @@ class BlockHeader:
         h.update(self.content_id)
 
         # slot
-        h.update(int.to_bytes(self.slot.absolute_slot, length=8, byteorder="big"))
+        h.update(self.slot.encode())
 
         # parent
         assert len(self.parent) == 32
@@ -256,7 +259,7 @@ class LedgerState:
         h.update("epoch-nonce".encode(encoding="utf-8"))
         h.update(self.nonce)
         h.update(block.leader_proof.nullifier)
-        h.update(block.slot.absolute_slot.to_bytes(8, byteorder="big"))
+        h.update(block.slot.encode())
 
         self.nonce = h.digest()
         self.block = block.id()
@@ -446,7 +449,7 @@ class MOCK_LEADER_VRF:
         h = sha256()
         h.update(int.to_bytes(sk, length=32, byteorder="big"))
         h.update(nonce)
-        h.update(int.to_bytes(slot.absolute_slot, length=8))
+        h.update(slot.encode())
         return int.from_bytes(h.digest())
 
     @classmethod
