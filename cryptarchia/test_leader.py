@@ -2,7 +2,16 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import Leader, Config, EpochState, LedgerState, Coin, phi, TimeConfig
+from .cryptarchia import (
+    Leader,
+    Config,
+    EpochState,
+    LedgerState,
+    Coin,
+    phi,
+    TimeConfig,
+    Slot,
+)
 
 
 class TestLeader(TestCase):
@@ -35,7 +44,10 @@ class TestLeader(TestCase):
 
         # After N slots, the measured leader rate should be within the interval `p +- margin_of_error` with high probabiltiy
         leader_rate = (
-            sum(l.try_prove_slot_leader(epoch, slot) is not None for slot in range(N))
+            sum(
+                l.try_prove_slot_leader(epoch, Slot(slot)) is not None
+                for slot in range(N)
+            )
             / N
         )
         assert (

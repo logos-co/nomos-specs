@@ -88,7 +88,7 @@ class Coin:
         return self.sk
 
     def evolve(self) -> "Coin":
-        sk_bytes = int.to_bytes(self.sk, length=32, byteorder="little")
+        sk_bytes = int.to_bytes(self.sk, length=32, byteorder="big")
 
         h = blake2b(digest_size=32)
         h.update(b"coin-evolve")
@@ -100,8 +100,8 @@ class Coin:
 
     def commitment(self) -> Id:
         # TODO: mocked until CL is understood
-        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="little")
-        value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
+        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="big")
+        value_bytes = int.to_bytes(self.value, length=32, byteorder="big")
 
         h = sha256()
         h.update(b"coin-commitment")
@@ -112,8 +112,8 @@ class Coin:
 
     def nullifier(self) -> Id:
         # TODO: mocked until CL is understood
-        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="little")
-        value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
+        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="big")
+        value_bytes = int.to_bytes(self.value, length=32, byteorder="big")
 
         h = sha256()
         h.update(b"coin-nullifier")
@@ -442,11 +442,11 @@ class MOCK_LEADER_VRF:
     ORDER = 2**256
 
     @classmethod
-    def vrf(cls, sk: int, nonce: bytes, slot: int) -> int:
+    def vrf(cls, sk: int, nonce: bytes, slot: Slot) -> int:
         h = sha256()
-        h.update(int.to_bytes(sk, length=32))
+        h.update(int.to_bytes(sk, length=32, byteorder="big"))
         h.update(nonce)
-        h.update(int.to_bytes(slot, length=16))  # 64bit slots
+        h.update(int.to_bytes(slot.absolute_slot, length=8))
         return int.from_bytes(h.digest())
 
     @classmethod
