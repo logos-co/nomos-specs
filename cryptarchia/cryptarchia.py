@@ -256,6 +256,7 @@ class LedgerState:
         h.update("epoch-nonce".encode(encoding="utf-8"))
         h.update(self.nonce)
         h.update(block.leader_proof.nullifier)
+        h.update(block.slot.absolute_slot.to_bytes(8, byteorder="big"))
 
         self.nonce = h.digest()
         self.block = block.id()
