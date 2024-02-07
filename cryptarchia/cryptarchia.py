@@ -260,7 +260,7 @@ class LedgerState:
         self.nonce = h.digest()
         self.block = block.id()
         self.nullifiers.add(block.leader_proof.nullifier)
-        self.commitments_spend.add(block.leader_proof.evolved_commitment)
+        self.commitments_spend.add(block.leader_proof.commitment)
         self.commitments_lead.add(block.leader_proof.evolved_commitment)
 
 
@@ -281,7 +281,7 @@ class EpochState:
         #
         # This verification is checking that first condition.
         #
-        # NOTE: `ledger_state.commitments_spend` is a super-set of `ledger_state.commitments_lead`
+        # NOTE: `ledger_state.commitments_spend` is a subset of `ledger_state.commitments_lead`
 
         return self.stake_distribution_snapshot.verify_eligible_to_spend(commitment)
 
