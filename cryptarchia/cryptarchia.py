@@ -70,6 +70,9 @@ class Slot:
     def epoch(self, config: Config) -> Epoch:
         return Epoch(self.absolute_slot // config.epoch_length)
 
+    def encode(self) -> bytes:
+        return int.to_bytes(self.absolute_slot, length=8, byteorder="big")
+
     def __eq__(self, other):
         return self.absolute_slot == other.absolute_slot
 
@@ -84,15 +87,19 @@ class Coin:
     nonce: bytes = bytes(32)
 
     @property
-    def pk(self):
+    def pk(self) -> int:
         return self.sk
 
-    def evolve(self) -> "Coin":
-        sk_bytes = int.to_bytes(self.sk, length=32, byteorder="little")
+    def encode_sk(self) -> bytes:
+        return int.to_bytes(self.sk, length=32, byteorder="big")
 
+    def encode_pk(self) -> bytes:
+        return int.to_bytes(self.pk, length=32, byteorder="big")
+
+    def evolve(self) -> "Coin":
         h = blake2b(digest_size=32)
         h.update(b"coin-evolve")
-        h.update(sk_bytes)
+        h.update(self.encode_sk())
         h.update(self.nonce)
         evolved_nonce = h.digest()
 
@@ -100,25 +107,23 @@ class Coin:
 
     def commitment(self) -> Id:
         # TODO: mocked until CL is understood
-        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="little")
-        value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
+        value_bytes = int.to_bytes(self.value, length=32, byteorder="big")
 
         h = sha256()
         h.update(b"coin-commitment")
         h.update(self.nonce)
-        h.update(pk_bytes)
+        h.update(self.encode_pk())
         h.update(value_bytes)
         return h.digest()
 
     def nullifier(self) -> Id:
         # TODO: mocked until CL is understood
-        pk_bytes = int.to_bytes(self.pk, length=32, byteorder="little")
-        value_bytes = int.to_bytes(self.value, length=32, byteorder="little")
+        value_bytes = int.to_bytes(self.value, length=32, byteorder="big")
 
         h = sha256()
         h.update(b"coin-nullifier")
         h.update(self.nonce)
-        h.update(pk_bytes)
+        h.update(self.encode_pk())
         h.update(value_bytes)
         return h.digest()
 
@@ -171,7 +176,7 @@ class BlockHeader:
         h.update(self.content_id)
 
         # slot
-        h.update(int.to_bytes(self.slot.absolute_slot, length=8, byteorder="big"))
+        h.update(self.slot.encode())
 
         # parent
         assert len(self.parent) == 32
@@ -256,7 +261,7 @@ class LedgerState:
         h.update("epoch-nonce".encode(encoding="utf-8"))
         h.update(self.nonce)
         h.update(block.leader_proof.nullifier)
-        h.update(block.slot.absolute_slot.to_bytes(8, byteorder="big"))
+        h.update(block.slot.encode())
 
         self.nonce = h.digest()
         self.block = block.id()
@@ -442,11 +447,14 @@ class MOCK_LEADER_VRF:
     ORDER = 2**256
 
     @classmethod
-    def vrf(cls, sk: int, nonce: bytes, slot: int) -> int:
+    def vrf(cls, coin: Coin, epoch_nonce: bytes, slot: Slot) -> int:
         h = sha256()
-        h.update(int.to_bytes(sk, length=32))
-        h.update(nonce)
-        h.update(int.to_bytes(slot, length=16))  # 64bit slots
+        h.update(b"lead")
+        h.update(epoch_nonce)
+        h.update(slot.encode())
+        h.update(coin.encode_sk())
+        h.update(coin.nonce)
+
         return int.from_bytes(h.digest())
 
     @classmethod
@@ -471,7 +479,7 @@ class Leader:
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
         relative_stake = self.coin.value / epoch.total_stake()
 
-        r = MOCK_LEADER_VRF.vrf(self.coin.pk, epoch.nonce(), slot)
+        r = MOCK_LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
 
         return r < MOCK_LEADER_VRF.ORDER * phi(
             self.config.active_slot_coeff, relative_stake
