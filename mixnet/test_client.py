@@ -6,7 +6,7 @@ import numpy
 from mixnet.client import MixClient
 from mixnet.poisson import poisson_mean_interval_sec
 from mixnet.test_utils import (
-    init_robustness_mixnet_config,
+    init_mixnet_config,
     with_test_timeout,
 )
 from mixnet.utils import random_bytes
@@ -15,7 +15,7 @@ from mixnet.utils import random_bytes
 class TestMixClient(IsolatedAsyncioTestCase):
     @with_test_timeout(100)
     async def test_mixclient(self):
-        config = init_robustness_mixnet_config().mixnet_layer_config
+        config = init_mixnet_config().mixclient_config
         config.emission_rate_per_min = 30
         config.redundancy = 3
 

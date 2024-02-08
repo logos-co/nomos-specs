@@ -10,13 +10,13 @@ from mixnet.packet import (
     MessageReconstructor,
     PacketBuilder,
 )
-from mixnet.test_utils import init_robustness_mixnet_config
+from mixnet.test_utils import init_mixnet_config
 from mixnet.utils import random_bytes
 
 
 class TestPacket(TestCase):
     def test_real_packet(self):
-        topology = init_robustness_mixnet_config().mixnet_layer_config.topology
+        topology = init_mixnet_config().mixclient_config.topology
         msg = random_bytes(3500)
         packets_and_routes = PacketBuilder.build_real_packets(msg, topology)
         self.assertEqual(4, len(packets_and_routes))
@@ -47,7 +47,7 @@ class TestPacket(TestCase):
         )
 
     def test_cover_packet(self):
-        topology = init_robustness_mixnet_config().mixnet_layer_config.topology
+        topology = init_mixnet_config().mixclient_config.topology
         msg = b"cover"
         packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, topology)
         self.assertEqual(1, len(packets_and_routes))

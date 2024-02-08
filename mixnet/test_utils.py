@@ -3,8 +3,15 @@ import asyncio
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from mixnet.bls import generate_bls
-from mixnet.config import MixnetConfig, MixNodeInfo
-from mixnet.robustness import MixnetTopologySize, Robustness, RobustnessMixnetConfig
+from mixnet.config import (
+    MixClientConfig,
+    MixNodeConfig,
+    MixnetConfig,
+    MixNodeInfo,
+    MixnetTopology,
+    MixnetTopologyConfig,
+    MixnetTopologySize,
+)
 from mixnet.utils import random_bytes
 
 
@@ -19,22 +26,21 @@ def with_test_timeout(t):
     return wrapper
 
 
-def init_robustness_mixnet_config() -> RobustnessMixnetConfig:
-    mixnode_candidates = [
-        MixNodeInfo(
-            generate_bls(),
-            X25519PrivateKey.generate(),
-            random_bytes(32),
-        )
-        for _ in range(12)
-    ]
-    topology_size = MixnetTopologySize(3, 3)
-    mixnet_layer_config = MixnetConfig(
-        30,
-        3,
-        30,
-        Robustness.build_topology(mixnode_candidates, topology_size, b"entropy"),
+def init_mixnet_config() -> MixnetConfig:
+    topology_config = MixnetTopologyConfig(
+        [
+            MixNodeInfo(
+                generate_bls(),
+                X25519PrivateKey.generate(),
+                random_bytes(32),
+            )
+            for _ in range(12)
+        ],
+        MixnetTopologySize(3, 3),
+        b"entropy",
     )
-    return RobustnessMixnetConfig(
-        mixnode_candidates, topology_size, mixnet_layer_config
+    mixclient_config = MixClientConfig(30, 3, MixnetTopology(topology_config))
+    mixnode_config = MixNodeConfig(
+        topology_config.mixnode_candidates[0].encryption_private_key, 30
     )
+    return MixnetConfig(topology_config, mixclient_config, mixnode_config)
