@@ -10,7 +10,7 @@ class TestEncoder(TestCase):
     def assert_encoding(self, encoder_params: DAEncoderParams, data: bytearray):
         encoded_data = encoder.DAEncoder(encoder_params).encode(data)
         self.assertEqual(encoded_data.data, data)
-        self.assertEqual(len(encoded_data.columns), encoder_params.column_count)
+        self.assertEqual(len(encoded_data.extended_matrix), encoder_params.column_count)
         self.assertEqual(len(encoded_data.column_proofs), encoder_params.column_count)
         chunks_size = (len(data) // encoder_params.bytes_per_field_element) // encoder_params.column_count
         self.assertEqual(len(encoded_data.row_commitments), chunks_size)
