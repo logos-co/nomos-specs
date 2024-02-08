@@ -36,7 +36,7 @@ class TestEncoder(TestCase):
 
     def test_encode(self):
         from random import randbytes
-        sizes = [pow(2, exp) for exp in range(1, 8, 2)]
+        sizes = [pow(2, exp) for exp in range(0, 8, 2)]
         encoder_params = DAEncoderParams(
             column_count=10,
             bytes_per_field_element=BYTES_PER_FIELD_ELEMENT
