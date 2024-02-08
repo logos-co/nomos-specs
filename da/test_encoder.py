@@ -1,7 +1,8 @@
+from typing import List
 from unittest import TestCase
 
 from da import encoder
-from da.encoder import DAEncoderParams
+from da.encoder import DAEncoderParams, Commitment
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT
 
 
@@ -14,6 +15,24 @@ class TestEncoder(TestCase):
         chunks_size = (len(data) // encoder_params.bytes_per_field_element) // encoder_params.column_count
         self.assertEqual(len(encoded_data.row_commitments), chunks_size)
         self.assertEqual(len(encoded_data.row_proofs), chunks_size)
+
+    def test_chunkify(self):
+        pass
+
+    def test_compute_row_kzg_commitments(self, rows: List[bytearray]):
+        pass
+
+    def test_rs_encode_rows(self, rows: List[bytearray]):
+        pass
+
+    def test_compute_rows_proofs(self, rows: List[bytearray], row_commitments: List[bytearray]):
+        pass
+
+    def test_compute_column_kzg_commitments(self, rows: List[bytearray]):
+        pass
+
+    def test_generate_aggregated_column_commitments(self, rows: List[bytearray], column_commitments: List[Commitment]):
+        pass
 
     def test_encode(self):
         from random import randbytes

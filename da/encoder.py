@@ -25,7 +25,7 @@ class DAEncoder:
     def __init__(self, params: DAEncoderParams):
         self.params = params
 
-    def _chunkify_data(self) -> List[bytearray]:
+    def _chunkify_data(self, data: bytearray) -> List[bytearray]:
         ...
 
     def _compute_row_kzg_commitments(self, rows: List[bytearray]) -> List[Commitment]:
@@ -46,7 +46,7 @@ class DAEncoder:
         ...
 
     def encode(self, data: bytearray) -> EncodedData:
-        rows = self._chunkify_data()
+        rows = self._chunkify_data(data)
         row_commitments = self._compute_row_kzg_commitments(rows)
         encoded_rows = self._rs_encode_rows(rows)
         row_proofs = self._compute_rows_proofs(encoded_rows, row_commitments)
