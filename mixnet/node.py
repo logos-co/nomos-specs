@@ -32,11 +32,10 @@ class MixNode:
     in order to define the MixNode as a simple dataclass for clarity.
     """
 
-    __config: MixNodeConfig
-
+    config: MixNodeConfig
     inbound_socket: PacketQueue
     outbound_socket: PacketPayloadQueue
-    __task: asyncio.Task  # A reference just to prevent task from being garbage collected
+    task: asyncio.Task  # A reference just to prevent task from being garbage collected
 
     @classmethod
     async def new(
@@ -44,10 +43,10 @@ class MixNode:
         config: MixNodeConfig,
     ) -> Self:
         self = cls()
-        self.__config = config
+        self.config = config
         self.inbound_socket = asyncio.Queue()
         self.outbound_socket = asyncio.Queue()
-        self.__task = asyncio.create_task(self.__run())
+        self.task = asyncio.create_task(self.__run())
         return self
 
     async def __run(self):
@@ -66,8 +65,8 @@ class MixNode:
             task = asyncio.create_task(
                 self.__process_packet(
                     packet,
-                    self.__config.encryption_private_key,
-                    self.__config.delay_rate_per_min,
+                    self.config.encryption_private_key,
+                    self.config.delay_rate_per_min,
                 )
             )
             self.tasks.add(task)
@@ -103,6 +102,6 @@ class MixNode:
                 raise UnknownHeaderTypeError
 
     async def cancel(self) -> None:
-        self.__task.cancel()
+        self.task.cancel()
         with suppress(asyncio.CancelledError):
-            await self.__task
+            await self.task
