@@ -52,5 +52,3 @@ class Dispersal:
                     attestations.append(attestation)
             if len(attestations) >= self.threshold:
                 return self._build_certificate(attestations)
-
-

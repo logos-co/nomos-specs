@@ -3,9 +3,10 @@ from typing import List
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
 
 
+@dataclass
 class DAEncoderParams:
     column_count: int
-    element_size: int
+    bytes_per_field_element: int
 
 
 @dataclass
