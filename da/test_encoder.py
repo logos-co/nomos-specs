@@ -18,19 +18,19 @@ class TestEncoder(TestCase):
     def test_chunkify(self):
         pass
 
-    def test_compute_row_kzg_commitments(self, rows: List[bytearray]):
+    def test_compute_row_kzg_commitments(self):
         pass
 
-    def test_rs_encode_rows(self, rows: List[bytearray]):
+    def test_rs_encode_rows(self):
         pass
 
-    def test_compute_rows_proofs(self, rows: List[bytearray], row_commitments: List[bytearray]):
+    def test_compute_rows_proofs(self):
         pass
 
-    def test_compute_column_kzg_commitments(self, rows: List[bytearray]):
+    def test_compute_column_kzg_commitments(self):
         pass
 
-    def test_generate_aggregated_column_commitments(self, rows: List[bytearray], column_commitments: List[Commitment]):
+    def test_generate_aggregated_column_commitments(self):
         pass
 
     def test_encode(self):
