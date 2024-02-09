@@ -23,7 +23,9 @@ def make_block(parent_id: Id, slot: Slot, content: bytes) -> BlockHeader:
         content_size=1,
         slot=slot,
         content_id=content_id,
-        leader_proof=MockLeaderProof.from_coin(Coin(sk=0, value=10)),
+        leader_proof=MockLeaderProof.new(
+            Coin(sk=0, value=10), slot=slot, parent=parent_id
+        ),
     )
 
 
@@ -49,14 +51,28 @@ class TestLeader(TestCase):
         # by setting a low k we trigger the density choice rule
         k = 1
         s = 50
-        assert maxvalid_bg(Chain(short_chain), [Chain(long_chain)], k, s) == Chain(
-            short_chain
+        short_chain = Chain(short_chain, genesis=bytes(32))
+        long_chain = Chain(long_chain, genesis=bytes(32))
+        assert (
+            maxvalid_bg(
+                short_chain,
+                [long_chain],
+                k,
+                s,
+            )
+            == short_chain
         )
 
         # However, if we set k to the fork length, it will be accepted
-        k = len(long_chain)
-        assert maxvalid_bg(Chain(short_chain), [Chain(long_chain)], k, s) == Chain(
-            long_chain
+        k = long_chain.length()
+        assert (
+            maxvalid_bg(
+                short_chain,
+                [long_chain],
+                k,
+                s,
+            )
+            == long_chain
         )
 
     def test_fork_choice_long_dense_chain(self):
@@ -73,6 +89,14 @@ class TestLeader(TestCase):
                 short_chain.append(make_block(bytes(32), Slot(slot), short_content))
         k = 1
         s = 50
-        assert maxvalid_bg(Chain(short_chain), [Chain(long_chain)], k, s) == Chain(
-            long_chain
+        short_chain = Chain(short_chain, genesis=bytes(32))
+        long_chain = Chain(long_chain, genesis=bytes(32))
+        assert (
+            maxvalid_bg(
+                short_chain,
+                [long_chain],
+                k,
+                s,
+            )
+            == long_chain
         )

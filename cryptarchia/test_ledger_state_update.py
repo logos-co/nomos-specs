@@ -26,7 +26,9 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
     )
 
 
-def mk_block(parent: Id, slot: int, coin: Coin, content=bytes(32)) -> BlockHeader:
+def mk_block(
+    parent: Id, slot: int, coin: Coin, content=bytes(32), orphaned_proofs=[]
+) -> BlockHeader:
     from hashlib import sha256
 
     return BlockHeader(
@@ -34,7 +36,8 @@ def mk_block(parent: Id, slot: int, coin: Coin, content=bytes(32)) -> BlockHeade
         parent=parent,
         content_size=len(content),
         content_id=sha256(content).digest(),
-        leader_proof=MockLeaderProof.from_coin(coin),
+        leader_proof=MockLeaderProof.new(coin, Slot(slot), parent=parent),
+        orphaned_proofs=orphaned_proofs,
     )
 
 
@@ -251,3 +254,51 @@ class TestLedgerStateUpdate(TestCase):
         block_2_1 = mk_block(slot=20, parent=block_2_0.id(), coin=coin_new.evolve())
         follower.on_block(block_2_1)
         assert follower.tip() == block_2_1
+
+    def test_orphaned_proofs(self):
+        coin = Coin(sk=0, value=100)
+        genesis = mk_genesis_state([coin])
+
+        # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
+        # and nonce snapshot before slot 7
+        config = Config(
+            k=1,
+            active_slot_coeff=1,
+            epoch_stake_distribution_stabilization=4,
+            epoch_period_nonce_buffer=3,
+            epoch_period_nonce_stabilization=3,
+            time=TimeConfig(slot_duration=1, chain_start_time=0),
+        )
+
+        follower = Follower(genesis, config)
+
+        # ---- EPOCH 0 ----
+
+        block_0_0 = mk_block(slot=0, parent=genesis.block, coin=coin)
+        follower.on_block(block_0_0)
+        assert follower.tip() == block_0_0
+
+        coin_new = coin.evolve()
+        coin_new_new = coin_new.evolve()
+        block_0_1 = mk_block(slot=1, parent=block_0_0.id(), coin=coin_new_new)
+        follower.on_block(block_0_1)
+        # the coin evolved twice should not be accepted as it is not in the lead commitments
+        assert follower.tip() == block_0_0
+        # an orphaned proof with an evolved coin for the same slot as the original coin should not be accepted as the evolved coin is not in the lead commitments at slot 0
+        block_0_1 = mk_block(
+            slot=1,
+            parent=block_0_0.id(),
+            coin=coin_new_new,
+            orphaned_proofs=[mk_block(parent=genesis.block, slot=0, coin=coin_new)],
+        )
+        follower.on_block(block_0_1)
+        assert follower.tip() == block_0_0
+        # the coin evolved twice should be accepted as the evolved coin is in the lead commitments at slot 1 and processed before that
+        block_0_2 = mk_block(
+            slot=2,
+            parent=block_0_0.id(),
+            coin=coin_new_new,
+            orphaned_proofs=[mk_block(parent=block_0_0.id(), slot=1, coin=coin_new)],
+        )
+        follower.on_block(block_0_2)
+        assert follower.tip() == block_0_2

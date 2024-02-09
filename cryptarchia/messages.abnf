@@ -3,7 +3,7 @@
 BLOCK            = HEADER CONTENT
 ; ------------ HEADER ---------------------
 VERSION           = %x01
-HEADER            = VERSION HEADER-FIELDS MOCK-LEADER-PROOF
+HEADER            = VERSION HEADER-FIELDS MOCK-LEADER-PROOF ORPHAN-PROOFS
 HEADER-FIELDS     = CONTENT-SIZE CONTENT-ID BLOCK-DATE PARENT-ID
 CONTENT-SIZE      = U32
 BLOCK-DATE        = BLOCK-SLOT
@@ -11,6 +11,10 @@ BLOCK-SLOT        = U64
 PARENT-ID         = HEADER-ID
 MOCK-LEADER-PROOF = COMMITMENT NULLIFIER EVOLVE-COMMITMENT
 EVOLVE-COMMITMENT = COMMITMENT
+ORPHAN-PROOFS     = ORPHAN-PROOF-CNT *ORPHAN-PROOF
+ORPHAN-PROOF-CNT  = U32
+; note this is not recursive, only the header leadership proof will be processed (orphan proofs are ignored)
+ORPHAN-PROOF      = HEADER
 
 ; ------------ CONTENT --------------------
 CONTENT          = *OCTET
