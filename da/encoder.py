@@ -2,9 +2,7 @@ from dataclasses import dataclass
 from typing import List
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
 
-
-class ChunksMatrix(List[bytearray]):
-    pass
+from da.common import ChunksMatrix
 
 
 @dataclass

@@ -7,6 +7,8 @@ from eth2spec.eip7594.mainnet import (
 )
 from itertools import batched
 
+from da.common import Column, Chunk, Attestation
+
 
 @dataclass
 class DABlob:
@@ -20,18 +22,13 @@ class DABlob:
     rows_proofs: List[Proof]
 
 
-@dataclass
-class Attestation:
-    pass
-
-
 class DAVerifier:
     def __init__(self):
         pass
 
     @staticmethod
     def _verify_column(
-            column: bytearray,
+            column: Column,
             column_commitment: Commitment,
             aggregated_column_commitment: Commitment,
             aggregated_column_proof: Proof,
@@ -44,15 +41,15 @@ class DAVerifier:
         # 3. compute column hash
         column_hash: bytearray = bytearray(hash(column))
         # 4. Check proof with commitment and proof over the aggregated column commitment
-        pass
+        return False
 
     @staticmethod
-    def _verify_chunk(chunk: bytearray, commitment: Commitment, proof: Proof) -> bool:
+    def _verify_chunk(chunk: Chunk, commitment: Commitment, proof: Proof) -> bool:
         pass
 
     @staticmethod
     def _verify_chunks(
-            chunks: List[bytearray],
+            chunks: List[Chunk],
             commitments: List[Commitment],
             proofs: List[Proof]
     ) -> bool:

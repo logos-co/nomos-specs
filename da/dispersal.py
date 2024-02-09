@@ -1,12 +1,9 @@
 from typing import List, Optional, Generator
 
+from da.common import Certificate
 from da.encoder import EncodedData
 from da.verifier import DABlob, Attestation
 from mixnet.node import NodeId
-
-
-class Certificate:
-    pass
 
 
 class Dispersal:
