@@ -161,7 +161,7 @@ class BlockHeader:
     content_size: int
     content_id: Id
     leader_proof: MockLeaderProof
-    orphaned_proofs: List[MockLeaderProof] = field(default_factory=list)
+    orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
 
     def update_header_hash(self, h):
         # version byte
