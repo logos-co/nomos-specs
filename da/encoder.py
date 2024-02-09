@@ -20,7 +20,6 @@ class EncodedData:
     row_commitments: List[Commitment]
     row_proofs: List[List[Proof]]
     column_commitments: List[Commitment]
-    column_proofs: List[Proof]
     aggregated_column_commitment: Commitment
     aggregated_column_proofs: List[Proof]
 
@@ -44,13 +43,6 @@ class DAEncoder:
     def _compute_column_kzg_commitments(self, chunks_matrix: ChunksMatrix) -> List[Commitment]:
         ...
 
-    def _compute_column_kzg_proofs(
-            self,
-            chunks_matrix: ChunksMatrix,
-            column_commitments: List[Commitment]
-    ) -> List[Proof]:
-        ...
-
     def _compute_aggregated_column_commitments(
             self, chunks_matrix: ChunksMatrix, column_commitments: List[Commitment]
     ) -> Commitment:
@@ -69,7 +61,6 @@ class DAEncoder:
         extended_matrix = self._rs_encode_rows(chunks_matrix)
         row_proofs = self._compute_rows_proofs(extended_matrix, row_commitments)
         column_commitments = self._compute_column_kzg_commitments(extended_matrix)
-        column_proofs = self._compute_column_kzg_proofs(extended_matrix, column_commitments)
         aggregated_column_commitment = self._compute_aggregated_column_commitments(extended_matrix, column_commitments)
         aggregated_column_proofs = self._compute_aggregated_column_proofs(extended_matrix, aggregated_column_commitment)
         result = EncodedData(
@@ -78,7 +69,6 @@ class DAEncoder:
             row_commitments,
             row_proofs,
             column_commitments,
-            column_proofs,
             aggregated_column_commitment,
             aggregated_column_proofs
         )
