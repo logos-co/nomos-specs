@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import List
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
-
-from da.common import ChunksMatrix
+from itertools import batched, chain, repeat
+from da.common import ChunksMatrix, Row, Chunk
 
 
 @dataclass
@@ -27,7 +27,12 @@ class DAEncoder:
         self.params = params
 
     def _chunkify_data(self, data: bytearray) -> ChunksMatrix:
-        ...
+        chunks = [Chunk(b) for b in batched(data, self.params.bytes_per_field_element)]
+        extra = len(chunks) % self.params.column_count
+        if extra > 0:
+            chunks.extend(Chunk(Chunk.default_bytes()) for _ in range(self.params.column_count - extra))
+        rows = list(batched(chunks, self.params.column_count))
+        return ChunksMatrix(rows)
 
     def _compute_row_kzg_commitments(self, rows: List[bytearray]) -> List[Commitment]:
         ...

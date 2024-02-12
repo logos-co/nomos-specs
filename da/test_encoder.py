@@ -1,5 +1,6 @@
 from typing import List
 from unittest import TestCase
+from random import randbytes
 
 from da import encoder
 from da.encoder import DAEncoderParams, Commitment
@@ -16,7 +17,21 @@ class TestEncoder(TestCase):
         self.assertEqual(len(encoded_data.row_proofs), chunks_size)
 
     def test_chunkify(self):
-        pass
+        encoder_params = DAEncoderParams(
+            column_count=10,
+            bytes_per_field_element=BYTES_PER_FIELD_ELEMENT
+        )
+        test_encoder = encoder.DAEncoder(encoder_params)
+        test_bytes_sizes = [bytearray(randbytes(BYTES_PER_FIELD_ELEMENT*i)) for i in (1, 10, 15)]
+        test_row_count = [1, 1, 2]
+        for test_bytes_size, expected_row_count in zip(test_bytes_sizes, test_row_count):
+            chunked_data = test_encoder._chunkify_data(test_bytes_size)
+            self.assertEqual(len(chunked_data), expected_row_count)
+            self.assertEqual(len(chunked_data[0]), encoder_params.column_count)
+            self.assertEqual(len(bytes(chunked_data[0][0])), encoder_params.bytes_per_field_element)
+
+
+
 
     def test_compute_row_kzg_commitments(self):
         pass
@@ -36,7 +51,6 @@ class TestEncoder(TestCase):
     def test_encode(self):
         # TODO: remove return, for now we make it work for now so we do not disturb other modules
         return
-        from random import randbytes
         sizes = [pow(2, exp) for exp in range(0, 8, 2)]
         encoder_params = DAEncoderParams(
             column_count=10,
