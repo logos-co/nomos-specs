@@ -4,14 +4,17 @@ from typing import List, Sequence
 import eth2spec.eip7594.mainnet
 from eth2spec.eip7594.mainnet import (
     bit_reversal_permutation, KZG_SETUP_G1_LAGRANGE, Polynomial,
-    BYTES_PER_FIELD_ELEMENT, bytes_to_bls_field, BLSFieldElement, compute_kzg_proof_impl, KZG_ENDIANNESS,
-    BLS_MODULUS, compute_roots_of_unity, compute_quotient_eval_within_domain,
-    div, bls_modular_inverse,
+    BYTES_PER_FIELD_ELEMENT, bytes_to_bls_field, BLSFieldElement, compute_kzg_proof_impl,
+    compute_roots_of_unity, verify_kzg_proof_impl
 )
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
+from eth2spec.eip7594.minimal import evaluate_polynomial_in_evaluation_form
 from eth2spec.utils import bls
 from remerkleable.basic import uint64
 from contextlib import contextmanager
+
+from da.common import Chunk
+
 
 @contextmanager
 def setup_field_elements(new_value: int):
@@ -19,11 +22,14 @@ def setup_field_elements(new_value: int):
     Override ethspecs setup to fit the variable sizes for our scheme
     """
     field_elements_old_value = eth2spec.eip7594.mainnet.FIELD_ELEMENTS_PER_BLOB
+    minimal_field_elements_old_value = eth2spec.eip7594.minimal.FIELD_ELEMENTS_PER_BLOB
     eth2spec.eip7594.mainnet.FIELD_ELEMENTS_PER_BLOB = new_value
+    eth2spec.eip7594.minimal.FIELD_ELEMENTS_PER_BLOB = new_value
     setup_old_value = eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE
     eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE = eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE[:new_value]
     yield
     eth2spec.eip7594.mainnet.FIELD_ELEMENTS_PER_BLOB = field_elements_old_value
+    eth2spec.eip7594.minimal.FIELD_ELEMENTS_PER_BLOB = minimal_field_elements_old_value
     eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE = setup_old_value
 
 class Polynomial(List[BLSFieldElement]):
@@ -76,4 +82,20 @@ def compute_kzg_proofs(b: bytearray) -> List[Proof]:
         __compute_single_proof(polynomial, roots_of_unity_brp, i)
         for i in range(len(b)//BYTES_PER_FIELD_ELEMENT)
     ]
+
+
+def __verify_single_proof(polynomial: Polynomial, proof: Proof, commitment: Commitment, index: int, roots_of_unity: Sequence[BLSFieldElement]) -> bool:
+    challenge = roots_of_unity[index]
+    with setup_field_elements(len(polynomial)):
+        y = evaluate_polynomial_in_evaluation_form(polynomial, challenge)
+        return verify_kzg_proof_impl(commitment, challenge, y, proof)
+
+
+def verify_proofs(b: bytearray, commitment: Commitment, proofs: Sequence[Proof]) -> bool:
+    polynomial = bytes_to_polynomial(b)
+    roots_of_unity_brp = bit_reversal_permutation(compute_roots_of_unity(uint64(len(polynomial))))
+    return all(
+        __verify_single_proof(polynomial, proof, commitment, i, roots_of_unity_brp)
+        for i, proof in enumerate(proofs)
+    )
 
