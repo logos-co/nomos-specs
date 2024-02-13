@@ -1,13 +1,30 @@
 from itertools import batched
 from typing import List, Sequence
 
+import eth2spec.eip7594.mainnet
 from eth2spec.eip7594.mainnet import (
     bit_reversal_permutation, KZG_SETUP_G1_LAGRANGE, Polynomial,
     BYTES_PER_FIELD_ELEMENT, bytes_to_bls_field, BLSFieldElement, compute_kzg_proof_impl, KZG_ENDIANNESS,
+    BLS_MODULUS, compute_roots_of_unity, compute_quotient_eval_within_domain,
+    div, bls_modular_inverse,
 )
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
 from eth2spec.utils import bls
+from remerkleable.basic import uint64
+from contextlib import contextmanager
 
+@contextmanager
+def setup_field_elements(new_value: int):
+    """
+    Override ethspecs setup to fit the variable sizes for our scheme
+    """
+    field_elements_old_value = eth2spec.eip7594.mainnet.FIELD_ELEMENTS_PER_BLOB
+    eth2spec.eip7594.mainnet.FIELD_ELEMENTS_PER_BLOB = new_value
+    setup_old_value = eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE
+    eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE = eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE[:new_value]
+    yield
+    eth2spec.eip7594.mainnet.FIELD_ELEMENTS_PER_BLOB = field_elements_old_value
+    eth2spec.eip7594.mainnet.KZG_SETUP_G1_LAGRANGE = setup_old_value
 
 class Polynomial(List[BLSFieldElement]):
     pass
@@ -40,14 +57,23 @@ def bytes_to_kzg_commitment(b: bytearray) -> Commitment:
     )
 
 
-def compute_kzg_proofs(b: bytearray, commitment: Commitment) -> List[Proof]:
+def __compute_single_proof(
+        polynomial: Polynomial,
+        roots_of_unity: Sequence[BLSFieldElement],
+        index: int
+) -> Proof:
+    with setup_field_elements(len(polynomial)):
+        evaluation_challenge = roots_of_unity[index]
+        proof, _ = compute_kzg_proof_impl(polynomial, evaluation_challenge)
+        return proof
+
+
+def compute_kzg_proofs(b: bytearray) -> List[Proof]:
     assert len(b) % BYTES_PER_FIELD_ELEMENT == 0
     polynomial = bytes_to_polynomial(b)
+    roots_of_unity_brp = bit_reversal_permutation(compute_roots_of_unity(uint64(len(polynomial))))
     return [
-        compute_kzg_proof_impl(
-            polynomial,
-            bytes_to_bls_field(i.to_bytes(length=BYTES_PER_FIELD_ELEMENT, byteorder=KZG_ENDIANNESS))
-        )[0]
+        __compute_single_proof(polynomial, roots_of_unity_brp, i)
         for i in range(len(b)//BYTES_PER_FIELD_ELEMENT)
     ]
 
