@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from typing import List
-from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
+from eth2spec.eip7594.mainnet import (
+    KZGCommitment as Commitment,
+    KZGProof as Proof,
+    blob_to_kzg_commitment
+)
 from itertools import batched, chain, repeat
 from da.common import ChunksMatrix, Row, Chunk
 
@@ -31,11 +35,13 @@ class DAEncoder:
         extra = len(chunks) % self.params.column_count
         if extra > 0:
             chunks.extend(Chunk(Chunk.default_bytes()) for _ in range(self.params.column_count - extra))
-        rows = list(batched(chunks, self.params.column_count))
+        rows = list(map(Row, batched(chunks, self.params.column_count)))
         return ChunksMatrix(rows)
 
-    def _compute_row_kzg_commitments(self, rows: List[bytearray]) -> List[Commitment]:
-        ...
+    def _compute_row_kzg_commitments(self, rows: ChunksMatrix) -> List[Commitment]:
+        assert all(self.params.column_count == len(row) for row in rows)
+        # blob is just an abstraction over a view of bytes used by ethspecs
+        return [blob_to_kzg_commitment(row.as_blob()) for row in rows]
 
     def _rs_encode_rows(self, chunks_matrix: ChunksMatrix) -> ChunksMatrix:
         ...

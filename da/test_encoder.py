@@ -1,13 +1,27 @@
+from itertools import chain
 from typing import List
 from unittest import TestCase
-from random import randbytes
+from random import randbytes, randrange
 
 from da import encoder
 from da.encoder import DAEncoderParams, Commitment
-from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT
+from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, FIELD_ELEMENTS_PER_BLOB, BLS_MODULUS, KZG_ENDIANNESS
 
 
 class TestEncoder(TestCase):
+
+    @staticmethod
+    def rand_row() -> bytearray:
+        return bytearray(
+            chain.from_iterable(
+                int.to_bytes(
+                    randrange(BLS_MODULUS),
+                    length=BYTES_PER_FIELD_ELEMENT,
+                    byteorder=KZG_ENDIANNESS
+                ) for _ in range(FIELD_ELEMENTS_PER_BLOB)
+            )
+        )
+
     def assert_encoding(self, encoder_params: DAEncoderParams, data: bytearray):
         encoded_data = encoder.DAEncoder(encoder_params).encode(data)
         self.assertEqual(encoded_data.data, data)
@@ -30,11 +44,16 @@ class TestEncoder(TestCase):
             self.assertEqual(len(chunked_data[0]), encoder_params.column_count)
             self.assertEqual(len(bytes(chunked_data[0][0])), encoder_params.bytes_per_field_element)
 
-
-
-
     def test_compute_row_kzg_commitments(self):
-        pass
+        encoder_params = DAEncoderParams(
+            column_count=FIELD_ELEMENTS_PER_BLOB,
+            bytes_per_field_element=BYTES_PER_FIELD_ELEMENT
+        )
+        test_bytes = self.rand_row()
+        test_encoder = encoder.DAEncoder(encoder_params)
+        rows = test_encoder._chunkify_data(test_bytes)
+        test_commitments = test_encoder._compute_row_kzg_commitments(rows)
+        self.assertEqual(len(rows), len(test_commitments))
 
     def test_rs_encode_rows(self):
         pass

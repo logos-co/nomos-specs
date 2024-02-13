@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Generator
-from eth2spec.eip7594.mainnet import Bytes32
+from itertools import chain
+from eth2spec.eip7594.mainnet import Bytes32, Blob
 
 
 class NodeId(Bytes32):
@@ -16,7 +17,8 @@ class Column(List[Chunk]):
 
 
 class Row(List[Chunk]):
-    pass
+    def as_blob(self) -> Blob:
+        return Blob(chain.from_iterable(self))
 
 
 class ChunksMatrix(List[Row]):
