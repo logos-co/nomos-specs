@@ -1,15 +1,29 @@
 from itertools import batched
-from typing import List
+from typing import List, Sequence
 
 from eth2spec.eip7594.mainnet import (
-    blob_to_kzg_commitment, g1_lincomb, bit_reversal_permutation, KZG_SETUP_G1_LAGRANGE, Polynomial,
+    bit_reversal_permutation, KZG_SETUP_G1_LAGRANGE, Polynomial,
     BYTES_PER_FIELD_ELEMENT, bytes_to_bls_field, BLSFieldElement,
 )
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
+from eth2spec.utils import bls
 
 
 class Polynomial(List[BLSFieldElement]):
     pass
+
+
+def g1_lincomb(points: Sequence[Commitment], scalars: Sequence[BLSFieldElement]) -> Commitment:
+    """
+    BLS multiscalar multiplication. This function can be optimized using Pippenger's algorithm and variants.
+    """
+    # we assert to have more points available than elements,
+    # this is dependent on the available kzg setup size
+    assert len(points) >= len(scalars)
+    result = bls.Z1()
+    for x, a in zip(points, scalars):
+        result = bls.add(result, bls.multiply(bls.bytes48_to_G1(x), a))
+    return Commitment(bls.G1_to_bytes48(result))
 
 
 def bytes_to_polynomial(b: bytearray) -> Polynomial:

@@ -30,3 +30,10 @@ class TestKzgRs(TestCase):
         eth_commitment = blob_to_kzg_commitment(Blob(rand_bytes))
         commitment = bytes_to_kzg_commitment(rand_bytes)
         self.assertEqual(eth_commitment, commitment)
+
+    def test_small_bytes_kzg_commitment(self):
+        rand_bytes = bytearray(int.to_bytes(randrange(BLS_MODULUS), length=BYTES_PER_FIELD_ELEMENT))
+        commitment = bytes_to_kzg_commitment(rand_bytes)
+        rand_bytes = self.rand_bytes()
+        commitment2 = bytes_to_kzg_commitment(rand_bytes)
+        self.assertEqual(len(commitment), len(commitment2))
