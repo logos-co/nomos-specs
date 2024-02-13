@@ -1,7 +1,7 @@
 from itertools import chain
 from random import randrange
 from unittest import TestCase
-from da.kzg_rs import Polynomial, bytes_to_polynomial, bytes_to_kzg_commitment
+from da.kzg_rs import Polynomial, bytes_to_polynomial, bytes_to_kzg_commitment, compute_kzg_proofs
 from eth2spec.eip7594.mainnet import (
     Polynomial as EthPolynomial, blob_to_polynomial, BLS_MODULUS,
     BYTES_PER_FIELD_ELEMENT, FIELD_ELEMENTS_PER_BLOB, Blob, blob_to_kzg_commitment
@@ -37,3 +37,9 @@ class TestKzgRs(TestCase):
         rand_bytes = self.rand_bytes()
         commitment2 = bytes_to_kzg_commitment(rand_bytes)
         self.assertEqual(len(commitment), len(commitment2))
+
+    def test_compute_kzg_proofs(self):
+        rand_bytes = self.rand_bytes()
+        commitment = bytes_to_kzg_commitment(rand_bytes)
+        proofs = compute_kzg_proofs(rand_bytes, commitment)
+        self.assertEqual(len(proofs), FIELD_ELEMENTS_PER_BLOB)

@@ -3,7 +3,7 @@ from typing import List, Sequence
 
 from eth2spec.eip7594.mainnet import (
     bit_reversal_permutation, KZG_SETUP_G1_LAGRANGE, Polynomial,
-    BYTES_PER_FIELD_ELEMENT, bytes_to_bls_field, BLSFieldElement,
+    BYTES_PER_FIELD_ELEMENT, bytes_to_bls_field, BLSFieldElement, compute_kzg_proof_impl, KZG_ENDIANNESS,
 )
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
 from eth2spec.utils import bls
@@ -38,3 +38,16 @@ def bytes_to_kzg_commitment(b: bytearray) -> Commitment:
     return g1_lincomb(
         bit_reversal_permutation(KZG_SETUP_G1_LAGRANGE), bytes_to_polynomial(b)
     )
+
+
+def compute_kzg_proofs(b: bytearray, commitment: Commitment) -> List[Proof]:
+    assert len(b) % BYTES_PER_FIELD_ELEMENT == 0
+    polynomial = bytes_to_polynomial(b)
+    return [
+        compute_kzg_proof_impl(
+            polynomial,
+            bytes_to_bls_field(i.to_bytes(length=BYTES_PER_FIELD_ELEMENT, byteorder=KZG_ENDIANNESS))
+        )[0]
+        for i in range(len(b)//BYTES_PER_FIELD_ELEMENT)
+    ]
+
