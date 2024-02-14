@@ -51,14 +51,14 @@ class TestKzgRs(TestCase):
         self.assertEqual(len(commitment), len(commitment2))
 
     def test_compute_kzg_proofs(self):
-        chunk_size = 32
-        rand_bytes = self.rand_bytes(chunk_size)
+        chunks_count = 32
+        rand_bytes = self.rand_bytes(chunks_count)
         proofs = compute_kzg_proofs(rand_bytes)
-        self.assertEqual(len(proofs), chunk_size)
+        self.assertEqual(len(proofs), chunks_count)
 
     def test_verify_kzg_proofs(self):
-        chunk_size = 32
-        rand_bytes = self.rand_bytes(chunk_size)
+        chunks_count = 1
+        rand_bytes = self.rand_bytes(chunks_count)
         commitment = bytes_to_kzg_commitment(rand_bytes)
         proofs = compute_kzg_proofs(rand_bytes)
         self.assertTrue(verify_proofs(rand_bytes, commitment, proofs))
