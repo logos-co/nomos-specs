@@ -6,7 +6,7 @@ from da.kzg_rs import (
     bytes_to_polynomial,
     bytes_to_kzg_commitment,
     compute_kzg_proofs,
-    verify_proofs
+    verify_proofs, setup_field_elements
 )
 from eth2spec.eip7594.mainnet import (
     Polynomial as EthPolynomial,

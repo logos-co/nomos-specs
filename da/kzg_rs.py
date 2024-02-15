@@ -1,14 +1,21 @@
 from itertools import batched
 from typing import List, Sequence
 
-import eth2spec.eip7594.mainnet
+import eth2spec.eip7594.minimal
 from eth2spec.eip7594.mainnet import (
-    bit_reversal_permutation, KZG_SETUP_G1_LAGRANGE, Polynomial,
-    BYTES_PER_FIELD_ELEMENT, bytes_to_bls_field, BLSFieldElement, compute_kzg_proof_impl,
-    compute_roots_of_unity, verify_kzg_proof_impl
+    bit_reversal_permutation,
+    KZG_SETUP_G1_LAGRANGE,
+    Polynomial,
+    BYTES_PER_FIELD_ELEMENT,
+    bytes_to_bls_field,
+    BLSFieldElement,
+    compute_kzg_proof_impl,
+    compute_roots_of_unity,
+    verify_kzg_proof_impl,
+    KZGCommitment as Commitment,
+    KZGProof as Proof,
+    evaluate_polynomial_in_evaluation_form
 )
-from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
-from eth2spec.eip7594.minimal import evaluate_polynomial_in_evaluation_form
 from eth2spec.utils import bls
 from remerkleable.basic import uint64
 from contextlib import contextmanager
