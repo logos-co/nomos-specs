@@ -37,3 +37,7 @@ class BlockMessage:
     vids: List[VID]
 
 DaApiMessage = DABlobMessage | AttestationMessage | CertificateMessage | BlockMessage
+
+def data_hash(data: bytearray):
+    # TODO: migth be unnecessary or moved to common.
+    pass

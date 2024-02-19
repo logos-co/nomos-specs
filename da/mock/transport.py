@@ -6,6 +6,7 @@ class Message:
         self.receiver = receiver
         self.message = message
 
+# Mock transport to imitate message passing between entities in the network.
 class Transport:
     def __init__(self, identifier, message_handler=None):
         self.identifier = identifier

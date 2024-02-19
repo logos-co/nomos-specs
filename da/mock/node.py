@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from typing import List, Optional, Generator
 
+from da.common import NodeId
 from da.verifier import DAVerifier
+
+from da.mock.common import DaApiMessage
+from da.mock.transport import Transport
 
 class MockDaNode:
     def __init__(self, node_id: NodeId):
@@ -10,6 +14,7 @@ class MockDaNode:
         self.transport = Transport(node_id, self.handle_incoming_message)
 
     def handle_incoming_message(self, transport, message: DaApiMessage):
+        print("DA Node got: ", message)
         # Receive DA Api message and act on it.
         match message:
             case DABlobMessage(blob, meta):

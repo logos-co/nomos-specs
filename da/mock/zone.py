@@ -6,13 +6,15 @@ from da.dispersal import Dispersal
 from da.encoder import EncodedData, DAEncoder, DAEncoderParams
 from da.verifier import Attestation, DABlob, DAVerifier
 
-from da.mock.common import CertificateMessage, DaApiMessage, Id, Metadata
+from da.mock.common import CertificateMessage, DaApiMessage, Id, Metadata, data_hash
+from da.mock.node import MockDaNode
+from da.mock.producer import MockProducerNode
 from da.mock.transport import Transport
 
 @dataclass
 class MockZoneParams:
-    da_nodes: List[NodeId]
-    block_producers: List[NodeId]
+    da_nodes: List[MockDaNode]
+    block_producer: MockProducerNode
     threshold: int
     encoder_params: DAEncoderParams
 
@@ -24,10 +26,6 @@ class MockZoneNode:
         self.encoder = DAEncoder(params.encoder_params)
         self.transport = Transport(node_id, self.handle_incoming_message)
 
-    def _data_hash(data: bytearray):
-        # TODO: migth be unnecessary or moved to common.
-        pass
-
     def _create_blobs(self, data: bytearray) -> Generator[DABlob, None, None]:
         # Encodes data and returns DABlob for disemination.
         encoded_data = self.encoder.encode(data)
@@ -38,13 +36,13 @@ class MockZoneNode:
         return self.dispersal._build_certificate(attestations)
 
     def connect(self, other_node):
-        self.transport.connect(other_node)
+        self.transport.connect(other_node.transport)
 
     def disperse_data(self, data: bytearray, meta: Metadata):
-        self.data_attestations[self._data_hash(data)] = []
+        self.data_attestations[data_hash(data)] = []
         blobs = self._create_blobs(data)
 
-        for node, blob in zip(self.da_nodes, blobs):
+        for node, blob in zip(self.params.da_nodes, blobs):
             message = DABlobMessage(blob, meta)
             self.transport.send_message(node, message)
 
@@ -54,9 +52,10 @@ class MockZoneNode:
         for producer in self.params.block_producers:
             self.transport.send_message(producer, message)
 
-    def handle_incoming_message(self, transport, data: DaApiMessage):
+    def handle_incoming_message(self, transport, message: DaApiMessage):
+        print("Zone got: ", message)
         # Receive DA Api message and act on it.
-        match data:
+        match message:
             case AttestationMessage(blob_id, attestation, meta):
                 da_node = message.sender
 
@@ -76,3 +75,4 @@ class MockZoneNode:
             case _:
                 # Ignore other messages
                 pass 
+
