@@ -29,3 +29,4 @@ class TestKZG(TestCase):
         commit = kzg.bytes_to_commitment(rand_bytes, GLOBAL_PARAMETERS)
         poly = kzg.bytes_to_polynomial(rand_bytes)
         proof = kzg.generate_element_proof(poly[0], poly, GLOBAL_PARAMETERS)
+        self.assertEqual(len(proof), 48)

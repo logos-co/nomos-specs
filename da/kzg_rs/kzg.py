@@ -15,7 +15,7 @@ def bytes_to_polynomial(b: bytearray) -> Polynomial:
     Convert bytes to list of BLS field scalars.
     """
     assert len(b) % BYTES_PER_FIELD_ELEMENT == 0
-    return Polynomial([int(bytes_to_bls_field(b)) for b in batched(b, int(BYTES_PER_FIELD_ELEMENT))])
+    return Polynomial([int(bytes_to_bls_field(b)) for b in batched(b, int(BYTES_PER_FIELD_ELEMENT))], BLS_MODULUS)
 
 
 def g1_linear_combination(polynomial: Polynomial[BLSFieldElement], global_parameters: Sequence[G1]) -> Commitment:
@@ -27,7 +27,7 @@ def g1_linear_combination(polynomial: Polynomial[BLSFieldElement], global_parame
     assert len(polynomial) <= len(global_parameters)
     point = reduce(
         bls.add,
-        (bls.multiply(g, p) for g, p in zip(global_parameters, polynomial.coef)),
+        (bls.multiply(g, p) for g, p in zip(global_parameters, polynomial)),
         bls.Z1()
     )
     return Commitment(bls.G1_to_bytes48(point))
@@ -44,8 +44,7 @@ def generate_element_proof(
         global_parameters: Sequence[G1]
 ) -> Proof:
     # compute a witness polynomial in that satisfies `witness(x) = (f(x)-v)/(x-u)`
-    f_x_v = polynomial - Polynomial([polynomial.eval(int(element)) % BLS_MODULUS])
-    x_u = Polynomial([-element, BLSFieldElement(1)])
-    witness = f_x_v // x_u
-    witness = Polynomial(list(BLSFieldElement(int(x) % BLS_MODULUS) for x in reversed(witness) if x != inf))
+    f_x_v = polynomial - Polynomial([polynomial.eval(int(element)) % BLS_MODULUS], BLS_MODULUS)
+    x_u = Polynomial([-element, BLSFieldElement(1)], BLS_MODULUS)
+    witness, _ = f_x_v / x_u
     return g1_linear_combination(witness, global_parameters)
