@@ -5,6 +5,7 @@ from typing import Sequence
 from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof
 from eth2spec.utils import bls
 from numpy import inf
+from sympy import intt
 
 from .common import BYTES_PER_FIELD_ELEMENT, G1, BLS_MODULUS
 from .poly import Polynomial
@@ -15,7 +16,9 @@ def bytes_to_polynomial(b: bytearray) -> Polynomial:
     Convert bytes to list of BLS field scalars.
     """
     assert len(b) % BYTES_PER_FIELD_ELEMENT == 0
-    return Polynomial([int(bytes_to_bls_field(b)) for b in batched(b, int(BYTES_PER_FIELD_ELEMENT))], BLS_MODULUS)
+    eval_form = [int(bytes_to_bls_field(b)) for b in batched(b, int(BYTES_PER_FIELD_ELEMENT))]
+    coefficients = intt(eval_form, prime=BLS_MODULUS)
+    return Polynomial(coefficients, BLS_MODULUS)
 
 
 def g1_linear_combination(polynomial: Polynomial[BLSFieldElement], global_parameters: Sequence[G1]) -> Commitment:
