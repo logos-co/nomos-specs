@@ -1,3 +1,4 @@
+from itertools import zip_longest
 class Polynomial[T]:
     def __init__(self, coefficients, modulus):
         self.coefficients = coefficients
@@ -8,13 +9,13 @@ class Polynomial[T]:
 
     def __add__(self, other):
         return Polynomial(
-            [(a + b) % self.modulus for a, b in zip(self.coefficients, other.coefficients)],
+            [(a + b) % self.modulus for a, b in zip_longest(self.coefficients, other.coefficients, fillvalue=0)],
             self.modulus
         )
 
     def __sub__(self, other):
         return Polynomial(
-            [(a - b) % self.modulus for a, b in zip(self.coefficients, other.coefficients)],
+            [(a - b) % self.modulus for a, b in zip_longest(self.coefficients, other.coefficients, fillvalue=0)],
             self.modulus
         )
 
@@ -25,35 +26,33 @@ class Polynomial[T]:
                 result[i + j] = (result[i + j] + self.coefficients[i] * other.coefficients[j]) % self.modulus
         return Polynomial(result, self.modulus)
 
-    def div(self, divisor):
-        """
-        Fast polynomial division by using Extended Synthetic Division. Also works with non-monic polynomials.
-        Taken from: https://rosettacode.org/wiki/Polynomial_synthetic_division#Python
-        """
-        # dividend and divisor are both polynomials, which are here simply lists of coefficients. Eg: x^2 + 3x + 5 will be represented as [1, 3, 5]
-        out = list(reversed(self.coefficients))  # Copy the dividend
-        normalizer = divisor[0]
-        for i in range(len(self) - (len(divisor) - 1)):
-            out[i] /= normalizer  # for general polynomial division (when polynomials are non-monic),
-            # we need to normalize by dividing the coefficient with the divisor's first coefficient
-            coef = out[i]
-            if coef != 0:  # useless to multiply if coef is 0
-                for j in range(1, len(divisor)):  # in synthetic division, we always skip the first coefficient of the divisor,
-                    # because it's only used to normalize the dividend coefficients
-                    out[i + j] += (-divisor[j] * coef) % self.modulus
+    def divide(self, other):
+        if not isinstance(other, Polynomial):
+            raise ValueError("Unsupported type for division.")
 
-        # The resulting out contains both the quotient and the remainder, the remainder being the size of the divisor (the remainder
-        # has necessarily the same degree as the divisor since it's what we couldn't divide from the dividend), so we compute the index
-        # where this separation is, and return the quotient and remainder.
-        separator = -(len(divisor) - 1)
-        return (
-            Polynomial(list(reversed(out[:separator])), self.modulus),
-            Polynomial(list(reversed(out[separator:])), self.modulus)
-        )
-        # return quotient, remainder.
+        dividend = list(self.coefficients)
+        divisor = list(other.coefficients)
+
+        quotient = []
+        remainder = dividend
+
+        while len(remainder) >= len(divisor):
+            factor = remainder[-1] * pow(divisor[-1], -1, self.modulus) % self.modulus
+            quotient.insert(0, factor)
+
+            # Subtract divisor * factor from remainder
+            for i in range(len(divisor)):
+                remainder[len(remainder) - len(divisor) + i] -= divisor[i] * factor
+                remainder[len(remainder) - len(divisor) + i] %= self.modulus
+
+            # Remove leading zeros from remainder
+            while remainder and remainder[-1] == 0:
+                remainder.pop()
+
+        return Polynomial(quotient, self.modulus), Polynomial(remainder, self.modulus)
 
     def __truediv__(self, other):
-        return self.div(other)
+        return self.divide(other)
 
     def __neg__(self):
         return Polynomial([-1 * c for c in self.coefficients], self.modulus)

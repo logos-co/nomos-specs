@@ -47,6 +47,6 @@ def generate_element_proof(
 ) -> Proof:
     # compute a witness polynomial in that satisfies `witness(x) = (f(x)-v)/(x-u)`
     f_x_v = polynomial - Polynomial([polynomial.eval(int(element)) % BLS_MODULUS], BLS_MODULUS)
-    x_u = Polynomial([-element, BLSFieldElement(1)], BLS_MODULUS)
+    x_u = Polynomial([-element, 1], BLS_MODULUS)
     witness, _ = f_x_v / x_u
     return g1_linear_combination(witness, global_parameters)
