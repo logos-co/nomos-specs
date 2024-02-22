@@ -4,7 +4,6 @@ from typing import Sequence
 
 from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof
 from eth2spec.utils import bls
-from numpy import inf
 from sympy import intt
 
 from .common import BYTES_PER_FIELD_ELEMENT, G1, BLS_MODULUS
