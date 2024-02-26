@@ -1,8 +1,18 @@
 from itertools import zip_longest
+from typing import List, Sequence, Self
+
+from sympy import ntt, intt
+
+
 class Polynomial[T]:
     def __init__(self, coefficients, modulus):
         self.coefficients = coefficients
         self.modulus = modulus
+
+    @classmethod
+    def from_evaluations(cls, evalutaions: Sequence[T], modulus) -> Self:
+        coefficients = intt(evalutaions, prime=modulus)
+        return cls(coefficients, modulus)
 
     def __repr__(self):
         return "Polynomial({}, modulus={})".format(self.coefficients, self.modulus)
@@ -67,4 +77,9 @@ class Polynomial[T]:
         return self.coefficients[item]
 
     def eval(self, element):
-        return sum((pow(element, i)*x) % self.modulus for i, x in enumerate(self.coefficients))
+        return sum(
+            (pow(element, i)*x) % self.modulus for i, x in enumerate(self.coefficients)
+        ) % self.modulus
+
+    def evaluation_form(self) -> List[T]:
+        return ntt(self.coefficients, prime=self.modulus)
