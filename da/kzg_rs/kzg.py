@@ -2,7 +2,7 @@ from functools import reduce
 from itertools import batched
 from typing import Sequence
 
-from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof
+from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof, verify_kzg_proof
 from eth2spec.utils import bls
 from sympy import intt
 
@@ -50,3 +50,19 @@ def generate_element_proof(
     x_u = Polynomial([-element, 1], BLS_MODULUS)
     witness, _ = f_x_v / x_u
     return g1_linear_combination(witness, global_parameters)
+
+
+def verify_element_proof(
+        polynomial: Polynomial,
+        commitment: Commitment,
+        proof: Proof,
+        element_index: int,
+        global_parameters: Sequence[G1]
+) -> bool:
+    v = polynomial.eval(element_index)
+    commitment_check = bls.bytes48_to_G1(commitment) / bls.multiply(bls.G1(), v) % BLS_MODULUS
+    proof_check = global_parameters[element_index] / bls.multiply(bls.G1(), element_index) % BLS_MODULUS
+    return bls.pairing_check([
+        [commitment_check, bls.G2()],
+        [bls.bytes48_to_G1(proof), proof_check]
+    ])
