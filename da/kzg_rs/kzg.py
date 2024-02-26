@@ -2,10 +2,8 @@ from functools import reduce
 from itertools import batched
 from typing import Sequence
 
-from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof, \
-    verify_kzg_proof, KZG_SETUP_G2_MONOMIAL
+from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof
 from eth2spec.utils import bls
-from sympy import intt
 
 from .common import BYTES_PER_FIELD_ELEMENT, G1, BLS_MODULUS, GLOBAL_PARAMETERS_G2
 from .poly import Polynomial

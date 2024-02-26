@@ -3,7 +3,6 @@ from random import randrange
 from unittest import TestCase
 
 from eth2spec.deneb.mainnet import BLS_MODULUS, bytes_to_bls_field
-from eth2spec.utils import bls
 
 from da.kzg_rs import kzg
 from da.kzg_rs.common import BYTES_PER_FIELD_ELEMENT, GLOBAL_PARAMETERS, ROOTS_OF_UNITY

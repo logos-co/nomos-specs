@@ -1,8 +1,7 @@
 from typing import List
 
 import eth2spec.eip7594.mainnet
-from eth2spec.eip7594.mainnet import KZG_SETUP_G1_LAGRANGE, BLSFieldElement, bit_reversal_permutation, \
-    compute_roots_of_unity
+from eth2spec.eip7594.mainnet import BLSFieldElement, compute_roots_of_unity
 from eth2spec.utils import bls
 from py_ecc.bls.typing import G1Uncompressed, G2Uncompressed
 from remerkleable.basic import uint64
