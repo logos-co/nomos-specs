@@ -1,55 +1,30 @@
-from typing import Sequence, List
+from eth2spec.utils import bls
 
-import scipy.interpolate
-from eth2spec.deneb.mainnet import BLSFieldElement
-from eth2spec.eip7594.mainnet import interpolate_polynomialcoeff
-from .common import G1, BLS_MODULUS
+from .common import BLS_MODULUS
 from .poly import Polynomial
+from functools import reduce
 
-ExtendedData = Sequence[BLSFieldElement]
 
-
-def encode(polynomial: Polynomial, factor: int, roots_of_unity: Sequence[BLSFieldElement]) -> ExtendedData:
+def generator_polynomial(n, k, gen=bls.G1()) -> Polynomial:
     """
-    Encode a polynomial extending to the given factor
-    Parameters:
-        polynomial: Polynomial to be encoded
-        factor: Encoding factor
-        roots_of_unity: Powers of 2 sequence
-
-    Returns:
-        list: Extended data set
+    Generate the generator polynomial for RS codes
+    g(x) = (x-α^1)(x-α^2)...(x-α^(n-k))
     """
-    assert factor >= 2
-    assert len(polynomial)*factor <= len(roots_of_unity)
-    return [polynomial.eval(e) for e in roots_of_unity[:len(polynomial)*factor]]
+    g = Polynomial([bls.Z1()], modulus=BLS_MODULUS)
+    return reduce(
+        Polynomial.__mul__,
+        (Polynomial([bls.Z1(), bls.multiply(gen, alpha)], modulus=BLS_MODULUS) for alpha in range(1, n-k+1)),
+        initial=g
+    )
 
 
-def __interpolate(evaluations: List[int], roots_of_unity: List[int]) -> List[int]:
-    """
-    Lagrange interpolation
-
-    Parameters:
-        evaluations: List of evaluations
-        roots_of_unity: Powers of 2 sequence
-
-    Returns:
-        list: Coefficients of the interpolated polynomial
-    """
-    return list(map(int, interpolate_polynomialcoeff(roots_of_unity[:len(evaluations)], evaluations)))
-
-
-def decode(encoded: ExtendedData, roots_of_unity: Sequence[BLSFieldElement], original_len: int) -> Polynomial:
-    """
-    Decode a polynomial from an extended data-set and the roots of unity, cap to original length
-
-    Parameters:
-        encoded: Extended data set
-        roots_of_unity: Powers of 2 sequence
-        original_len: Original length of the encoded polynomial
-
-    Returns:
-        Polynomial: original polynomial
-    """
-    coefs = __interpolate(list(map(int, encoded)), list(map(int, roots_of_unity)))[:original_len]
-    return Polynomial([int(c) for c in coefs], BLS_MODULUS)
+def encode(m: Polynomial, g: Polynomial, n: int, k: int) -> Polynomial:
+    # mprime = q*g + b for some q
+    xshift = Polynomial([bls.Z1(),  *[0 for _ in range(n-k)]], modulus=m.modulus)
+    mprime = m * xshift
+    _, b = m / g
+    # subtract out b, so now c = q*g
+    c = mprime - b
+    # Since c is a multiple of g, it has (at least) n-k roots: α^1 through
+    # α^(n-k)
+    return c
