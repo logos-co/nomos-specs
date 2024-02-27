@@ -5,7 +5,8 @@ from unittest import TestCase
 from eth2spec.deneb.mainnet import BLS_MODULUS, bytes_to_bls_field
 
 from da.kzg_rs import kzg
-from da.kzg_rs.common import BYTES_PER_FIELD_ELEMENT, GLOBAL_PARAMETERS, ROOTS_OF_UNITY
+from da.kzg_rs.common import BYTES_PER_FIELD_ELEMENT, GLOBAL_PARAMETERS, ROOTS_OF_UNITY, GLOBAL_PARAMETERS_G2
+from da.kzg_rs.trusted_setup import verify_setup
 
 
 class TestKZG(TestCase):
@@ -18,6 +19,9 @@ class TestKZG(TestCase):
                 for _ in range(size)
             )
         )
+
+    def test_kzg_setup(self):
+        self.assertTrue(verify_setup((GLOBAL_PARAMETERS, GLOBAL_PARAMETERS_G2)))
 
     def test_poly_forms(self):
         rand_bytes = self.rand_bytes(8)
