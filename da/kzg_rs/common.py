@@ -11,9 +11,9 @@ G2 = G2Uncompressed
 
 
 BYTES_PER_FIELD_ELEMENT = 32
-# we reversed the trusted setup here as np uses a biggest element first approach
 GLOBAL_PARAMETERS: List[G1]
 GLOBAL_PARAMETERS_G2: List[G2]
+# secret is fixed but this should come from a different synchronization protocol
 GLOBAL_PARAMETERS, GLOBAL_PARAMETERS_G2 = map(list, generate_setup(1024, 8, 1987))
 ROOTS_OF_UNITY: List[BLSFieldElement] = list(compute_roots_of_unity(uint64(4096)))
 BLS_MODULUS = eth2spec.eip7594.mainnet.BLS_MODULUS
