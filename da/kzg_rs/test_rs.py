@@ -6,7 +6,6 @@ from da.kzg_rs.rs import encode, decode
 
 
 class TestFFT(TestCase):
-
     def test_encode_decode(self):
         poly = Polynomial(list(range(10)), modulus=BLS_MODULUS)
         encoded = encode(poly, 2, ROOTS_OF_UNITY)
