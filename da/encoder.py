@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from itertools import batched
-from typing import List
+from typing import List, Sequence
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
 
 from da.common import ChunksMatrix
 from da.kzg_rs import kzg, rs, poly
+from da.kzg_rs.common import GLOBAL_PARAMETERS
 
 @dataclass
 class DAEncoderParams:
@@ -31,8 +32,9 @@ class DAEncoder:
         size: int = self.params.column_count * self.params.bytes_per_field_element
         return ChunksMatrix(batched(data, size))
 
-    def _compute_row_kzg_commitments(self, rows: List[bytearray]) -> List[Commitment]:
-        ...
+    @staticmethod
+    def _compute_row_kzg_commitments(rows: Sequence[bytearray]) -> List[Commitment]:
+        return [kzg.bytes_to_commitment(row, GLOBAL_PARAMETERS) for row in rows]
 
     def _rs_encode_rows(self, chunks_matrix: ChunksMatrix) -> ChunksMatrix:
         ...

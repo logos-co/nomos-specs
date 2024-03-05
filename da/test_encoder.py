@@ -4,13 +4,24 @@ from typing import List
 from unittest import TestCase
 
 from da import encoder
-from da.encoder import DAEncoderParams, Commitment
+from da.encoder import DAEncoderParams, Commitment, DAEncoder
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT
 
 from da.kzg_rs.common import BLS_MODULUS
 
 
 class TestEncoder(TestCase):
+
+    def setUp(self):
+        self.params: DAEncoderParams = DAEncoderParams(column_count=10, bytes_per_field_element=32)
+        self.encoder: DAEncoder = DAEncoder(self.params)
+        self.elements = 100
+        self.data = bytearray(
+            chain.from_iterable(
+                randrange(BLS_MODULUS).to_bytes(length=self.params.bytes_per_field_element, byteorder='big')
+                for _ in range(self.elements)
+            )
+        )
 
     def assert_encoding(self, encoder_params: DAEncoderParams, data: bytearray):
         encoded_data = encoder.DAEncoder(encoder_params).encode(data)
@@ -30,9 +41,10 @@ class TestEncoder(TestCase):
         for column in chunks_matrix:
             self.assertEqual(len(column), encoder_settings.bytes_per_field_element*encoder_settings.column_count)
 
-
     def test_compute_row_kzg_commitments(self):
-        pass
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        commitments = self.encoder._compute_row_kzg_commitments(chunks_matrix)
+        self.assertEqual(len(commitments), len(chunks_matrix))
 
     def test_rs_encode_rows(self):
         pass
