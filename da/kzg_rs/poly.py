@@ -10,8 +10,8 @@ class Polynomial[T]:
         self.modulus = modulus
 
     @classmethod
-    def from_evaluations(cls, evalutaions: Sequence[T], modulus) -> Self:
-        coefficients = intt(evalutaions, prime=modulus)
+    def from_evaluations(cls, evaluations: Sequence[T], modulus) -> Self:
+        coefficients = intt(evaluations, prime=modulus)[:len(evaluations)]
         return cls(coefficients, modulus)
 
     def __repr__(self):
