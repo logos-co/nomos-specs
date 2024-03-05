@@ -11,7 +11,7 @@ class Polynomial[T]:
 
     @classmethod
     def from_evaluations(cls, evaluations: Sequence[T], modulus) -> Self:
-        coefficients = intt(evaluations, prime=modulus)[:len(evaluations)]
+        coefficients = intt(evaluations, prime=modulus)
         return cls(coefficients, modulus)
 
     def __repr__(self):

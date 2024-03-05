@@ -9,7 +9,7 @@ from .poly import Polynomial
 ExtendedData = Sequence[BLSFieldElement]
 
 
-def encode(polynomial: Polynomial, factor: int, roots_of_unity: Sequence[BLSFieldElement]) -> ExtendedData:
+def encode(polynomial: Polynomial, factor: int, roots_of_unity: Sequence[int]) -> ExtendedData:
     """
     Encode a polynomial extending to the given factor
     Parameters:

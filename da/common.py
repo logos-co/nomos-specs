@@ -11,11 +11,11 @@ class Chunk(Bytes32):
     pass
 
 
-class Column(List[Chunk]):
+class Column(bytes):
     pass
 
 
-class Row(List[Chunk]):
+class Row(bytes):
     pass
 
 

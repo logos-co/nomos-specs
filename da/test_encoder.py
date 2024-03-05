@@ -1,21 +1,20 @@
-from itertools import chain
+from itertools import chain, batched
 from random import randrange
-from typing import List
 from unittest import TestCase
 
 from da import encoder
 from da.encoder import DAEncoderParams, Commitment, DAEncoder
-from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT
+from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
 
-from da.kzg_rs.common import BLS_MODULUS
-
+from da.kzg_rs.common import BLS_MODULUS, ROOTS_OF_UNITY
+from da.kzg_rs import kzg, rs
 
 class TestEncoder(TestCase):
 
     def setUp(self):
-        self.params: DAEncoderParams = DAEncoderParams(column_count=10, bytes_per_field_element=32)
+        self.params: DAEncoderParams = DAEncoderParams(column_count=16, bytes_per_field_element=32)
         self.encoder: DAEncoder = DAEncoder(self.params)
-        self.elements = 100
+        self.elements = 16
         self.data = bytearray(
             chain.from_iterable(
                 randrange(BLS_MODULUS).to_bytes(length=self.params.bytes_per_field_element, byteorder='big')
@@ -47,7 +46,14 @@ class TestEncoder(TestCase):
         self.assertEqual(len(commitments), len(chunks_matrix))
 
     def test_rs_encode_rows(self):
-        pass
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        extended_chunks_matrix = self.encoder._rs_encode_rows(chunks_matrix)
+        for r1, r2 in zip(chunks_matrix, extended_chunks_matrix):
+            r2 = [BLSFieldElement.from_bytes(x) for x in batched(r2, self.params.bytes_per_field_element)]
+            poly_1 = kzg.bytes_to_polynomial(r1)
+            # we check against decoding so we now the encoding was properly done
+            poly_2 = rs.decode(r2, ROOTS_OF_UNITY, len(poly_1))
+            self.assertEqual(poly_1, poly_2)
 
     def test_compute_rows_proofs(self):
         pass
