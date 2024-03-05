@@ -51,7 +51,16 @@ class DAEncoder:
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
 
     def _compute_rows_proofs(self, chunks_matrix: ChunksMatrix, row_commitments: List[Commitment]) -> List[List[Proof]]:
-        ...
+        proofs = []
+        for row, commitment in zip(chunks_matrix, row_commitments):
+            poly = kzg.bytes_to_polynomial(row)
+            proofs.append(
+                [
+                    kzg.generate_element_proof(i, poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
+                    for i in range(len(row)//self.params.bytes_per_field_element)
+                ]
+            )
+        return proofs
 
     def _compute_column_kzg_commitments(self, chunks_matrix: ChunksMatrix) -> List[Commitment]:
         ...

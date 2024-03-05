@@ -57,7 +57,21 @@ class TestEncoder(TestCase):
             self.assertEqual(poly_1, poly_2)
 
     def test_compute_rows_proofs(self):
-        pass
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        commitments = self.encoder._compute_row_kzg_commitments(chunks_matrix)
+        extended_chunks_matrix = self.encoder._rs_encode_rows(chunks_matrix)
+        original_proofs = self.encoder._compute_rows_proofs(chunks_matrix, commitments)
+        extended_proofs = self.encoder._compute_rows_proofs(extended_chunks_matrix, commitments)
+        # check original sized matrix
+        for row, commitment, proofs in zip(chunks_matrix, commitments, original_proofs):
+            poly = kzg.bytes_to_polynomial(row)
+            for i in range(len(proofs)):
+                self.assertTrue(kzg.verify_element_proof(poly, commitment, proofs[i], i, ROOTS_OF_UNITY))
+        # check extended matrix
+        for row, commitment, proofs in zip(extended_chunks_matrix, commitments, extended_proofs):
+            poly = kzg.bytes_to_polynomial(row)
+            for i in range(len(proofs)):
+                self.assertTrue(kzg.verify_element_proof(poly, commitment, proofs[i], i, ROOTS_OF_UNITY))
 
     def test_compute_column_kzg_commitments(self):
         pass
