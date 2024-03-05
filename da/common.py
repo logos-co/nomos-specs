@@ -20,9 +20,9 @@ class Row(List[Chunk]):
 
 
 class ChunksMatrix(List[Row]):
+    @property
     def columns(self) -> Generator[List[Chunk], None, None]:
-        # TODO: yield columns
-        yield None
+        yield from map(list, zip(*self))
 
 
 

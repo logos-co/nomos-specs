@@ -3,7 +3,7 @@ from typing import List
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
 
 from da.common import ChunksMatrix
-
+from da.kzg_rs import kzg, rs, poly
 
 @dataclass
 class DAEncoderParams:
