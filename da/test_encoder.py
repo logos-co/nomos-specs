@@ -1,3 +1,5 @@
+from itertools import chain
+from random import randrange
 from typing import List
 from unittest import TestCase
 
@@ -5,8 +7,11 @@ from da import encoder
 from da.encoder import DAEncoderParams, Commitment
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT
 
+from da.kzg_rs.common import BLS_MODULUS
+
 
 class TestEncoder(TestCase):
+
     def assert_encoding(self, encoder_params: DAEncoderParams, data: bytearray):
         encoded_data = encoder.DAEncoder(encoder_params).encode(data)
         self.assertEqual(encoded_data.data, data)
@@ -16,7 +21,15 @@ class TestEncoder(TestCase):
         self.assertEqual(len(encoded_data.row_proofs), chunks_size)
 
     def test_chunkify(self):
-        pass
+        encoder_settings = DAEncoderParams(column_count=2, bytes_per_field_element=32)
+        elements = 10
+        data = bytearray(chain.from_iterable(int.to_bytes(0, length=32, byteorder='big') for _ in range(elements)))
+        _encoder = encoder.DAEncoder(encoder_settings)
+        chunks_matrix = _encoder._chunkify_data(data)
+        self.assertEqual(len(chunks_matrix), elements//encoder_settings.column_count)
+        for column in chunks_matrix:
+            self.assertEqual(len(column), encoder_settings.bytes_per_field_element*encoder_settings.column_count)
+
 
     def test_compute_row_kzg_commitments(self):
         pass

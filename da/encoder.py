@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from itertools import batched
 from typing import List
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof
 
@@ -27,7 +28,8 @@ class DAEncoder:
         self.params = params
 
     def _chunkify_data(self, data: bytearray) -> ChunksMatrix:
-        ...
+        size: int = self.params.column_count * self.params.bytes_per_field_element
+        return ChunksMatrix(batched(data, size))
 
     def _compute_row_kzg_commitments(self, rows: List[bytearray]) -> List[Commitment]:
         ...
