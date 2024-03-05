@@ -1,7 +1,6 @@
 from unittest import TestCase
 
-from da.kzg_rs.common import BLS_MODULUS, ROOTS_OF_UNITY, INVERSE_ROOTS_OF_UNITY
-from da.kzg_rs.fft import fft, ifft
+from da.kzg_rs.common import BLS_MODULUS, ROOTS_OF_UNITY
 from da.kzg_rs.poly import Polynomial
 from da.kzg_rs.rs import encode, decode
 

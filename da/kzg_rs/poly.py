@@ -76,6 +76,9 @@ class Polynomial[T]:
     def __getitem__(self, item):
         return self.coefficients[item]
 
+    def __eq__(self, other):
+        return self.coefficients == other.coefficients and self.modulus == other.modulus
+
     def eval(self, element):
         return sum(
             (pow(element, i)*x) % self.modulus for i, x in enumerate(self.coefficients)
