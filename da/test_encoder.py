@@ -14,7 +14,7 @@ class TestEncoder(TestCase):
     def setUp(self):
         self.params: DAEncoderParams = DAEncoderParams(column_count=16, bytes_per_field_element=32)
         self.encoder: DAEncoder = DAEncoder(self.params)
-        self.elements = 16
+        self.elements = 100
         self.data = bytearray(
             chain.from_iterable(
                 randrange(BLS_MODULUS).to_bytes(length=self.params.bytes_per_field_element, byteorder='big')
@@ -49,6 +49,7 @@ class TestEncoder(TestCase):
         chunks_matrix = self.encoder._chunkify_data(self.data)
         extended_chunks_matrix = self.encoder._rs_encode_rows(chunks_matrix)
         for r1, r2 in zip(chunks_matrix, extended_chunks_matrix):
+            self.assertEqual(len(r1), len(r2)//2)
             r2 = [BLSFieldElement.from_bytes(x) for x in batched(r2, self.params.bytes_per_field_element)]
             poly_1 = kzg.bytes_to_polynomial(r1)
             # we check against decoding so we now the encoding was properly done
