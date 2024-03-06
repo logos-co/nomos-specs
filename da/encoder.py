@@ -38,8 +38,8 @@ class DAEncoder:
         )
 
     @staticmethod
-    def _compute_row_kzg_commitments(rows: Sequence[Row]) -> List[Tuple[Polynomial, Commitment]]:
-        return [kzg.bytes_to_commitment(row.as_bytes(), GLOBAL_PARAMETERS) for row in rows]
+    def _compute_row_kzg_commitments(matrix: ChunksMatrix) -> List[Tuple[Polynomial, Commitment]]:
+        return [kzg.bytes_to_commitment(row.as_bytes(), GLOBAL_PARAMETERS) for row in matrix]
 
     def _rs_encode_rows(self, chunks_matrix: ChunksMatrix) -> ChunksMatrix:
         def __rs_encode_row(row: Row) -> Row:
@@ -67,8 +67,8 @@ class DAEncoder:
             )
         return proofs
 
-    def _compute_column_kzg_commitments(self, chunks_matrix: ChunksMatrix) -> List[Commitment]:
-        ...
+    def _compute_column_kzg_commitments(self, chunks_matrix: ChunksMatrix) -> List[Tuple[Polynomial, Commitment]]:
+        return self._compute_row_kzg_commitments(chunks_matrix.transposed())
 
     def _compute_aggregated_column_commitments(
             self, chunks_matrix: ChunksMatrix, column_commitments: List[Commitment]

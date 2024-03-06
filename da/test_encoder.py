@@ -43,8 +43,9 @@ class TestEncoder(TestCase):
 
     def test_compute_row_kzg_commitments(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
-        commitments = self.encoder._compute_row_kzg_commitments(chunks_matrix)
+        polynomials, commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix))
         self.assertEqual(len(commitments), len(chunks_matrix))
+        self.assertEqual(len(polynomials), len(chunks_matrix))
 
     def test_rs_encode_rows(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
@@ -74,7 +75,10 @@ class TestEncoder(TestCase):
                 self.assertTrue(kzg.verify_element_proof(BLSFieldElement.from_bytes(chunk), commitment, proofs[i], i, ROOTS_OF_UNITY))
 
     def test_compute_column_kzg_commitments(self):
-        pass
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        polynomials, commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix.transposed()))
+        self.assertEqual(len(commitments), len(chunks_matrix))
+        self.assertEqual(len(polynomials), len(chunks_matrix))
 
     def test_generate_aggregated_column_commitments(self):
         pass
