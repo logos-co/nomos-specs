@@ -11,11 +11,25 @@ class Polynomial[T]:
         self.coefficients = coefficients
         self.modulus = modulus
 
+    @staticmethod
+    def interpolate(evaluations: List[int], roots_of_unity: List[int]) -> List[int]:
+        """
+        Lagrange interpolation
+
+        Parameters:
+            evaluations: List of evaluations
+            roots_of_unity: Powers of 2 sequence
+
+        Returns:
+            list: Coefficients of the interpolated polynomial
+        """
+        return list(map(int, interpolate_polynomialcoeff(roots_of_unity[:len(evaluations)], evaluations)))
+
     @classmethod
     def from_evaluations(cls, evaluations: Sequence[T], modulus, roots_of_unity: Sequence[int]=ROOTS_OF_UNITY) -> Self:
         coefficients = [
             x % modulus
-            for x in map(int, interpolate_polynomialcoeff(ROOTS_OF_UNITY[:len(evaluations)], evaluations))
+            for x in map(int, Polynomial.interpolate(evaluations, roots_of_unity))
         ]
         return cls(coefficients, modulus)
 
