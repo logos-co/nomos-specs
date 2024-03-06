@@ -13,7 +13,8 @@ class Chunk(Bytes32):
 
 
 class Column(List[Bytes32]):
-    pass
+    def as_bytes(self) -> bytes:
+        return bytes(chain.from_iterable(self))
 
 
 class Row(List[Bytes32]):
@@ -21,10 +22,10 @@ class Row(List[Bytes32]):
         return bytes(chain.from_iterable(self))
 
 
-class ChunksMatrix(List[Row]):
+class ChunksMatrix(List[Row | Column]):
     @property
     def columns(self) -> Generator[List[Chunk], None, None]:
-        yield from map(Row, zip(*self))
+        yield from map(Column, zip(*self))
 
     def transposed(self) -> Self:
         return ChunksMatrix(self.columns)
