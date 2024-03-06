@@ -58,18 +58,16 @@ class TestEncoder(TestCase):
 
     def test_compute_rows_proofs(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
-        commitments = self.encoder._compute_row_kzg_commitments(chunks_matrix)
+        polynomials, commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix))
         extended_chunks_matrix = self.encoder._rs_encode_rows(chunks_matrix)
-        original_proofs = self.encoder._compute_rows_proofs(chunks_matrix, commitments)
-        extended_proofs = self.encoder._compute_rows_proofs(extended_chunks_matrix, commitments)
+        original_proofs = self.encoder._compute_rows_proofs(chunks_matrix, polynomials, commitments)
+        extended_proofs = self.encoder._compute_rows_proofs(extended_chunks_matrix, polynomials, commitments)
         # check original sized matrix
-        for row, commitment, proofs in zip(chunks_matrix, commitments, original_proofs):
-            poly = kzg.bytes_to_polynomial(row)
+        for row, poly, commitment, proofs in zip(chunks_matrix, polynomials, commitments, original_proofs):
             for i in range(len(proofs)):
                 self.assertTrue(kzg.verify_element_proof(poly, commitment, proofs[i], i, ROOTS_OF_UNITY))
         # check extended matrix
-        for row, commitment, proofs in zip(extended_chunks_matrix, commitments, extended_proofs):
-            poly = kzg.bytes_to_polynomial(row)
+        for row, poly, commitment, proofs in zip(extended_chunks_matrix, polynomials, commitments, extended_proofs):
             for i in range(len(proofs)):
                 self.assertTrue(kzg.verify_element_proof(poly, commitment, proofs[i], i, ROOTS_OF_UNITY))
 

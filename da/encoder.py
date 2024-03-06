@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from itertools import batched, chain
-from typing import List, Sequence
+from typing import List, Sequence, Tuple
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof, BLSFieldElement
 
 from da.common import ChunksMatrix, Chunk
 from da.kzg_rs import kzg, rs, poly
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY
+from da.kzg_rs.poly import Polynomial
 
 
 @dataclass
@@ -34,7 +35,7 @@ class DAEncoder:
         return ChunksMatrix(bytes(b) for b in batched(data, size))
 
     @staticmethod
-    def _compute_row_kzg_commitments(rows: Sequence[bytes]) -> List[Commitment]:
+    def _compute_row_kzg_commitments(rows: Sequence[bytes]) -> List[Tuple[Polynomial, Commitment]]:
         return [kzg.bytes_to_commitment(row, GLOBAL_PARAMETERS) for row in rows]
 
     def _rs_encode_rows(self, chunks_matrix: ChunksMatrix) -> ChunksMatrix:
@@ -50,10 +51,13 @@ class DAEncoder:
             )
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
 
-    def _compute_rows_proofs(self, chunks_matrix: ChunksMatrix, row_commitments: List[Commitment]) -> List[List[Proof]]:
+    def _compute_rows_proofs(
+            self,
+            chunks_matrix: ChunksMatrix,
+            polynomials: Sequence[Polynomial],
+            row_commitments: Sequence[Commitment]) -> List[List[Proof]]:
         proofs = []
-        for row, commitment in zip(chunks_matrix, row_commitments):
-            poly = kzg.bytes_to_polynomial(row)
+        for row, poly, commitment in zip(chunks_matrix, polynomials, row_commitments):
             proofs.append(
                 [
                     kzg.generate_element_proof(i, poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)

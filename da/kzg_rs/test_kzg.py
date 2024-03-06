@@ -32,7 +32,7 @@ class TestKZG(TestCase):
 
     def test_commitment(self):
         rand_bytes = self.rand_bytes(32)
-        commit = kzg.bytes_to_commitment(rand_bytes, GLOBAL_PARAMETERS)
+        _, commit = kzg.bytes_to_commitment(rand_bytes, GLOBAL_PARAMETERS)
         self.assertEqual(len(commit), 48)
 
     def test_proof(self):
@@ -44,7 +44,7 @@ class TestKZG(TestCase):
     def test_verify(self):
         n_chunks = 32
         rand_bytes = self.rand_bytes(n_chunks)
-        commit = kzg.bytes_to_commitment(rand_bytes, GLOBAL_PARAMETERS)
+        _, commit = kzg.bytes_to_commitment(rand_bytes, GLOBAL_PARAMETERS)
         poly = kzg.bytes_to_polynomial(rand_bytes)
         for n in range(n_chunks):
             proof = kzg.generate_element_proof(n, poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)

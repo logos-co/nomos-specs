@@ -1,6 +1,6 @@
 from functools import reduce
 from itertools import batched
-from typing import Sequence
+from typing import Sequence, Tuple
 
 from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof
 from eth2spec.utils import bls
@@ -33,9 +33,9 @@ def g1_linear_combination(polynomial: Polynomial[BLSFieldElement], global_parame
     return Commitment(bls.G1_to_bytes48(point))
 
 
-def bytes_to_commitment(b: bytes, global_parameters: Sequence[G1]) -> Commitment:
+def bytes_to_commitment(b: bytes, global_parameters: Sequence[G1]) -> Tuple[Polynomial, Commitment]:
     poly = bytes_to_polynomial(b)
-    return g1_linear_combination(poly, global_parameters)
+    return poly, g1_linear_combination(poly, global_parameters)
 
 
 def generate_element_proof(
