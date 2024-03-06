@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from itertools import chain
-from typing import List, Generator
+from typing import List, Generator, Self
 
 from eth2spec.eip7594.mainnet import Bytes32
 
@@ -24,7 +24,10 @@ class Row(List[Bytes32]):
 class ChunksMatrix(List[Row]):
     @property
     def columns(self) -> Generator[List[Chunk], None, None]:
-        yield from map(list, zip(*self))
+        yield from map(Row, zip(*self))
+
+    def transposed(self) -> Self:
+        return ChunksMatrix(self.columns)
 
 
 
