@@ -15,3 +15,6 @@ class TestCommon(TestCase):
         matrix = ChunksMatrix([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
         expected = ChunksMatrix([[1, 4, 7], [2, 5, 8], [3, 6, 9]])
         self.assertEqual(matrix.transposed(), expected)
+        matrix = ChunksMatrix([[1, 2, 3], [4, 5, 6]])
+        expected = ChunksMatrix([[1, 4], [2, 5], [3, 6]])
+        self.assertEqual(matrix.transposed(), expected)

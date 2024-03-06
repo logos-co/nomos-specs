@@ -33,7 +33,7 @@ class DAEncoder:
     def _chunkify_data(self, data: bytes) -> ChunksMatrix:
         size: int = self.params.column_count * self.params.bytes_per_field_element
         return ChunksMatrix(
-            Row([bytes(chunk) for chunk in batched(b, self.params.bytes_per_field_element)])
+            Row(Chunk(bytes(chunk)) for chunk in batched(b, self.params.bytes_per_field_element))
             for b in batched(data, size)
         )
 

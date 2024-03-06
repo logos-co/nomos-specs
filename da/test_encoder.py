@@ -14,7 +14,7 @@ class TestEncoder(TestCase):
     def setUp(self):
         self.params: DAEncoderParams = DAEncoderParams(column_count=16, bytes_per_field_element=32)
         self.encoder: DAEncoder = DAEncoder(self.params)
-        self.elements = 100
+        self.elements = 32
         self.data = bytearray(
             chain.from_iterable(
                 randrange(BLS_MODULUS).to_bytes(length=self.params.bytes_per_field_element, byteorder='big')
@@ -76,9 +76,9 @@ class TestEncoder(TestCase):
 
     def test_compute_column_kzg_commitments(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
-        polynomials, commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix.transposed()))
-        self.assertEqual(len(commitments), len(chunks_matrix))
-        self.assertEqual(len(polynomials), len(chunks_matrix))
+        polynomials, commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
+        self.assertEqual(len(commitments), len(chunks_matrix[0]))
+        self.assertEqual(len(polynomials), len(chunks_matrix[0]))
 
     def test_generate_aggregated_column_commitments(self):
         pass
