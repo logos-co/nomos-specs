@@ -37,8 +37,9 @@ class TestEncoder(TestCase):
         _encoder = encoder.DAEncoder(encoder_settings)
         chunks_matrix = _encoder._chunkify_data(data)
         self.assertEqual(len(chunks_matrix), elements//encoder_settings.column_count)
-        for column in chunks_matrix:
-            self.assertEqual(len(column), encoder_settings.bytes_per_field_element*encoder_settings.column_count)
+        for row in chunks_matrix:
+            self.assertEqual(len(row), encoder_settings.column_count)
+            self.assertEqual(len(row[0]), encoder_settings.bytes_per_field_element)
 
     def test_compute_row_kzg_commitments(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
@@ -50,8 +51,8 @@ class TestEncoder(TestCase):
         extended_chunks_matrix = self.encoder._rs_encode_rows(chunks_matrix)
         for r1, r2 in zip(chunks_matrix, extended_chunks_matrix):
             self.assertEqual(len(r1), len(r2)//2)
-            r2 = [BLSFieldElement.from_bytes(x) for x in batched(r2, self.params.bytes_per_field_element)]
-            poly_1 = kzg.bytes_to_polynomial(r1)
+            r2 = [BLSFieldElement.from_bytes(x) for x in r2]
+            poly_1 = kzg.bytes_to_polynomial(r1.as_bytes())
             # we check against decoding so we now the encoding was properly done
             poly_2 = rs.decode(r2, ROOTS_OF_UNITY, len(poly_1))
             self.assertEqual(poly_1, poly_2)
@@ -64,12 +65,13 @@ class TestEncoder(TestCase):
         extended_proofs = self.encoder._compute_rows_proofs(extended_chunks_matrix, polynomials, commitments)
         # check original sized matrix
         for row, poly, commitment, proofs in zip(chunks_matrix, polynomials, commitments, original_proofs):
-            for i in range(len(proofs)):
-                self.assertTrue(kzg.verify_element_proof(poly, commitment, proofs[i], i, ROOTS_OF_UNITY))
+            self.assertEqual(len(proofs), len(row))
+            for i, chunk in enumerate(row):
+                self.assertTrue(kzg.verify_element_proof(BLSFieldElement.from_bytes(chunk), commitment, proofs[i], i, ROOTS_OF_UNITY))
         # check extended matrix
         for row, poly, commitment, proofs in zip(extended_chunks_matrix, polynomials, commitments, extended_proofs):
-            for i in range(len(proofs)):
-                self.assertTrue(kzg.verify_element_proof(poly, commitment, proofs[i], i, ROOTS_OF_UNITY))
+            for i, chunk in enumerate(row):
+                self.assertTrue(kzg.verify_element_proof(BLSFieldElement.from_bytes(chunk), commitment, proofs[i], i, ROOTS_OF_UNITY))
 
     def test_compute_column_kzg_commitments(self):
         pass

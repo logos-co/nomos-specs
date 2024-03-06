@@ -54,14 +54,14 @@ def generate_element_proof(
 
 
 def verify_element_proof(
-        polynomial: Polynomial,
+        chunk: BLSFieldElement,
         commitment: Commitment,
         proof: Proof,
         element_index: int,
         roots_of_unity: Sequence[BLSFieldElement],
 ) -> bool:
     u = int(roots_of_unity[element_index])
-    v = polynomial.eval(u)
+    v = chunk
     commitment_check_G1 = bls.bytes48_to_G1(commitment) - bls.multiply(bls.G1(), v)
     proof_check_g2 = bls.add(
         GLOBAL_PARAMETERS_G2[1],

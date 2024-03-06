@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from itertools import chain
 from typing import List, Generator
 
 from eth2spec.eip7594.mainnet import Bytes32
@@ -16,7 +17,8 @@ class Column(List[Bytes32]):
 
 
 class Row(List[Bytes32]):
-    pass
+    def as_bytes(self) -> bytes:
+        return bytes(chain.from_iterable(self))
 
 
 class ChunksMatrix(List[Row]):

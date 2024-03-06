@@ -3,7 +3,7 @@ from itertools import batched, chain
 from typing import List, Sequence, Tuple
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof, BLSFieldElement
 
-from da.common import ChunksMatrix, Chunk
+from da.common import ChunksMatrix, Chunk, Row
 from da.kzg_rs import kzg, rs, poly
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY
 from da.kzg_rs.poly import Polynomial
@@ -32,22 +32,23 @@ class DAEncoder:
 
     def _chunkify_data(self, data: bytes) -> ChunksMatrix:
         size: int = self.params.column_count * self.params.bytes_per_field_element
-        return ChunksMatrix(bytes(b) for b in batched(data, size))
+        return ChunksMatrix(
+            Row([bytes(chunk) for chunk in batched(b, self.params.bytes_per_field_element)])
+            for b in batched(data, size)
+        )
 
     @staticmethod
-    def _compute_row_kzg_commitments(rows: Sequence[bytes]) -> List[Tuple[Polynomial, Commitment]]:
-        return [kzg.bytes_to_commitment(row, GLOBAL_PARAMETERS) for row in rows]
+    def _compute_row_kzg_commitments(rows: Sequence[Row]) -> List[Tuple[Polynomial, Commitment]]:
+        return [kzg.bytes_to_commitment(row.as_bytes(), GLOBAL_PARAMETERS) for row in rows]
 
     def _rs_encode_rows(self, chunks_matrix: ChunksMatrix) -> ChunksMatrix:
-        def __rs_encode_row(row: bytes) -> bytes:
-            polynomial = kzg.bytes_to_polynomial(row)
-            return bytes(
-                chain.from_iterable(
-                    Chunk(BLSFieldElement.to_bytes(
-                        x,
-                        length=self.params.bytes_per_field_element, byteorder="big"
-                    )) for x in rs.encode(polynomial, 2, ROOTS_OF_UNITY)
-                )
+        def __rs_encode_row(row: Row) -> Row:
+            polynomial = kzg.bytes_to_polynomial(row.as_bytes())
+            return Row(
+                Chunk(BLSFieldElement.to_bytes(
+                    x,
+                    length=self.params.bytes_per_field_element, byteorder="big"
+                )) for x in rs.encode(polynomial, 2, ROOTS_OF_UNITY)
             )
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
 
@@ -61,7 +62,7 @@ class DAEncoder:
             proofs.append(
                 [
                     kzg.generate_element_proof(i, poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
-                    for i in range(len(row)//self.params.bytes_per_field_element)
+                    for i in range(len(row))
                 ]
             )
         return proofs
