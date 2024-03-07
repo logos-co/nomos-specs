@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from itertools import chain
+from itertools import chain, zip_longest
 from typing import List, Generator, Self
 
 from eth2spec.eip7594.mainnet import Bytes32
@@ -25,7 +25,7 @@ class Row(List[Bytes32]):
 class ChunksMatrix(List[Row | Column]):
     @property
     def columns(self) -> Generator[List[Chunk], None, None]:
-        yield from map(Column, zip(*self))
+        yield from map(Column, zip_longest(*self, fillvalue=b""))
 
     def transposed(self) -> Self:
         return ChunksMatrix(self.columns)

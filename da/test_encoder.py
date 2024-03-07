@@ -2,6 +2,8 @@ from itertools import chain, batched
 from random import randrange
 from unittest import TestCase
 
+from eth2spec.deneb.mainnet import bytes_to_bls_field
+
 from da import encoder
 from da.encoder import DAEncoderParams, Commitment, DAEncoder
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
@@ -22,13 +24,38 @@ class TestEncoder(TestCase):
             )
         )
 
-    def assert_encoding(self, encoder_params: DAEncoderParams, data: bytearray):
+    def assert_encoding(self, encoder_params: DAEncoderParams, data: bytes):
         encoded_data = encoder.DAEncoder(encoder_params).encode(data)
         self.assertEqual(encoded_data.data, data)
-        self.assertEqual(len(encoded_data.extended_matrix), encoder_params.column_count)
+        extended_factor = 2
+        column_count = encoder_params.column_count*extended_factor
+        columns_len = len(list(encoded_data.extended_matrix.columns))
+        self.assertEqual(columns_len, column_count)
         chunks_size = (len(data) // encoder_params.bytes_per_field_element) // encoder_params.column_count
         self.assertEqual(len(encoded_data.row_commitments), chunks_size)
         self.assertEqual(len(encoded_data.row_proofs), chunks_size)
+        self.assertEqual(len(encoded_data.row_proofs[0]), column_count)
+        self.assertIsNotNone(encoded_data.aggregated_column_commitment)
+        self.assertEqual(len(encoded_data.aggregated_column_proofs), columns_len)
+
+        # verify rows
+        for row, proofs, commitment in zip(encoded_data.extended_matrix, encoded_data.row_proofs, encoded_data.row_commitments):
+            for i, (chunk, proof) in enumerate(zip(row, proofs)):
+                self.assertTrue(
+                    kzg.verify_element_proof(bytes_to_bls_field(chunk), commitment, proof, i, ROOTS_OF_UNITY)
+                )
+
+        # verify column aggregation
+        for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.aggregated_column_proofs)):
+            data = DAEncoder._hash_column_and_commitment(column, commitment)
+            kzg.verify_element_proof(
+                bytes_to_bls_field(data),
+                encoded_data.aggregated_column_commitment,
+                proof,
+                i,
+                ROOTS_OF_UNITY
+            )
+
 
     def test_chunkify(self):
         encoder_settings = DAEncoderParams(column_count=2, bytes_per_field_element=32)
@@ -81,17 +108,34 @@ class TestEncoder(TestCase):
         self.assertEqual(len(polynomials), len(chunks_matrix[0]))
 
     def test_generate_aggregated_column_commitments(self):
-        pass
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
+        poly, commitment = self.encoder._compute_aggregated_column_commitment(chunks_matrix, column_commitments)
+        self.assertIsNotNone(poly)
+        self.assertIsNotNone(commitment)
+
+    def test_generate_aggregated_column_proofs(self):
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
+        poly, _ = self.encoder._compute_aggregated_column_commitment(chunks_matrix, column_commitments)
+        proofs = self.encoder._compute_aggregated_column_proofs(poly, column_commitments)
+        self.assertEqual(len(proofs), len(column_commitments))
 
     def test_encode(self):
-        # TODO: remove return, for now we make it work for now so we do not disturb other modules
-        return
         from random import randbytes
-        sizes = [pow(2, exp) for exp in range(0, 8, 2)]
+        sizes = [pow(2, exp) for exp in range(4, 8, 2)]
         encoder_params = DAEncoderParams(
-            column_count=10,
+            column_count=8,
             bytes_per_field_element=BYTES_PER_FIELD_ELEMENT
         )
         for size in sizes:
-            data = bytearray(randbytes(size*1024))
+            data = bytes(
+                chain.from_iterable(
+                    # TODO: For now we make data fit with modulus, we need to research if this is correct
+                    (int.from_bytes(b) % BLS_MODULUS).to_bytes(length=32)
+                    for b in batched(
+                        randbytes(size*self.encoder.params.column_count), self.encoder.params.bytes_per_field_element
+                    )
+                )
+            )
             self.assert_encoding(encoder_params, data)

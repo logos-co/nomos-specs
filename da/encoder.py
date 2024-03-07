@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from itertools import batched, chain
 from typing import List, Sequence, Tuple
+from hashlib import sha256
+
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof, BLSFieldElement
 
-from da.common import ChunksMatrix, Chunk, Row
-from da.kzg_rs import kzg, rs, poly
-from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY
+from da.common import ChunksMatrix, Chunk, Row, Column
+from da.kzg_rs import kzg, rs
+from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY, BLS_MODULUS
 from da.kzg_rs.poly import Polynomial
 
 
@@ -52,11 +54,12 @@ class DAEncoder:
             )
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
 
+    @staticmethod
     def _compute_rows_proofs(
-            self,
-            chunks_matrix: ChunksMatrix,
-            polynomials: Sequence[Polynomial],
-            row_commitments: Sequence[Commitment]) -> List[List[Proof]]:
+        chunks_matrix: ChunksMatrix,
+        polynomials: Sequence[Polynomial],
+        row_commitments: Sequence[Commitment]
+    ) -> List[List[Proof]]:
         proofs = []
         for row, poly, commitment in zip(chunks_matrix, polynomials, row_commitments):
             proofs.append(
@@ -70,26 +73,38 @@ class DAEncoder:
     def _compute_column_kzg_commitments(self, chunks_matrix: ChunksMatrix) -> List[Tuple[Polynomial, Commitment]]:
         return self._compute_row_kzg_commitments(chunks_matrix.transposed())
 
-    def _compute_aggregated_column_commitments(
-            self, chunks_matrix: ChunksMatrix, column_commitments: List[Commitment]
-    ) -> Commitment:
-        ...
+    @staticmethod
+    def _compute_aggregated_column_commitment(
+        chunks_matrix: ChunksMatrix, column_commitments: Sequence[Commitment]
+    ) -> Tuple[Polynomial, Commitment]:
+        data = bytes(chain.from_iterable(
+            DAEncoder._hash_column_and_commitment(column, commitment)
+            for column, commitment in zip(chunks_matrix.columns, column_commitments)
+        ))
+        return kzg.bytes_to_commitment(data, GLOBAL_PARAMETERS)
 
+    @staticmethod
     def _compute_aggregated_column_proofs(
-            self,
-            chunks_matrix: ChunksMatrix,
-            aggregated_column_commitment: Commitment
+            polynomial: Polynomial,
+            column_commitments: Sequence[Commitment],
     ) -> List[Proof]:
-        ...
+        return [
+            kzg.generate_element_proof(i, polynomial, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
+            for i in range(len(column_commitments))
+        ]
 
     def encode(self, data: bytes) -> EncodedData:
         chunks_matrix = self._chunkify_data(data)
-        row_commitments = self._compute_row_kzg_commitments(chunks_matrix)
+        row_polynomials, row_commitments = zip(*self._compute_row_kzg_commitments(chunks_matrix))
         extended_matrix = self._rs_encode_rows(chunks_matrix)
-        row_proofs = self._compute_rows_proofs(extended_matrix, row_commitments)
-        column_commitments = self._compute_column_kzg_commitments(extended_matrix)
-        aggregated_column_commitment = self._compute_aggregated_column_commitments(extended_matrix, column_commitments)
-        aggregated_column_proofs = self._compute_aggregated_column_proofs(extended_matrix, aggregated_column_commitment)
+        row_proofs = self._compute_rows_proofs(extended_matrix, row_polynomials, row_commitments)
+        column_polynomials, column_commitments = zip(*self._compute_column_kzg_commitments(extended_matrix))
+        aggregated_column_polynomial, aggregated_column_commitment = (
+            self._compute_aggregated_column_commitment(extended_matrix, column_commitments)
+        )
+        aggregated_column_proofs = self._compute_aggregated_column_proofs(
+            aggregated_column_polynomial, column_commitments
+        )
         result = EncodedData(
             data,
             extended_matrix,
@@ -100,3 +115,10 @@ class DAEncoder:
             aggregated_column_proofs
         )
         return result
+
+    @staticmethod
+    def _hash_column_and_commitment(column: Column, commitment: Commitment) -> bytes:
+        # TODO: Check correctness of bytes to blsfieldelement using modulus over the hash
+        return (
+                int.from_bytes(sha256(column.as_bytes() + bytes(commitment)).digest()) % BLS_MODULUS
+        ).to_bytes(32, byteorder="big")
