@@ -246,7 +246,9 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_0_1)
         # the coin evolved twice should not be accepted as it is not in the lead commitments
         assert follower.tip() == block_0_0
-        # an orphaned proof with an evolved coin for the same slot as the original coin should not be accepted as the evolved coin is not in the lead commitments at slot 0
+
+        # an orphaned proof with an evolved coin for the same slot as the original coin
+        # should not be accepted as the evolved coin is not in the lead commitments at slot 0
         block_0_1 = mk_block(
             slot=1,
             parent=block_0_0.id(),
@@ -255,7 +257,9 @@ class TestLedgerStateUpdate(TestCase):
         )
         follower.on_block(block_0_1)
         assert follower.tip() == block_0_0
-        # the coin evolved twice should be accepted as the evolved coin is in the lead commitments at slot 1 and processed before that
+
+        # the coin evolved twice should be accepted as the evolved coin is in the lead commitments
+        # at slot 1 and processed before that
         block_0_2 = mk_block(
             slot=2,
             parent=block_0_0.id(),
