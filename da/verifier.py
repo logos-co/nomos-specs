@@ -27,8 +27,8 @@ class DABlob:
 
 
 class DAVerifier:
-    def __init__(self):
-        pass
+    def __init__(self, sk: bytes):
+        self.sk = sk
 
     @staticmethod
     def _verify_column(
@@ -53,7 +53,7 @@ class DAVerifier:
 
     @staticmethod
     def _verify_chunk(chunk: Chunk, commitment: Commitment, proof: Proof, index: int) -> bool:
-        chunk = BLSFieldElement.from_bytes((int.from_bytes(chunk) % BLS_MODULUS).to_bytes())
+        chunk = BLSFieldElement(int.from_bytes(bytes(chunk)) % BLS_MODULUS)
         return kzg.verify_element_proof(chunk, commitment, proof, index, ROOTS_OF_UNITY)
 
     @staticmethod
@@ -73,10 +73,13 @@ class DAVerifier:
     def _build_attestation(self, _blob: DABlob) -> Attestation:
         return Attestation()
 
-    @staticmethod
-    def verify(blob: DABlob) -> Optional[Attestation]:
+    def verify(self, blob: DABlob) -> Optional[Attestation]:
         is_column_verified = DAVerifier._verify_column(
-            blob.column, blob.aggregated_column_commitment, blob.aggregated_column_proof, blob.index
+            blob.column,
+            blob.column_commitment,
+            blob.aggregated_column_commitment,
+            blob.aggregated_column_proof,
+            blob.index
         )
         if not is_column_verified:
             return
@@ -85,4 +88,4 @@ class DAVerifier:
         )
         if not are_chunks_verified:
             return
-        return DAVerifier._build_attestation(blob)
+        return self._build_attestation(blob)

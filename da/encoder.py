@@ -20,12 +20,14 @@ class DAEncoderParams:
 @dataclass
 class EncodedData:
     data: bytes
+    chunked_data: ChunksMatrix
     extended_matrix: ChunksMatrix
     row_commitments: List[Commitment]
     row_proofs: List[List[Proof]]
     column_commitments: List[Commitment]
     aggregated_column_commitment: Commitment
     aggregated_column_proofs: List[Proof]
+
 
 
 class DAEncoder:
@@ -107,6 +109,7 @@ class DAEncoder:
         )
         result = EncodedData(
             data,
+            chunks_matrix,
             extended_matrix,
             row_commitments,
             row_proofs,

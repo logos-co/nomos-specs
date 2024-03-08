@@ -11,7 +11,7 @@ from da.verifier import Attestation, DAVerifier, DABlob
 class TestVerifier(TestCase):
 
     def setUp(self):
-        self.verifier = DAVerifier()
+        self.verifier = DAVerifier(b"")
 
     def test_verify_column(self):
         column = Column(int.to_bytes(i, length=32) for i in range(8))
@@ -25,11 +25,21 @@ class TestVerifier(TestCase):
                 column, column_commitment, aggregated_column_commitment, aggregated_proof, 0
             )
         )
-    def test_verify_chunk(self):
-        pass
 
     def test_build_attestation(self):
         pass
 
     def test_verify(self):
-        pass
+        _ = TestEncoder()
+        _.setUp()
+        encoded_data = _.encoder.encode(_.data)
+        da_blob = DABlob(
+            0,
+            Column(next(encoded_data.chunked_data.columns)),
+            encoded_data.column_commitments[0],
+            encoded_data.aggregated_column_commitment,
+            encoded_data.aggregated_column_proofs[0],
+            encoded_data.row_commitments,
+            [row[0] for row in encoded_data.row_proofs],
+        )
+        self.assertIsNotNone(self.verifier.verify(da_blob))

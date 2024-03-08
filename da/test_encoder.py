@@ -11,8 +11,8 @@ from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
 from da.kzg_rs.common import BLS_MODULUS, ROOTS_OF_UNITY
 from da.kzg_rs import kzg, rs
 
-class TestEncoder(TestCase):
 
+class TestEncoder(TestCase):
     def setUp(self):
         self.params: DAEncoderParams = DAEncoderParams(column_count=16, bytes_per_field_element=32)
         self.encoder: DAEncoder = DAEncoder(self.params)
