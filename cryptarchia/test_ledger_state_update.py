@@ -85,9 +85,7 @@ class TestLedgerStateUpdate(TestCase):
 
         follower.on_block(block_1)
         assert follower.tip_id() == block_1.id()
-        assert not follower.ledger_state[block_1.id()].verify_unspent(
-            coin_1.nullifier()
-        )
+        assert not follower.tip_state().verify_unspent(coin_1.nullifier())
 
         # 3) then sees block 2, but sticks with block_1 as the tip
 
@@ -103,7 +101,7 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.tip_id() == block_3.id()
 
         # and the original coin_1 should now be removed from the spent pool
-        assert follower.ledger_state[block_3.id()].verify_unspent(coin_1.nullifier())
+        assert follower.tip_state().verify_unspent(coin_1.nullifier())
 
     def test_epoch_transition(self):
         leader_coins = [Coin(sk=i, value=100) for i in range(4)]

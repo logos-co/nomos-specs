@@ -452,7 +452,7 @@ class Follower:
             return self.genesis_state.block
 
     def tip_state(self) -> LedgerState:
-        return self.ledger_state[self.tip_id]
+        return self.ledger_state[self.tip_id()]
 
     def state_at_slot_beginning(self, chain: Chain, slot: Slot) -> LedgerState:
         for block in reversed(chain.blocks):
