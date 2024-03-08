@@ -14,18 +14,7 @@ from .cryptarchia import (
     Id,
 )
 
-from .test_common import mk_config, mk_block
-
-
-def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
-    return LedgerState(
-        block=bytes(32),
-        nonce=bytes(32),
-        total_stake=sum(c.value for c in initial_stake_distribution),
-        commitments_spend={c.commitment() for c in initial_stake_distribution},
-        commitments_lead={c.commitment() for c in initial_stake_distribution},
-        nullifiers=set(),
-    )
+from .test_common import mk_config, mk_block, mk_genesis_state
 
 
 class TestLedgerStateUpdate(TestCase):
