@@ -106,22 +106,36 @@ class TestLedgerStateUpdate(TestCase):
     def test_epoch_transition(self):
         leader_coins = [Coin(sk=i, value=100) for i in range(4)]
         genesis = mk_genesis_state(leader_coins)
+        config = mk_config()
 
-        follower = Follower(genesis, mk_config())
+        follower = Follower(genesis, config)
+
+        # We assume an epoch length of 10 slots in this test.
+        assert config.epoch_length == 10
+
+        # ---- EPOCH 0 ----
 
         block_1 = mk_block(slot=0, parent=genesis.block, coin=leader_coins[0])
         follower.on_block(block_1)
         assert follower.tip() == block_1
-        assert follower.tip().slot.epoch(follower.config).epoch == 0
-        block_2 = mk_block(slot=9, parent=block_1.id(), coin=leader_coins[1])
+        assert follower.tip().slot.epoch(config).epoch == 0
+
+        block_2 = mk_block(9, parent=block_1.id(), coin=leader_coins[1])
         follower.on_block(block_2)
         assert follower.tip() == block_2
-        assert follower.tip().slot.epoch(follower.config).epoch == 0
+        assert follower.tip().slot.epoch(config).epoch == 0
+
+        # ---- EPOCH 1 ----
+
         block_3 = mk_block(slot=10, parent=block_2.id(), coin=leader_coins[2])
         follower.on_block(block_3)
+        assert follower.tip() == block_3
+        assert follower.tip().slot.epoch(config).epoch == 1
 
-        # when trying to propose a block for epoch 2, the stake distribution snapshot should be taken at the end
-        # of epoch 1, i.e. slot 9
+        # ---- EPOCH 2 ----
+
+        # when trying to propose a block for epoch 2, the stake distribution snapshot should be taken
+        # at the end of epoch 0, i.e. slot 9
         # To ensure this is the case, we add a new coin just to the state associated with that slot,
         # so that the new block can be accepted only if that is the snapshot used
         # first, verify that if we don't change the state, the block is not accepted
@@ -134,7 +148,7 @@ class TestLedgerStateUpdate(TestCase):
         )
         follower.on_block(block_4)
         assert follower.tip() == block_4
-        assert follower.tip().slot.epoch(follower.config).epoch == 2
+        assert follower.tip().slot.epoch(config).epoch == 2
 
     def test_evolved_coin_is_eligible_for_leadership(self):
         coin = Coin(sk=0, value=100)
