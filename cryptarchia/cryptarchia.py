@@ -55,7 +55,7 @@ class Config:
 
     @property
     def s(self):
-        return self.base_period_length * self.epoch_period_nonce_stabilization
+        return self.base_period_length * 3
 
     def replace(self, **kwarg) -> "Config":
         return replace(self, **kwarg)
