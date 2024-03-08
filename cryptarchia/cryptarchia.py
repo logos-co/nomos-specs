@@ -6,7 +6,7 @@ from itertools import chain
 import functools
 
 # Please note this is still a work in progress
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 Id: TypeAlias = bytes
 
@@ -56,6 +56,9 @@ class Config:
     @property
     def s(self):
         return self.base_period_length * self.epoch_period_nonce_stabilization
+
+    def replace(self, **kwarg) -> "Config":
+        return replace(self, **kwarg)
 
 
 # An absolute unique indentifier of a slot, counting incrementally from 0

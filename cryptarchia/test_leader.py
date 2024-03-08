@@ -12,6 +12,7 @@ from .cryptarchia import (
     TimeConfig,
     Slot,
 )
+from .test_common import mk_config
 
 
 class TestLeader(TestCase):
@@ -24,15 +25,10 @@ class TestLeader(TestCase):
         )
 
         f = 0.05
-        config = Config(
-            k=10,
-            active_slot_coeff=f,
-            epoch_stake_distribution_stabilization=3,
-            epoch_period_nonce_buffer=3,
-            epoch_period_nonce_stabilization=4,
-            time=TimeConfig(slot_duration=1, chain_start_time=0),
+        l = Leader(
+            config=mk_config().replace(active_slot_coeff=f),
+            coin=Coin(sk=0, value=10),
         )
-        l = Leader(config=config, coin=Coin(sk=0, value=10))
 
         # We'll use the Margin of Error equation to decide how many samples we need.
         # https://en.wikipedia.org/wiki/Margin_of_error
