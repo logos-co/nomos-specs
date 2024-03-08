@@ -48,18 +48,11 @@ def mk_block(
     )
 
 
-def mk_chain(
-    base_state: LedgerState, length: int, coin: Coin
-) -> tuple[list[BlockHeader], Coin]:
+def mk_chain(parent, coin: Coin, slots: list[int]) -> tuple[list[BlockHeader], Coin]:
     chain = []
-    parent = base_state.block
-    for i in range(length):
-        chain.append(
-            mk_block(
-                parent=parent,
-                slot=base_state.slot.absolute_slot + i,
-                coin=coin,
-            )
-        )
+    for s in slots:
+        block = mk_block(parent=parent, slot=s, coin=coin)
+        chain.append(block)
+        parent = block.id()
         coin = coin.evolve()
     return chain, coin
