@@ -14,7 +14,7 @@ from .cryptarchia import (
     Id,
 )
 
-from .test_common import mk_config
+from .test_common import mk_config, mk_block
 
 
 def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
@@ -25,21 +25,6 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
         commitments_spend={c.commitment() for c in initial_stake_distribution},
         commitments_lead={c.commitment() for c in initial_stake_distribution},
         nullifiers=set(),
-    )
-
-
-def mk_block(
-    parent: Id, slot: int, coin: Coin, content=bytes(32), orphaned_proofs=[]
-) -> BlockHeader:
-    from hashlib import sha256
-
-    return BlockHeader(
-        slot=Slot(slot),
-        parent=parent,
-        content_size=len(content),
-        content_id=sha256(content).digest(),
-        leader_proof=MockLeaderProof.new(coin, Slot(slot), parent=parent),
-        orphaned_proofs=orphaned_proofs,
     )
 
 
@@ -60,7 +45,7 @@ class TestLedgerStateUpdate(TestCase):
         # Follower should have updated their ledger state to mark the leader coin as spent
         assert follower.tip_state().verify_unspent(leader_coin.nullifier()) == False
 
-        reuse_coin_block = mk_block(slot=1, parent=block.id, coin=leader_coin)
+        reuse_coin_block = mk_block(slot=1, parent=block.id(), coin=leader_coin)
         follower.on_block(block)
 
         # Follower should *not* have accepted the block
