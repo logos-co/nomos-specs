@@ -33,13 +33,14 @@ class TestVerifier(TestCase):
         _ = TestEncoder()
         _.setUp()
         encoded_data = _.encoder.encode(_.data)
-        da_blob = DABlob(
-            0,
-            Column(next(encoded_data.chunked_data.columns)),
-            encoded_data.column_commitments[0],
-            encoded_data.aggregated_column_commitment,
-            encoded_data.aggregated_column_proofs[0],
-            encoded_data.row_commitments,
-            [row[0] for row in encoded_data.row_proofs],
-        )
-        self.assertIsNotNone(self.verifier.verify(da_blob))
+        for i, column in enumerate(encoded_data.chunked_data.columns):
+            da_blob = DABlob(
+                i,
+                Column(column),
+                encoded_data.column_commitments[i],
+                encoded_data.aggregated_column_commitment,
+                encoded_data.aggregated_column_proofs[i],
+                encoded_data.row_commitments,
+                [row[i] for row in encoded_data.row_proofs],
+            )
+            self.assertIsNotNone(self.verifier.verify(da_blob))
