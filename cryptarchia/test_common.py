@@ -3,7 +3,7 @@ from .cryptarchia import Config, TimeConfig
 
 def mk_config() -> Config:
     return Config(
-        k=2,
+        k=1,
         active_slot_coeff=1,
         epoch_stake_distribution_stabilization=3,
         epoch_period_nonce_buffer=3,
