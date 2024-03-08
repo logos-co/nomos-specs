@@ -13,7 +13,7 @@ class Dispersal:
     def _prepare_data(self, encoded_data: EncodedData) -> Generator[DABlob, None, None]:
         assert len(encoded_data.row_commitments) == len(self.nodes)
         assert len(encoded_data.row_proofs) == len(self.nodes)
-        columns = encoded_data.extended_matrix.columns()
+        columns = encoded_data.extended_matrix.columns
         column_commitments = encoded_data.column_commitments
         row_commitments = encoded_data.row_commitments
         rows_proofs = encoded_data.row_proofs

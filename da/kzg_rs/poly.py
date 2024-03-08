@@ -1,7 +1,9 @@
 from itertools import zip_longest
 from typing import List, Sequence, Self
 
-from sympy import ntt, intt
+from eth2spec.eip7594.mainnet import interpolate_polynomialcoeff
+
+from da.kzg_rs.common import ROOTS_OF_UNITY
 
 
 class Polynomial[T]:
@@ -9,9 +11,26 @@ class Polynomial[T]:
         self.coefficients = coefficients
         self.modulus = modulus
 
+    @staticmethod
+    def interpolate(evaluations: List[int], roots_of_unity: List[int]) -> List[int]:
+        """
+        Lagrange interpolation
+
+        Parameters:
+            evaluations: List of evaluations
+            roots_of_unity: Powers of 2 sequence
+
+        Returns:
+            list: Coefficients of the interpolated polynomial
+        """
+        return list(map(int, interpolate_polynomialcoeff(roots_of_unity[:len(evaluations)], evaluations)))
+
     @classmethod
-    def from_evaluations(cls, evalutaions: Sequence[T], modulus) -> Self:
-        coefficients = intt(evalutaions, prime=modulus)
+    def from_evaluations(cls, evaluations: Sequence[T], modulus, roots_of_unity: Sequence[int]=ROOTS_OF_UNITY) -> Self:
+        coefficients = [
+            x % modulus
+            for x in map(int, Polynomial.interpolate(evaluations, roots_of_unity))
+        ]
         return cls(coefficients, modulus)
 
     def __repr__(self):
@@ -77,12 +96,16 @@ class Polynomial[T]:
         return self.coefficients[item]
 
     def __eq__(self, other):
-        return self.coefficients == other.coefficients and self.modulus == other.modulus
+        return (
+            self.coefficients == other.coefficients and
+            self.modulus == other.modulus
+        )
 
-    def eval(self, element):
-        return sum(
-            (pow(element, i)*x) % self.modulus for i, x in enumerate(self.coefficients)
-        ) % self.modulus
+    def eval(self, x):
+        return (self.coefficients[0] + sum(
+            (pow(x, i, mod=self.modulus)*coefficient)
+            for i, coefficient in enumerate(self.coefficients[1:], start=1)
+        )) % self.modulus
 
     def evaluation_form(self) -> List[T]:
-        return ntt(self.coefficients, prime=self.modulus)
+        return [self.eval(ROOTS_OF_UNITY[i]) for i in range(len(self))]

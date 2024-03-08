@@ -9,7 +9,7 @@ from .poly import Polynomial
 ExtendedData = Sequence[BLSFieldElement]
 
 
-def encode(polynomial: Polynomial, factor: int, roots_of_unity: Sequence[BLSFieldElement]) -> ExtendedData:
+def encode(polynomial: Polynomial, factor: int, roots_of_unity: Sequence[int]) -> ExtendedData:
     """
     Encode a polynomial extending to the given factor
     Parameters:
@@ -25,20 +25,6 @@ def encode(polynomial: Polynomial, factor: int, roots_of_unity: Sequence[BLSFiel
     return [polynomial.eval(e) for e in roots_of_unity[:len(polynomial)*factor]]
 
 
-def __interpolate(evaluations: List[int], roots_of_unity: List[int]) -> List[int]:
-    """
-    Lagrange interpolation
-
-    Parameters:
-        evaluations: List of evaluations
-        roots_of_unity: Powers of 2 sequence
-
-    Returns:
-        list: Coefficients of the interpolated polynomial
-    """
-    return list(map(int, interpolate_polynomialcoeff(roots_of_unity[:len(evaluations)], evaluations)))
-
-
 def decode(encoded: ExtendedData, roots_of_unity: Sequence[BLSFieldElement], original_len: int) -> Polynomial:
     """
     Decode a polynomial from an extended data-set and the roots of unity, cap to original length
@@ -51,5 +37,5 @@ def decode(encoded: ExtendedData, roots_of_unity: Sequence[BLSFieldElement], ori
     Returns:
         Polynomial: original polynomial
     """
-    coefs = __interpolate(list(map(int, encoded)), list(map(int, roots_of_unity)))[:original_len]
+    coefs = Polynomial.interpolate(list(map(int, encoded)), list(map(int, roots_of_unity)))[:original_len]
     return Polynomial([int(c) for c in coefs], BLS_MODULUS)

@@ -1,6 +1,6 @@
 from functools import reduce
 from itertools import batched
-from typing import Sequence
+from typing import Sequence, Tuple
 
 from eth2spec.deneb.mainnet import bytes_to_bls_field, BLSFieldElement, KZGCommitment as Commitment, KZGProof as Proof
 from eth2spec.utils import bls
@@ -9,12 +9,12 @@ from .common import BYTES_PER_FIELD_ELEMENT, G1, BLS_MODULUS, GLOBAL_PARAMETERS_
 from .poly import Polynomial
 
 
-def bytes_to_polynomial(bytes: bytearray) -> Polynomial:
+def bytes_to_polynomial(b: bytes) -> Polynomial:
     """
     Convert bytes to list of BLS field scalars.
     """
-    assert len(bytes) % BYTES_PER_FIELD_ELEMENT == 0
-    eval_form = [int(bytes_to_bls_field(b)) for b in batched(bytes, int(BYTES_PER_FIELD_ELEMENT))]
+    assert len(b) % BYTES_PER_FIELD_ELEMENT == 0
+    eval_form = [int(bytes_to_bls_field(b)) for b in batched(b, int(BYTES_PER_FIELD_ELEMENT))]
     return Polynomial.from_evaluations(eval_form, BLS_MODULUS)
 
 
@@ -33,9 +33,9 @@ def g1_linear_combination(polynomial: Polynomial[BLSFieldElement], global_parame
     return Commitment(bls.G1_to_bytes48(point))
 
 
-def bytes_to_commitment(b: bytearray, global_parameters: Sequence[G1]) -> Commitment:
+def bytes_to_commitment(b: bytes, global_parameters: Sequence[G1]) -> Tuple[Polynomial, Commitment]:
     poly = bytes_to_polynomial(b)
-    return g1_linear_combination(poly, global_parameters)
+    return poly, g1_linear_combination(poly, global_parameters)
 
 
 def generate_element_proof(
@@ -54,14 +54,14 @@ def generate_element_proof(
 
 
 def verify_element_proof(
-        polynomial: Polynomial,
+        chunk: BLSFieldElement,
         commitment: Commitment,
         proof: Proof,
         element_index: int,
         roots_of_unity: Sequence[BLSFieldElement],
 ) -> bool:
     u = int(roots_of_unity[element_index])
-    v = polynomial.eval(u)
+    v = chunk
     commitment_check_G1 = bls.bytes48_to_G1(commitment) - bls.multiply(bls.G1(), v)
     proof_check_g2 = bls.add(
         GLOBAL_PARAMETERS_G2[1],
