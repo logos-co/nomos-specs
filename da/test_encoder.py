@@ -5,7 +5,7 @@ from unittest import TestCase
 from eth2spec.deneb.mainnet import bytes_to_bls_field
 
 from da import encoder
-from da.encoder import DAEncoderParams, Commitment, DAEncoder
+from da.encoder import DAEncoderParams, DAEncoder
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
 
 from da.kzg_rs.common import BLS_MODULUS, ROOTS_OF_UNITY

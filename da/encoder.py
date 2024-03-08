@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from itertools import batched, chain
 from typing import List, Sequence, Tuple
-from hashlib import sha256
+from hashlib import sha3_256
 
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof, BLSFieldElement
 
@@ -120,5 +120,5 @@ class DAEncoder:
     def _hash_column_and_commitment(column: Column, commitment: Commitment) -> bytes:
         # TODO: Check correctness of bytes to blsfieldelement using modulus over the hash
         return (
-                int.from_bytes(sha256(column.as_bytes() + bytes(commitment)).digest()) % BLS_MODULUS
+                int.from_bytes(sha3_256(column.as_bytes() + bytes(commitment)).digest()) % BLS_MODULUS
         ).to_bytes(32, byteorder="big")
