@@ -29,32 +29,33 @@ class TimeConfig:
 class Config:
     k: int  # The depth of a block before it is considered immutable.
     active_slot_coeff: float  # 'f', the rate of occupied slots
+
+    # The stake distribution is always taken at the beginning of the previous epoch.
+    # This parameters controls how many slots to wait for it to be stabilized
+    # The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
+    epoch_stake_distribution_stabilization: int
+    # This parameter controls how many slots we wait after the stake distribution
+    # snapshot has stabilized to take the nonce snapshot.
+    epoch_period_nonce_buffer: int
+    # This parameter controls how many slots we wait for the nonce snapshot to be considered
+    # stabilized
+    epoch_period_nonce_stabilization: int
+
     time: TimeConfig
 
-    @property
-    def epoch_stake_distribution_stabilization(self) -> int:
-        """
-        The stake distribution is always taken at the beginning of the previous epoch.
-        This parameters controls how many slots to wait for it to be stabilized
-        The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
-        """
-        return 3
-
-    @property
-    def epoch_period_nonce_buffer(self) -> int:
-        """
-        This parameter controls how many slots we wait after the stake distribution
-        snapshot has stabilized to take the nonce snapshot.
-        """
-        return 3
-
-    @property
-    def epoch_period_nonce_stabilization(self) -> int:
-        """
-        This parameter controls how many slots we wait for the nonce snapshot to be considered
-        stabilized
-        """
-        return 4
+    @staticmethod
+    def cryptarchia_v0_0_1() -> "Config":
+        return Config(
+            k=2160,
+            active_slot_coeff=0.05,
+            epoch_stake_distribution_stabilization=3,
+            epoch_period_nonce_buffer=3,
+            epoch_period_nonce_stabilization=4,
+            time=TimeConfig(
+                slot_duration=1,
+                chain_start_time=0,
+            ),
+        )
 
     @property
     def base_period_length(self) -> int:

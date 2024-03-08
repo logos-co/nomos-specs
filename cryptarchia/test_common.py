@@ -11,10 +11,9 @@ from .cryptarchia import (
 
 
 def mk_config() -> Config:
-    return Config(
+    return Config.cryptarchia_v0_0_1().replace(
         k=1,
-        active_slot_coeff=1,
-        time=TimeConfig(slot_duration=1, chain_start_time=0),
+        active_slot_coeff=1.0,
     )
 
 
