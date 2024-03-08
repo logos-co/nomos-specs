@@ -27,19 +27,34 @@ class TimeConfig:
 
 @dataclass
 class Config:
-    k: int
+    k: int  # The depth of a block before it is considered immutable.
     active_slot_coeff: float  # 'f', the rate of occupied slots
-    # The stake distribution is always taken at the beginning of the previous epoch.
-    # This parameters controls how many slots to wait for it to be stabilized
-    # The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
-    epoch_stake_distribution_stabilization: int
-    # This parameter controls how many slots we wait after the stake distribution
-    # snapshot has stabilized to take the nonce snapshot.
-    epoch_period_nonce_buffer: int
-    # This parameter controls how many slots we wait for the nonce snapshot to be considered
-    # stabilized
-    epoch_period_nonce_stabilization: int
     time: TimeConfig
+
+    @property
+    def epoch_stake_distribution_stabilization(self) -> int:
+        """
+        The stake distribution is always taken at the beginning of the previous epoch.
+        This parameters controls how many slots to wait for it to be stabilized
+        The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
+        """
+        return 3
+
+    @property
+    def epoch_period_nonce_buffer(self) -> int:
+        """
+        This parameter controls how many slots we wait after the stake distribution
+        snapshot has stabilized to take the nonce snapshot.
+        """
+        return 3
+
+    @property
+    def epoch_period_nonce_stabilization(self) -> int:
+        """
+        This parameter controls how many slots we wait for the nonce snapshot to be considered
+        stabilized
+        """
+        return 4
 
     @property
     def base_period_length(self) -> int:
@@ -55,6 +70,10 @@ class Config:
 
     @property
     def s(self):
+        """
+        The Security Paramater. This paramter controls how many slots one must wait before we
+        have high confidence that k blocks have been produced.
+        """
         return self.base_period_length * 3
 
     def replace(self, **kwarg) -> "Config":
