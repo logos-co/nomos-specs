@@ -45,9 +45,9 @@ def config() -> Config:
     return Config(
         k=10,
         active_slot_coeff=0.05,
-        epoch_stake_distribution_stabilization=4,
+        epoch_stake_distribution_stabilization=3,
         epoch_period_nonce_buffer=3,
-        epoch_period_nonce_stabilization=3,
+        epoch_period_nonce_stabilization=4,
         time=TimeConfig(slot_duration=1, chain_start_time=0),
     )
 
@@ -121,18 +121,8 @@ class TestLedgerStateUpdate(TestCase):
         leader_coins = [Coin(sk=i, value=100) for i in range(4)]
         genesis = mk_genesis_state(leader_coins)
 
-        # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
-        # and nonce snapshot before slot 7
-        config = Config(
-            k=1,
-            active_slot_coeff=1,
-            epoch_stake_distribution_stabilization=4,
-            epoch_period_nonce_buffer=3,
-            epoch_period_nonce_stabilization=3,
-            time=TimeConfig(slot_duration=1, chain_start_time=0),
-        )
+        follower = Follower(genesis, config())
 
-        follower = Follower(genesis, config)
         block_1 = mk_block(slot=0, parent=genesis.block, coin=leader_coins[0])
         follower.on_block(block_1)
         assert follower.tip() == block_1
@@ -165,16 +155,7 @@ class TestLedgerStateUpdate(TestCase):
 
         genesis = mk_genesis_state([coin])
 
-        config = Config(
-            k=1,
-            active_slot_coeff=1,
-            epoch_stake_distribution_stabilization=4,
-            epoch_period_nonce_buffer=3,
-            epoch_period_nonce_stabilization=3,
-            time=TimeConfig(slot_duration=1, chain_start_time=0),
-        )
-
-        follower = Follower(genesis, config)
+        follower = Follower(genesis, config())
 
         # coin wins the first slot
         block_1 = mk_block(slot=0, parent=genesis.block, coin=coin)
@@ -195,18 +176,7 @@ class TestLedgerStateUpdate(TestCase):
         coin = Coin(sk=0, value=100)
         genesis = mk_genesis_state([coin])
 
-        # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
-        # and nonce snapshot before slot 7
-        config = Config(
-            k=1,
-            active_slot_coeff=1,
-            epoch_stake_distribution_stabilization=4,
-            epoch_period_nonce_buffer=3,
-            epoch_period_nonce_stabilization=3,
-            time=TimeConfig(slot_duration=1, chain_start_time=0),
-        )
-
-        follower = Follower(genesis, config)
+        follower = Follower(genesis, config())
 
         # ---- EPOCH 0 ----
 
@@ -259,18 +229,7 @@ class TestLedgerStateUpdate(TestCase):
         coin = Coin(sk=0, value=100)
         genesis = mk_genesis_state([coin])
 
-        # An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
-        # and nonce snapshot before slot 7
-        config = Config(
-            k=1,
-            active_slot_coeff=1,
-            epoch_stake_distribution_stabilization=4,
-            epoch_period_nonce_buffer=3,
-            epoch_period_nonce_stabilization=3,
-            time=TimeConfig(slot_duration=1, chain_start_time=0),
-        )
-
-        follower = Follower(genesis, config)
+        follower = Follower(genesis, config())
 
         # ---- EPOCH 0 ----
 
