@@ -17,7 +17,7 @@ from cryptarchia.cryptarchia import (
 from .test_common import mk_chain
 
 
-class TestLeader(TestCase):
+class TestForkChoice(TestCase):
     def test_fork_choice_long_sparse_chain(self):
         # The longest chain is not dense after the fork
         short_coin, long_coin = Coin(sk=0, value=100), Coin(sk=1, value=100)

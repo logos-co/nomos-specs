@@ -38,7 +38,8 @@ class TestLeader(TestCase):
         Z = 3  # we want 3 std from the mean to be within the margin of error
         N = int((Z * std / margin_of_error) ** 2)
 
-        # After N slots, the measured leader rate should be within the interval `p +- margin_of_error` with high probabiltiy
+        # After N slots, the measured leader rate should be within the
+        # interval `p +- margin_of_error` with high probabiltiy
         leader_rate = (
             sum(
                 l.try_prove_slot_leader(epoch, Slot(slot), bytes(32)) is not None
