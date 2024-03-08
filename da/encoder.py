@@ -78,7 +78,7 @@ class DAEncoder:
         chunks_matrix: ChunksMatrix, column_commitments: Sequence[Commitment]
     ) -> Tuple[Polynomial, Commitment]:
         data = bytes(chain.from_iterable(
-            DAEncoder._hash_column_and_commitment(column, commitment)
+            DAEncoder.hash_column_and_commitment(column, commitment)
             for column, commitment in zip(chunks_matrix.columns, column_commitments)
         ))
         return kzg.bytes_to_commitment(data, GLOBAL_PARAMETERS)
@@ -117,7 +117,7 @@ class DAEncoder:
         return result
 
     @staticmethod
-    def _hash_column_and_commitment(column: Column, commitment: Commitment) -> bytes:
+    def hash_column_and_commitment(column: Column, commitment: Commitment) -> bytes:
         # TODO: Check correctness of bytes to blsfieldelement using modulus over the hash
         return (
                 int.from_bytes(sha3_256(column.as_bytes() + bytes(commitment)).digest()) % BLS_MODULUS

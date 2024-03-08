@@ -47,7 +47,7 @@ class TestEncoder(TestCase):
 
         # verify column aggregation
         for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.aggregated_column_proofs)):
-            data = DAEncoder._hash_column_and_commitment(column, commitment)
+            data = DAEncoder.hash_column_and_commitment(column, commitment)
             kzg.verify_element_proof(
                 bytes_to_bls_field(data),
                 encoded_data.aggregated_column_commitment,
