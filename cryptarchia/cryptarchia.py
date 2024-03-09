@@ -6,7 +6,7 @@ from itertools import chain
 import functools
 
 # Please note this is still a work in progress
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 Id: TypeAlias = bytes
 
@@ -27,8 +27,9 @@ class TimeConfig:
 
 @dataclass
 class Config:
-    k: int
+    k: int  # The depth of a block before it is considered immutable.
     active_slot_coeff: float  # 'f', the rate of occupied slots
+
     # The stake distribution is always taken at the beginning of the previous epoch.
     # This parameters controls how many slots to wait for it to be stabilized
     # The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
@@ -39,7 +40,22 @@ class Config:
     # This parameter controls how many slots we wait for the nonce snapshot to be considered
     # stabilized
     epoch_period_nonce_stabilization: int
+
     time: TimeConfig
+
+    @staticmethod
+    def cryptarchia_v0_0_1() -> "Config":
+        return Config(
+            k=2160,
+            active_slot_coeff=0.05,
+            epoch_stake_distribution_stabilization=3,
+            epoch_period_nonce_buffer=3,
+            epoch_period_nonce_stabilization=4,
+            time=TimeConfig(
+                slot_duration=1,
+                chain_start_time=0,
+            ),
+        )
 
     @property
     def base_period_length(self) -> int:
@@ -55,7 +71,14 @@ class Config:
 
     @property
     def s(self):
-        return self.base_period_length * self.epoch_period_nonce_stabilization
+        """
+        The Security Paramater. This paramter controls how many slots one must wait before we
+        have high confidence that k blocks have been produced.
+        """
+        return self.base_period_length * 3
+
+    def replace(self, **kwarg) -> "Config":
+        return replace(self, **kwarg)
 
 
 # An absolute unique indentifier of a slot, counting incrementally from 0
@@ -447,6 +470,9 @@ class Follower:
             return self.local_chain.tip().id()
         else:
             return self.genesis_state.block
+
+    def tip_state(self) -> LedgerState:
+        return self.ledger_state[self.tip_id()]
 
     def state_at_slot_beginning(self, chain: Chain, slot: Slot) -> LedgerState:
         for block in reversed(chain.blocks):
