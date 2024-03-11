@@ -31,11 +31,14 @@ class ChunksMatrix(List[Row | Column]):
         return ChunksMatrix(self.columns)
 
 
+BLSPublickey = bytes
+BLSPrivateKey = int
+BLSSignature = bytes
 
 
 @dataclass
 class Attestation:
-    pass
+    signature: BLSSignature
 
 
 @dataclass
