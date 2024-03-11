@@ -2,11 +2,14 @@ from dataclasses import dataclass
 from itertools import chain, zip_longest
 from typing import List, Generator, Self
 
-from eth2spec.eip7594.mainnet import Bytes32
+
+
+from eth2spec.eip7594.mainnet import Bytes32, KZGCommitment as Commitment
 
 
 class NodeId(Bytes32):
     pass
+
 
 class Chunk(Bytes32):
     pass
@@ -43,5 +46,7 @@ class Attestation:
 
 @dataclass
 class Certificate:
-    pass
+    aggregated_signatures: BLSSignature
+    aggregated_column_commitment: Commitment
+    row_commitments: List[Commitment]
 
