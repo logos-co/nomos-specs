@@ -41,7 +41,7 @@ class Dispersal:
             )
             yield blob
 
-    def _send_and_await_response(self, node, encoded_data: EncodedData) -> Optional[Attestation]:
+    def _send_and_await_response(self, node: NodeId, encoded_data: EncodedData) -> Optional[Attestation]:
         pass
 
     def _build_certificate(self, encoded_data: EncodedData, attestations: Sequence[Attestation]) -> Certificate:
