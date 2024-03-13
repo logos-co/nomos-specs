@@ -4,7 +4,7 @@ from typing import List, Optional, Generator, Sequence
 
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
-from da.common import Certificate, NodeId, BLSPublickey
+from da.common import Certificate, NodeId, BLSPublickey, Bitfield
 from da.encoder import EncodedData
 from da.verifier import DABlob, Attestation
 
@@ -45,11 +45,18 @@ class Dispersal:
     def _send_and_await_response(self, node: NodeId, blob: DABlob) -> Optional[Attestation]:
         pass
 
-    def _build_certificate(self, encoded_data: EncodedData, attestations: Sequence[Attestation]) -> Certificate:
+    def _build_certificate(
+            self,
+            encoded_data: EncodedData,
+            attestations: Sequence[Attestation],
+            signers: Bitfield
+    ) -> Certificate:
         assert len(attestations) >= self.settings.threshold
+        assert len(attestations) == signers.count(True)
         aggregated = bls_pop.Aggregate([attestation.signature for attestation in attestations])
         return Certificate(
             aggregated_signatures=aggregated,
+            signers=signers,
             aggregated_column_commitment=encoded_data.aggregated_column_commitment,
             row_commitments=encoded_data.row_commitments
         )
@@ -69,9 +76,18 @@ class Dispersal:
     def disperse(self, encoded_data: EncodedData) -> Optional[Certificate]:
         attestations = []
         attested_message = self._build_attestation_message(encoded_data)
-        for node, pk, blob in zip(self.settings.nodes_ids, self.settings.nodes_pubkey,  self._prepare_data(encoded_data)):
+        signed = Bitfield(False for _ in range(len(self.settings.nodes_ids)))
+        blob_data = zip(
+            range(len(self.settings.nodes_ids)),
+            self.settings.nodes_ids,
+            self.settings.nodes_pubkey,
+            self._prepare_data(encoded_data)
+        )
+        for i, node, pk, blob in blob_data:
             if attestation := self._send_and_await_response(node, blob):
                 if self._verify_attestation(pk, attested_message, attestation):
+                    # mark as received
+                    signed[i] = True
                     attestations.append(attestation)
             if len(attestations) >= self.settings.threshold:
-                return self._build_certificate(encoded_data, attestations)
+                return self._build_certificate(encoded_data, attestations, signed)

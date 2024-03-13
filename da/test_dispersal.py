@@ -4,7 +4,7 @@ from unittest import TestCase
 from .encoder import DAEncoderParams, DAEncoder
 from .test_encoder import TestEncoder
 
-from da.common import NodeId, Attestation
+from da.common import NodeId, Attestation, Bitfield
 from da.dispersal import Dispersal, EncodedData, DispersalSettings
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
@@ -28,7 +28,7 @@ class TestDispersal(TestCase):
 
     def test_build_certificate_insufficient_attestations(self):
         with self.assertRaises(AssertionError):
-            self.dispersal._build_certificate(None, [])
+            self.dispersal._build_certificate(None, [], [])
 
     def test_build_certificate_enough_attestations(self):
         mock_encoded_data = EncodedData(
@@ -36,7 +36,11 @@ class TestDispersal(TestCase):
         )
         mock_message = sha3_256(mock_encoded_data.aggregated_column_commitment).digest()
         mock_attestations = [Attestation(bls_pop.Sign(sk, mock_message)) for sk in self.secret_keys]
-        certificate = self.dispersal._build_certificate(mock_encoded_data, mock_attestations)
+        certificate = self.dispersal._build_certificate(
+            mock_encoded_data,
+            mock_attestations,
+            Bitfield([True for _ in range(len(self.secret_keys))])
+        )
         self.assertIsNotNone(certificate)
         self.assertEqual(certificate.aggregated_column_commitment, mock_encoded_data.aggregated_column_commitment)
         self.assertEqual(certificate.row_commitments, [])
@@ -66,5 +70,9 @@ class TestDispersal(TestCase):
                 [self.dispersal._build_attestation_message(encoded_data)]*self.dispersal.settings.threshold,
                 certificate.aggregated_signatures
             )
+        )
+        self.assertEqual(
+            certificate.signers,
+            [True if i < self.dispersal.settings.threshold else False for i in range(self.n_nodes)]
         )
 
