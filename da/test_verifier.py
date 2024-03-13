@@ -11,7 +11,7 @@ from da.verifier import Attestation, DAVerifier, DABlob
 class TestVerifier(TestCase):
 
     def setUp(self):
-        self.verifier = DAVerifier(b"")
+        self.verifier = DAVerifier(1987)
 
     def test_verify_column(self):
         column = Column(int.to_bytes(i, length=32) for i in range(8))

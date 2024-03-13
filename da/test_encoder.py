@@ -56,7 +56,6 @@ class TestEncoder(TestCase):
                 ROOTS_OF_UNITY
             )
 
-
     def test_chunkify(self):
         encoder_settings = DAEncoderParams(column_count=2, bytes_per_field_element=32)
         elements = 10

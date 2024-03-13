@@ -7,9 +7,9 @@ from eth2spec.eip7594.mainnet import (
     KZGCommitment as Commitment,
     KZGProof as Proof,
 )
-from itertools import batched
+from py_ecc.bls import G2ProofOfPossession as bls_pop
 
-from da.common import Column, Chunk, Attestation
+from da.common import Column, Chunk, Attestation, BLSPrivateKey
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import ROOTS_OF_UNITY, GLOBAL_PARAMETERS, BLS_MODULUS
@@ -27,7 +27,7 @@ class DABlob:
 
 
 class DAVerifier:
-    def __init__(self, sk: bytes):
+    def __init__(self, sk: BLSPrivateKey):
         self.sk = sk
 
     @staticmethod
@@ -70,8 +70,13 @@ class DAVerifier:
                 return False
         return True
 
-    def _build_attestation(self, _blob: DABlob) -> Attestation:
-        return Attestation()
+    def _build_attestation(self, blob: DABlob) -> Attestation:
+        hasher = sha3_256()
+        hasher.update(bytes(blob.aggregated_column_commitment))
+        for c in blob.rows_commitments:
+            hasher.update(bytes(c))
+        message = hasher.digest()
+        return Attestation(signature=bls_pop.Sign(self.sk, message))
 
     def verify(self, blob: DABlob) -> Optional[Attestation]:
         is_column_verified = DAVerifier._verify_column(
