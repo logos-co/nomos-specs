@@ -15,7 +15,7 @@ class MockStore(BlobStore):
     def populate(self, blob, cert_id: bytes):
         self.blob_store[cert_id] = blob
 
-    # cert, app_id, idx
+    # Implements `add` method from BlobStore abstract class.
     def add(self, cert_id: bytes, metadata: Metadata):
         if metadata.index in self.app_id_store[metadata.app_id]:
             raise ValueError("index already written")
@@ -23,6 +23,7 @@ class MockStore(BlobStore):
         blob = self.blob_store.pop(cert_id)
         self.app_id_store[metadata.app_id][metadata.index] = blob 
 
+    # Implements `get_multiple` method from BlobStore abstract class.
     def get_multiple(self, app_id, indexes) -> List[Optional[DABlob]]:
         return [
                 self.app_id_store[app_id].get(i) for i in indexes
@@ -43,9 +44,9 @@ class TestFlow(TestCase):
         api = Api(mock_store)
 
         api.write(cert_id, mock_meta)
-        blob = api.read(app_id, [idx])
+        blobs = api.read(app_id, [idx])
 
-        self.assertEqual([expected_blob], blob)
+        self.assertEqual([expected_blob], blobs)
 
     def test_same_index(self):
         expected_blob = "hello"
@@ -63,7 +64,7 @@ class TestFlow(TestCase):
         with self.assertRaises(ValueError):
             api.write(cert_id, mock_meta)
 
-        blob = api.read(app_id, [idx])
+        blobs = api.read(app_id, [idx])
 
-        self.assertEqual([expected_blob], blob)
+        self.assertEqual([expected_blob], blobs)
 
