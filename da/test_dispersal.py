@@ -46,7 +46,7 @@ class TestDispersal(TestCase):
         self.assertEqual(certificate.row_commitments, [])
         self.assertIsNotNone(certificate.aggregated_signatures)
         self.assertTrue(
-            bls_pop.AggregateVerify(self.public_keys, [mock_message]*len(self.public_keys), certificate.aggregated_signatures)
+            certificate.verify(self.public_keys)
         )
 
     def test_disperse(self):
@@ -64,12 +64,7 @@ class TestDispersal(TestCase):
 
         certificate = self.dispersal.disperse(encoded_data)
         self.assertIsNotNone(certificate)
-        self.assertTrue(
-            bls_pop.AggregateVerify(
-                self.public_keys[:self.dispersal.settings.threshold],
-                [self.dispersal._build_attestation_message(encoded_data)]*self.dispersal.settings.threshold,
-                certificate.aggregated_signatures
-            )
+        self.assertTrue(certificate.verify(self.public_keys)
         )
         self.assertEqual(
             certificate.signers,

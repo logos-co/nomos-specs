@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from itertools import chain, zip_longest
-from typing import List, Generator, Self
-
-
+from hashlib import sha3_256
+from itertools import chain, zip_longest, compress
+from typing import List, Generator, Self, Sequence
 
 from eth2spec.eip7594.mainnet import Bytes32, KZGCommitment as Commitment
+from py_ecc.bls import G2ProofOfPossession as bls_pop
 
 
 class NodeId(Bytes32):
@@ -55,3 +55,16 @@ class Certificate:
     aggregated_column_commitment: Commitment
     row_commitments: List[Commitment]
 
+    def verify(self, nodes_public_keys: List[BLSPublickey]) -> bool:
+        # we short them as the signers bitfield is sorted by the public keys as well
+        signers_keys = list(compress(sorted(nodes_public_keys), self.signers))
+        message = build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
+        return bls_pop.AggregateVerify(signers_keys, [message]*len(signers_keys), self.aggregated_signatures)
+
+
+def build_attestation_message(aggregated_column_commitment: Commitment, row_commitments: Sequence[Commitment]) -> bytes:
+    hasher = sha3_256()
+    hasher.update(bytes(aggregated_column_commitment))
+    for c in row_commitments:
+        hasher.update(bytes(c))
+    return hasher.digest()
