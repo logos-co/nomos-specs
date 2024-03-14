@@ -3,9 +3,11 @@ from collections import defaultdict
 
 from da.api.common import *
 
+
 @dataclass
 class MockCertificate:
     cert_id: int
+
 
 class MockStore(BlobStore):
     def __init__(self):
@@ -41,7 +43,7 @@ class TestFlow(TestCase):
         mock_store = MockStore()
         mock_store.populate(expected_blob, cert_id)
 
-        api = Api(mock_store)
+        api = DAApi(mock_store)
 
         api.write(cert_id, mock_meta)
         blobs = api.read(app_id, [idx])
@@ -58,7 +60,7 @@ class TestFlow(TestCase):
         mock_store = MockStore()
         mock_store.populate(expected_blob, cert_id)
 
-        api = Api(mock_store)
+        api = DAApi(mock_store)
 
         api.write(cert_id, mock_meta)
         with self.assertRaises(ValueError):
