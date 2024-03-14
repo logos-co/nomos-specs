@@ -39,6 +39,10 @@ BLSPrivateKey = int
 BLSSignature = bytes
 
 
+class Bitfield(List[bool]):
+    pass
+
+
 @dataclass
 class Attestation:
     signature: BLSSignature
@@ -47,6 +51,7 @@ class Attestation:
 @dataclass
 class Certificate:
     aggregated_signatures: BLSSignature
+    signers: Bitfield
     aggregated_column_commitment: Commitment
     row_commitments: List[Commitment]
 
