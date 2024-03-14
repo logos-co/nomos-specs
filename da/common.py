@@ -56,7 +56,7 @@ class Certificate:
     row_commitments: List[Commitment]
 
     def verify(self, nodes_public_keys: List[BLSPublickey]) -> bool:
-        # we short them as the signers bitfield is sorted by the public keys as well
+        # we sort them as the signers bitfield is sorted by the public keys as well
         signers_keys = list(compress(sorted(nodes_public_keys), self.signers))
         message = build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
         return bls_pop.AggregateVerify(signers_keys, [message]*len(signers_keys), self.aggregated_signatures)
