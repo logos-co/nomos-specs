@@ -55,6 +55,9 @@ class Certificate:
     aggregated_column_commitment: Commitment
     row_commitments: List[Commitment]
 
+    def id(self) -> bytes:
+        return build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
+
     def verify(self, nodes_public_keys: List[BLSPublickey]) -> bool:
         """
         List of nodes public keys should be a trusted list of verified proof of possession keys.

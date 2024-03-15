@@ -13,6 +13,10 @@ class Metadata:
     # app identifier
     app_id: bytes
 
+@dataclass
+class VID():
+    cert_id: bytes
+    metadata: Metadata
 
 class BlobStore(ABC):
     @abstractmethod
