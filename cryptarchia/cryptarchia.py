@@ -286,6 +286,9 @@ class LedgerState:
             nullifiers=deepcopy(self.nullifiers),
         )
 
+    def replace(self, **kwarg) -> "LedgerState":
+        return replace(self, **kwarg)
+
     def verify_eligible_to_spend(self, commitment: Id) -> bool:
         return commitment in self.commitments_spend
 
@@ -547,13 +550,6 @@ class Leader:
     ) -> MockLeaderProof | None:
         if self._is_slot_leader(epoch, slot):
             return MockLeaderProof.new(self.coin, slot, parent)
-
-    def propose_block(
-        self, slot: Slot, parent: BlockHeader, orphaned_proofs=[]
-    ) -> BlockHeader:
-        return BlockHeader(
-            parent=parent.id(), slot=slot, orphaned_proofs=orphaned_proofs
-        )
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
         relative_stake = self.coin.value / epoch.total_stake()
