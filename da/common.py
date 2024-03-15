@@ -56,6 +56,11 @@ class Certificate:
     row_commitments: List[Commitment]
 
     def verify(self, nodes_public_keys: List[BLSPublickey]) -> bool:
+        """
+        List of nodes public keys should be a trusted list of verified proof of possession keys.
+        Otherwise, we could fall under the Rogue Key Attack
+        `assert all(bls_pop.PopVerify(pk, proof) for pk, proof in zip(node_public_keys, pops))`
+        """
         # we sort them as the signers bitfield is sorted by the public keys as well
         signers_keys = list(compress(sorted(nodes_public_keys), self.signers))
         message = build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
