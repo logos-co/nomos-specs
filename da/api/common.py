@@ -8,15 +8,19 @@ from da.verifier import DABlob
 
 @dataclass
 class Metadata:
-    # index of VID certificate blob
-    index: int
     # app identifier
     app_id: bytes
+    # index of VID certificate blob
+    index: int
+
 
 @dataclass
-class VID():
+class VID:
+    # da certificate id
     cert_id: bytes
+    # application + index information
     metadata: Metadata
+
 
 class BlobStore(ABC):
     @abstractmethod

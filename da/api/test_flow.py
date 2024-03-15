@@ -23,12 +23,12 @@ class MockStore(BlobStore):
             raise ValueError("index already written")
 
         blob = self.blob_store.pop(cert_id)
-        self.app_id_store[metadata.app_id][metadata.index] = blob 
+        self.app_id_store[metadata.app_id][metadata.index] = blob
 
     # Implements `get_multiple` method from BlobStore abstract class.
     def get_multiple(self, app_id, indexes) -> List[Optional[DABlob]]:
         return [
-                self.app_id_store[app_id].get(i) for i in indexes
+            self.app_id_store[app_id].get(i) for i in indexes
         ]
 
 
