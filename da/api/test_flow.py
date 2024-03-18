@@ -69,3 +69,29 @@ class TestFlow(TestCase):
         blobs = api.read(app_id, [idx])
 
         self.assertEqual([expected_blob], blobs)
+
+    def test_multiple_indexes_same_data(self):
+        expected_blob = "hello"
+        cert_id = b"11"*32
+        app_id = 1
+        idx1 = 1
+        idx2 = 2
+        mock_meta1 = Metadata(app_id, idx1)
+        mock_meta2 = Metadata(app_id, idx2)
+
+        mock_store = MockStore()
+        mock_store.populate(expected_blob, cert_id)
+
+        api = DAApi(mock_store)
+
+        api.write(cert_id, mock_meta1)
+        mock_store.populate(expected_blob, cert_id)
+        api.write(cert_id, mock_meta2)
+
+        blobs_idx1 = api.read(app_id, [idx1])
+        blobs_idx2 = api.read(app_id, [idx2])
+
+        self.assertEqual([expected_blob], blobs_idx1)
+        self.assertEqual([expected_blob], blobs_idx2)
+        self.assertEqual(mock_store.app_id_store[app_id][idx1], mock_store.app_id_store[app_id][idx2])
+
