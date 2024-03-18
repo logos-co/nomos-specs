@@ -22,14 +22,14 @@ class MockStore(BlobStore):
         if metadata.index in self.app_id_store[metadata.app_id]:
             raise ValueError("index already written")
 
-        blob = self.blob_store.pop(cert_id)
-        self.app_id_store[metadata.app_id][metadata.index] = blob
+        self.app_id_store[metadata.app_id][metadata.index] = cert_id
 
     # Implements `get_multiple` method from BlobStore abstract class.
     def get_multiple(self, app_id, indexes) -> List[Optional[DABlob]]:
         return [
-            self.app_id_store[app_id].get(i) for i in indexes
+            self.blob_store.get(self.app_id_store[app_id].get(i), None) if self.app_id_store[app_id].get(i) else None for i in indexes
         ]
+
 
 
 class TestFlow(TestCase):
@@ -69,4 +69,3 @@ class TestFlow(TestCase):
         blobs = api.read(app_id, [idx])
 
         self.assertEqual([expected_blob], blobs)
-
