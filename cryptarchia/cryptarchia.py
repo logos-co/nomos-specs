@@ -4,17 +4,20 @@ from math import floor
 from copy import deepcopy
 from itertools import chain
 import functools
-
-# Please note this is still a work in progress
 from dataclasses import dataclass, field, replace
+
+import numpy as np
 
 Id: TypeAlias = bytes
 
 
-@dataclass
+@dataclass(frozen=True)
 class Epoch:
     # identifier of the epoch, counting incrementally from 0
     epoch: int
+
+    def prev(self) -> "Epoch":
+        return Epoch(self.epoch - 1)
 
 
 @dataclass
@@ -41,16 +44,22 @@ class Config:
     # stabilized
     epoch_period_nonce_stabilization: int
 
+    # -- Stake Relativization Params
+    initial_inferred_total_stake: int  # D_0
+    total_stake_learning_rate: int  # beta
+
     time: TimeConfig
 
     @staticmethod
-    def cryptarchia_v0_0_1() -> "Config":
+    def cryptarchia_v0_0_1(initial_inferred_total_stake) -> "Config":
         return Config(
             k=2160,
             active_slot_coeff=0.05,
             epoch_stake_distribution_stabilization=3,
             epoch_period_nonce_buffer=3,
             epoch_period_nonce_stabilization=4,
+            initial_inferred_total_stake=initial_inferred_total_stake,
+            total_stake_learning_rate=0.8,
             time=TimeConfig(
                 slot_duration=1,
                 chain_start_time=0,
@@ -244,13 +253,13 @@ class Chain:
     def length(self) -> int:
         return len(self.blocks)
 
-    def contains_block(self, block: BlockHeader) -> bool:
-        return block in self.blocks
+    def contains_block(self, block: Id) -> bool:
+        return any(block == b.id() for b in self.blocks)
 
-    def block_position(self, block: BlockHeader) -> int:
+    def block_position(self, block: Id) -> int:
         assert self.contains_block(block)
         for i, b in enumerate(self.blocks):
-            if b == block:
+            if b.id() == block:
                 return i
 
 
@@ -261,11 +270,12 @@ class LedgerState:
     """
 
     block: Id = None
+    slot: Slot = field(default_factory=lambda: Slot(0))
+
     # This nonce is used to derive the seed for the slot leader lottery
     # It's updated at every block by hashing the previous nonce with the nullifier
     # Note that this does not prevent nonce grinding at the last slot before the nonce snapshot
     nonce: Id = None
-    total_stake: int = None
 
     # set of commitments
     commitments_spend: set[Id] = field(default_factory=set)
@@ -276,14 +286,19 @@ class LedgerState:
     # set of nullified coins
     nullifiers: set[Id] = field(default_factory=set)
 
+    # -- Stake Relativization State
+    # The number of observed leaders (block proposers + orphans), this is used to infer total stake
+    leader_count: int = 0
+
     def copy(self):
         return LedgerState(
             block=self.block,
+            slot=self.slot,
             nonce=self.nonce,
-            total_stake=self.total_stake,
             commitments_spend=deepcopy(self.commitments_spend),
             commitments_lead=deepcopy(self.commitments_lead),
             nullifiers=deepcopy(self.nullifiers),
+            leader_count=self.leader_count,
         )
 
     def replace(self, **kwarg) -> "LedgerState":
@@ -309,11 +324,13 @@ class LedgerState:
 
         self.nonce = h.digest()
         self.block = block.id()
+        self.slot = block.slot
         for proof in chain(block.orphaned_proofs, [block]):
             proof = proof.leader_proof
             self.nullifiers.add(proof.nullifier)
             self.commitments_spend.add(proof.evolved_commitment)
             self.commitments_lead.add(proof.evolved_commitment)
+            self.leader_count += 1
 
 
 @dataclass
@@ -327,6 +344,10 @@ class EpochState:
     # The nonce snapshot is taken 7k/f slots into the previous epoch
     nonce_snapshot: LedgerState
 
+    # Total stake is inferred from watching the block production rate over the past epoch.
+    # This inferred total stake is used to relativize stake values in the leadership lottery.
+    inferred_total_stake: int
+
     def verify_eligible_to_lead_due_to_age(self, commitment: Id) -> bool:
         # A coin is eligible to lead if it was committed to before the the stake
         # distribution snapshot was taken or it was produced by a leader proof since the snapshot was taken.
@@ -339,7 +360,7 @@ class EpochState:
 
     def total_stake(self) -> int:
         """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
-        return self.stake_distribution_snapshot.total_stake
+        return self.inferred_total_stake
 
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
@@ -352,6 +373,13 @@ class Follower:
         self.local_chain = Chain([], genesis=genesis_state.block)
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block: genesis_state.copy()}
+        self.epoch_state = {
+            (Epoch(0), genesis_state.block): EpochState(
+                stake_distribution_snapshot=genesis_state,
+                nonce_snapshot=genesis_state,
+                inferred_total_stake=config.initial_inferred_total_stake,
+            )
+        }
 
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
         # TODO: verify blocks are not in the 'future'
@@ -373,6 +401,7 @@ class Follower:
                 orphaned_commitments.add(proof.evolved_commitment)
                 current_state.nullifiers.add(proof.nullifier)
             else:
+                print("WARN: orphan proof is invalid")
                 # otherwise, the whole block is invalid
                 return False
 
@@ -411,7 +440,7 @@ class Follower:
             return self.local_chain
 
         for chain in self.forks:
-            if chain.tip().id() == block.parent:
+            if chain.tip_id() == block.parent:
                 return chain
 
         return None
@@ -423,10 +452,10 @@ class Follower:
 
         chains = self.forks + [self.local_chain]
         for chain in chains:
-            if chain.contains_block(block):
-                block_position = chain.block_position(block)
+            if chain.contains_block(block.parent):
+                block_position = chain.block_position(block.parent)
                 return Chain(
-                    blocks=chain.blocks[:block_position],
+                    blocks=chain.blocks[: block_position + 1],
                     genesis=self.genesis_state.block,
                 )
 
@@ -442,11 +471,13 @@ class Follower:
             if new_chain is not None:
                 self.forks.append(new_chain)
             else:
+                print("WARN: missing parent block")
                 # otherwise, we're missing the parent block
                 # in that case, just ignore the block
                 return
 
         if not self.validate_header(block, new_chain):
+            print("WARN: invalid header")
             return
 
         new_chain.blocks.append(block)
@@ -459,6 +490,22 @@ class Follower:
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
 
+    def unimported_orphans(self, parent: Id) -> list[BlockHeader]:
+        """
+        Returns all unimported orphans w.r.t. the given parent state.
+        Orphans are returned in the order that they should be imported.
+        """
+        tip_state = self.ledger_state[parent]
+
+        orphans = []
+        for fork in [self.local_chain, *self.forks]:
+            for block in fork.blocks:
+                for b in [*block.orphaned_proofs, block]:
+                    if b.leader_proof.nullifier not in tip_state.nullifiers:
+                        orphans += [b]
+
+        return orphans
+
     # Evaluate the fork choice rule and return the block header of the block that should be the head of the chain
     def fork_choice(self) -> Chain:
         return maxvalid_bg(
@@ -469,10 +516,7 @@ class Follower:
         return self.local_chain.tip()
 
     def tip_id(self) -> Id:
-        if self.local_chain.length() > 0:
-            return self.local_chain.tip().id()
-        else:
-            return self.genesis_state.block
+        return self.local_chain.tip_id()
 
     def tip_state(self) -> LedgerState:
         return self.ledger_state[self.tip_id()]
@@ -484,28 +528,101 @@ class Follower:
 
         return self.genesis_state
 
-    def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
+    def epoch_start_slot(self, epoch) -> Slot:
+        return Slot(epoch.epoch * self.config.epoch_length)
+
+    def stake_distribution_snapshot(self, epoch, chain):
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
-        stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.epoch_length)
-        stake_distribution_snapshot = self.state_at_slot_beginning(
-            chain, stake_snapshot_slot
-        )
+        slot = Slot(epoch.prev().epoch * self.config.epoch_length)
+        return self.state_at_slot_beginning(chain, slot)
 
-        nonce_slot = Slot(
+    def nonce_snapshot(self, epoch, chain):
+        # nonce snapshot happens partway through the previous epoch after the
+        # stake distribution has stabilized
+        slot = Slot(
             self.config.base_period_length
             * (
                 self.config.epoch_stake_distribution_stabilization
                 + self.config.epoch_period_nonce_buffer
             )
-            + stake_snapshot_slot.absolute_slot
+            + self.epoch_start_slot(epoch.prev()).absolute_slot
         )
-        nonce_snapshot = self.state_at_slot_beginning(chain, nonce_slot)
+        return self.state_at_slot_beginning(chain, slot)
 
-        return EpochState(
+    def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
+        if epoch.epoch == 0:
+            return EpochState(
+                stake_distribution_snapshot=self.genesis_state,
+                nonce_snapshot=self.genesis_state,
+                inferred_total_stake=self.config.initial_inferred_total_stake,
+            )
+
+        stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, chain)
+        nonce_snapshot = self.nonce_snapshot(epoch, chain)
+
+        memo_block_id = nonce_snapshot.block
+        if state := self.epoch_state.get((epoch, memo_block_id)):
+            return state
+
+        prev_epoch = self.compute_epoch_state(epoch.prev(), chain)
+
+        # Compute inferred total stake from results of last epoch
+        block_proposals_last_epoch = (
+            nonce_snapshot.leader_count - stake_distribution_snapshot.leader_count
+        )
+        expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
+        h = (
+            self.config.total_stake_learning_rate
+            * prev_epoch.inferred_total_stake
+            / expected_blocks_per_slot
+        )
+        T = (
+            nonce_snapshot.slot.absolute_slot
+            - stake_distribution_snapshot.slot.absolute_slot
+        )
+        mean_blocks_per_slot = block_proposals_last_epoch / T
+        blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
+        inferred_total_stake = prev_epoch.inferred_total_stake - h * blocks_per_slot_err
+
+        state = EpochState(
             stake_distribution_snapshot=stake_distribution_snapshot,
             nonce_snapshot=nonce_snapshot,
+            inferred_total_stake=inferred_total_stake,
         )
+
+        self.epoch_state[(epoch, memo_block_id)] = state
+        return state
+
+    def _infer_total_stake(
+        self, last_inferred_total_stake, block_proposals, slots
+    ) -> int:
+        last_nonce_snapshot = self.state_at_slot_beginning(
+            chain, Slot(nonce_snapshot.slot.absolute_slot - self.config.epoch_length)
+        )
+
+        prev_epoch_total_stake = self.compute_epoch_state(
+            last_nonce_snapshot.slot, chain
+        ).inferred_total_stake
+
+        # Compute inferred total stake from results of last epoch
+        block_proposals_last_epoch = (
+            nonce_snapshot.leader_count - last_nonce_snapshot.leader_count
+        )
+        expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
+        h = (
+            self.config.total_stake_learning_rate
+            * prev_epoch_total_stake
+            / expected_blocks_per_slot
+        )
+        # T is epoch length in all epochs except for the first epoch.
+        epoch_length = (
+            nonce_snapshot.slot.absolute_slot - last_nonce_snapshot.slot.absolute_slot
+        )
+        mean_blocks_per_slot = block_proposals_last_epoch / T
+        blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
+        inferred_total_stake = int(prev_epoch_total_stake - h * blocks_per_slot_err)
+        return inferred_total_stake
 
 
 def phi(f: float, alpha: float) -> float:

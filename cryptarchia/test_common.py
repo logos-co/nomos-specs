@@ -10,10 +10,11 @@ from .cryptarchia import (
 )
 
 
-def mk_config() -> Config:
-    return Config.cryptarchia_v0_0_1().replace(
+def mk_config(initial_stake_distribution: list[Coin]) -> Config:
+    initial_inferred_total_stake = sum(c.value for c in initial_stake_distribution)
+    return Config.cryptarchia_v0_0_1(initial_inferred_total_stake).replace(
         k=1,
-        active_slot_coeff=1.0,
+        active_slot_coeff=0.5,
     )
 
 
@@ -21,7 +22,6 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
     return LedgerState(
         block=bytes(32),
         nonce=bytes(32),
-        total_stake=sum(c.value for c in initial_stake_distribution),
         commitments_spend={c.commitment() for c in initial_stake_distribution},
         commitments_lead={c.commitment() for c in initial_stake_distribution},
         nullifiers=set(),
