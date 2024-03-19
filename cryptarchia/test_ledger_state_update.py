@@ -77,6 +77,52 @@ class TestLedgerStateUpdate(TestCase):
         # and the original coin_1 should now be removed from the spent pool
         assert follower.tip_state().verify_unspent(coin_1.nullifier())
 
+    def test_fork_creation(self):
+        coins = [Coin(sk=i, value=100) for i in range(7)]
+        genesis = mk_genesis_state(coins)
+
+        follower = Follower(genesis, mk_config())
+
+        # coin_0 & coin_1 both concurrently win slot 0 based on the genesis block
+        # Both blocks are accepted, and a fork is created "from the genesis block"
+        block_1 = mk_block(parent=genesis.block, slot=0, coin=coins[0])
+        block_2 = mk_block(parent=genesis.block, slot=0, coin=coins[1])
+        follower.on_block(block_1)
+        follower.on_block(block_2)
+        assert follower.tip() == block_1
+        assert len(follower.forks) == 1, f"{len(follower.forks)}"
+        assert follower.forks[0].tip() == block_2
+
+        # coin_2 wins slot 1 and chooses to extend from block_1
+        # coin_3 also wins slot 1 and but chooses to extend from block_2
+        # Both blocks are accepted. Both the local chain and the fork grow. No fork is newly created.
+        block_3 = mk_block(parent=block_1.id(), slot=1, coin=coins[2])
+        block_4 = mk_block(parent=block_2.id(), slot=1, coin=coins[3])
+        follower.on_block(block_3)
+        follower.on_block(block_4)
+        assert follower.tip() == block_3
+        assert len(follower.forks) == 1, f"{len(follower.forks)}"
+        assert follower.forks[0].tip() == block_4
+
+        # coin_4 wins slot 1 and but chooses to extend from block_2 as well
+        # The block is accepted. A new fork is created "from the block_2".
+        block_5 = mk_block(parent=block_2.id(), slot=1, coin=coins[4])
+        follower.on_block(block_5)
+        assert follower.tip() == block_3
+        assert len(follower.forks) == 2, f"{len(follower.forks)}"
+        assert follower.forks[0].tip() == block_4
+        assert follower.forks[1].tip() == block_5
+
+        # A block based on an unknown parent is not accepted.
+        # Nothing changes from the local chain and forks.
+        unknown_block = mk_block(parent=block_5.id(), slot=2, coin=coins[5])
+        block_6 = mk_block(parent=unknown_block.id(), slot=2, coin=coins[6])
+        follower.on_block(block_6)
+        assert follower.tip() == block_3
+        assert len(follower.forks) == 2, f"{len(follower.forks)}"
+        assert follower.forks[0].tip() == block_4
+        assert follower.forks[1].tip() == block_5
+
     def test_epoch_transition(self):
         leader_coins = [Coin(sk=i, value=100) for i in range(4)]
         genesis = mk_genesis_state(leader_coins)
