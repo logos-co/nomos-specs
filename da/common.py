@@ -11,7 +11,7 @@ class NodeId(Bytes32):
     pass
 
 
-class Chunk(Bytes32):
+class Chunk(bytes):
     pass
 
 

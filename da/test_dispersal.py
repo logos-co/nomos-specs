@@ -50,7 +50,7 @@ class TestDispersal(TestCase):
 
     def test_disperse(self):
         data = self.encoder_test.data
-        encoding_params = DAEncoderParams(column_count=self.n_nodes // 2, bytes_per_field_element=32)
+        encoding_params = DAEncoderParams(column_count=self.n_nodes // 2, bytes_per_chunk=31)
         encoded_data = DAEncoder(encoding_params).encode(data)
 
         # mock send and await method with local verifiers

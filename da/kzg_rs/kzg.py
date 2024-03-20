@@ -9,12 +9,12 @@ from .common import BYTES_PER_FIELD_ELEMENT, G1, BLS_MODULUS, GLOBAL_PARAMETERS_
 from .poly import Polynomial
 
 
-def bytes_to_polynomial(b: bytes) -> Polynomial:
+def bytes_to_polynomial(b: bytes, bytes_per_field_element=BYTES_PER_FIELD_ELEMENT) -> Polynomial:
     """
     Convert bytes to list of BLS field scalars.
     """
-    assert len(b) % BYTES_PER_FIELD_ELEMENT == 0
-    eval_form = [int(bytes_to_bls_field(b)) for b in batched(b, int(BYTES_PER_FIELD_ELEMENT))]
+    assert len(b) % bytes_per_field_element == 0
+    eval_form = [int(bytes_to_bls_field(b)) for b in batched(b, int(bytes_per_field_element))]
     return Polynomial.from_evaluations(eval_form, BLS_MODULUS)
 
 
@@ -34,7 +34,7 @@ def g1_linear_combination(polynomial: Polynomial[BLSFieldElement], global_parame
 
 
 def bytes_to_commitment(b: bytes, global_parameters: Sequence[G1]) -> Tuple[Polynomial, Commitment]:
-    poly = bytes_to_polynomial(b)
+    poly = bytes_to_polynomial(b, bytes_per_field_element=BYTES_PER_FIELD_ELEMENT)
     return poly, g1_linear_combination(poly, global_parameters)
 
 

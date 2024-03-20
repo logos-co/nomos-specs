@@ -7,14 +7,14 @@ from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Pr
 
 from da.common import ChunksMatrix, Chunk, Row, Column
 from da.kzg_rs import kzg, rs
-from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY, BLS_MODULUS
+from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY, BLS_MODULUS, BYTES_PER_FIELD_ELEMENT
 from da.kzg_rs.poly import Polynomial
 
 
 @dataclass
 class DAEncoderParams:
     column_count: int
-    bytes_per_field_element: int
+    bytes_per_chunk: int
 
 
 @dataclass
@@ -29,21 +29,29 @@ class EncodedData:
     aggregated_column_proofs: List[Proof]
 
 
-
 class DAEncoder:
     def __init__(self, params: DAEncoderParams):
+        # we can only encode up to 31 bytes per element which fits without problem in a 32 byte element
+        assert params.bytes_per_chunk < BYTES_PER_FIELD_ELEMENT
         self.params = params
 
     def _chunkify_data(self, data: bytes) -> ChunksMatrix:
-        size: int = self.params.column_count * self.params.bytes_per_field_element
+        size: int = self.params.column_count * self.params.bytes_per_chunk
         return ChunksMatrix(
-            Row(Chunk(bytes(chunk)) for chunk in batched(b, self.params.bytes_per_field_element))
+            Row(Chunk(int.from_bytes(chunk, byteorder="big").to_bytes(length=BYTES_PER_FIELD_ELEMENT))
+                for chunk in batched(b, self.params.bytes_per_chunk)
+            )
             for b in batched(data, size)
         )
 
-    @staticmethod
-    def _compute_row_kzg_commitments(matrix: ChunksMatrix) -> List[Tuple[Polynomial, Commitment]]:
-        return [kzg.bytes_to_commitment(row.as_bytes(), GLOBAL_PARAMETERS) for row in matrix]
+    def _compute_row_kzg_commitments(self, matrix: ChunksMatrix) -> List[Tuple[Polynomial, Commitment]]:
+        return [
+            kzg.bytes_to_commitment(
+                row.as_bytes(),
+                GLOBAL_PARAMETERS,
+            )
+            for row in matrix
+        ]
 
     def _rs_encode_rows(self, chunks_matrix: ChunksMatrix) -> ChunksMatrix:
         def __rs_encode_row(row: Row) -> Row:
@@ -51,7 +59,8 @@ class DAEncoder:
             return Row(
                 Chunk(BLSFieldElement.to_bytes(
                     x,
-                    length=self.params.bytes_per_field_element, byteorder="big"
+                    # fixed to 32 bytes as bls_field_elements are 32bytes (256bits) encoded
+                    length=32, byteorder="big"
                 )) for x in rs.encode(polynomial, 2, ROOTS_OF_UNITY)
             )
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
