@@ -4,19 +4,8 @@ import itertools
 
 import numpy as np
 
-from .cryptarchia import (
-    Leader,
-    Follower,
-    BlockHeader,
-    Config,
-    EpochState,
-    LedgerState,
-    Coin,
-    phi,
-    TimeConfig,
-    Slot,
-)
-from .test_common import mk_config, mk_genesis_state
+from .cryptarchia import Config, Coin, Slot
+from .test_common import mk_config, mk_genesis_state, TestNode
 
 # TODO: tests to implement
 # - sim. based test showing inferrer total stake converges to true total stake
@@ -69,7 +58,7 @@ class TestStakeRelativization(TestCase):
         print("T=", T)
         slot_leaders = np.zeros(T, dtype=np.int32)
         for slot in map(Slot, range(T)):
-            if slot == Slot(288):
+            if slot == Slot(341):
                 import pdb
 
                 pdb.set_trace()

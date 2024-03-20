@@ -189,9 +189,9 @@ class MockLeaderProof:
             parent=parent,
         )
 
-    def verify(self, slot: Slot, parent: Id):
+    def verify(self, slot: Slot):
         # TODO: verification not implemented
-        return slot == self.slot and parent == self.parent
+        return slot == self.slot
 
 
 @dataclass
@@ -506,13 +506,14 @@ class Follower:
         Returns all unimported orphans w.r.t. the given parent state.
         Orphans are returned in the order that they should be imported.
         """
-        tip_state = self.ledger_state[parent]
+        tip_state = self.ledger_state[parent].copy()
 
         orphans = []
         for fork in [self.local_chain, *self.forks]:
             for block in fork.blocks:
                 for b in [*block.orphaned_proofs, block]:
                     if b.leader_proof.nullifier not in tip_state.nullifiers:
+                        tip_state.nullifiers.add(b.leader_proof.nullifier)
                         orphans += [b]
 
         return orphans
