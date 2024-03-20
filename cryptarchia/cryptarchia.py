@@ -79,8 +79,9 @@ class Config:
     @property
     def epoch_length(self) -> int:
         return (
-            self.epoch_relative_nonce_slot + self.epoch_period_nonce_stabilization
-        ) * self.base_period_length
+            self.epoch_relative_nonce_slot
+            + self.epoch_period_nonce_stabilization * self.base_period_length
+        )
 
     @property
     def s(self):
