@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from hashlib import sha3_256
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Set
 
 from eth2spec.deneb.mainnet import BLSFieldElement
 from eth2spec.eip7594.mainnet import (
@@ -9,6 +9,7 @@ from eth2spec.eip7594.mainnet import (
 )
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
+import da.common
 from da.common import Column, Chunk, Attestation, BLSPrivateKey
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
@@ -25,9 +26,13 @@ class DABlob:
     rows_commitments: List[Commitment]
     rows_proofs: List[Proof]
 
+    def id(self):
+        return da.common.build_attestation_message(self.aggregated_column_commitment, self.rows_commitments)
+
 
 class DAVerifier:
     def __init__(self, sk: BLSPrivateKey):
+        self.attested_blobs: Set[bytes] = set()
         self.sk = sk
 
     @staticmethod
@@ -79,6 +84,9 @@ class DAVerifier:
         return Attestation(signature=bls_pop.Sign(self.sk, message))
 
     def verify(self, blob: DABlob) -> Optional[Attestation]:
+        if (blob_id := blob.id()) in self.attested_blobs:
+            # We already attested for such blob, skip
+            return None
         is_column_verified = DAVerifier._verify_column(
             blob.column,
             blob.column_commitment,
@@ -93,4 +101,5 @@ class DAVerifier:
         )
         if not are_chunks_verified:
             return
+        self.attested_blobs.add(blob_id)
         return self._build_attestation(blob)
