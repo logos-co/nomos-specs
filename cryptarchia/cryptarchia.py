@@ -71,11 +71,15 @@ class Config:
         return int(floor(self.k / self.active_slot_coeff))
 
     @property
+    def epoch_relative_nonce_slot(self) -> int:
+        return (
+            self.epoch_stake_distribution_stabilization + self.epoch_period_nonce_buffer
+        ) * self.base_period_length
+
+    @property
     def epoch_length(self) -> int:
         return (
-            self.epoch_stake_distribution_stabilization
-            + self.epoch_period_nonce_buffer
-            + self.epoch_period_nonce_stabilization
+            self.epoch_relative_nonce_slot + self.epoch_period_nonce_stabilization
         ) * self.base_period_length
 
     @property
@@ -111,6 +115,9 @@ class Slot:
 
     def __lt__(self, other):
         return self.absolute_slot < other.absolute_slot
+
+    def __str__(self):
+        return f"Slot({self.absolute_slot})"
 
 
 @dataclass
@@ -541,11 +548,7 @@ class Follower:
         # nonce snapshot happens partway through the previous epoch after the
         # stake distribution has stabilized
         slot = Slot(
-            self.config.base_period_length
-            * (
-                self.config.epoch_stake_distribution_stabilization
-                + self.config.epoch_period_nonce_buffer
-            )
+            self.config.epoch_relative_nonce_slot
             + self.epoch_start_slot(epoch.prev()).absolute_slot
         )
         return self.state_at_slot_beginning(chain, slot)
@@ -577,10 +580,7 @@ class Follower:
             * prev_epoch.inferred_total_stake
             / expected_blocks_per_slot
         )
-        T = (
-            nonce_snapshot.slot.absolute_slot
-            - stake_distribution_snapshot.slot.absolute_slot
-        )
+        T = self.config.epoch_relative_nonce_slot
         mean_blocks_per_slot = block_proposals_last_epoch / T
         blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
         inferred_total_stake = prev_epoch.inferred_total_stake - h * blocks_per_slot_err
