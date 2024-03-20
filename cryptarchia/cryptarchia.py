@@ -492,7 +492,10 @@ class Follower:
 
         # We may need to switch forks, lets run the fork choice rule to check.
         new_chain = self.fork_choice()
-        self.local_chain = new_chain
+        if new_chain != self.local_chain:
+            self.forks.remove(new_chain)
+            self.forks.append(self.local_chain)
+            self.local_chain = new_chain
 
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
