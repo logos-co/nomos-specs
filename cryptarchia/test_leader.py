@@ -20,7 +20,7 @@ class TestLeader(TestCase):
         epoch = EpochState(
             stake_distribution_snapshot=LedgerState(),
             nonce_snapshot=LedgerState(nonce=b"1010101010"),
-            inferred_total_stake=1000,
+            inferred_total_active_stake=1000,
         )
 
         coin = Coin(sk=0, value=10)
@@ -33,7 +33,7 @@ class TestLeader(TestCase):
         # We'll use the Margin of Error equation to decide how many samples we need.
         # https://en.wikipedia.org/wiki/Margin_of_error
         margin_of_error = 1e-4
-        p = phi(f=f, alpha=10 / epoch.total_stake())
+        p = phi(f=f, alpha=10 / epoch.total_active_stake())
         std = np.sqrt(p * (1 - p))
         Z = 3  # we want 3 std from the mean to be within the margin of error
         N = int((Z * std / margin_of_error) ** 2)

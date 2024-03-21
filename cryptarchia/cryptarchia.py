@@ -46,21 +46,21 @@ class Config:
     epoch_period_nonce_stabilization: int
 
     # -- Stake Relativization Params
-    initial_total_stake: int  # D_0
-    total_stake_learning_rate: int  # beta
+    initial_total_active_stake: int  # D_0
+    total_active_stake_learning_rate: int  # beta
 
     time: TimeConfig
 
     @staticmethod
-    def cryptarchia_v0_0_1(initial_total_stake) -> "Config":
+    def cryptarchia_v0_0_1(initial_total_active_stake) -> "Config":
         return Config(
             k=2160,
             active_slot_coeff=0.05,
             epoch_stake_distribution_stabilization=3,
             epoch_period_nonce_buffer=3,
             epoch_period_nonce_stabilization=4,
-            initial_total_stake=initial_total_stake,
-            total_stake_learning_rate=0.8,
+            initial_total_active_stake=initial_total_active_stake,
+            total_active_stake_learning_rate=0.8,
             time=TimeConfig(
                 slot_duration=1,
                 chain_start_time=0,
@@ -353,7 +353,7 @@ class EpochState:
     # Total stake is inferred from watching block production rate over the past
     # epoch. This inferred total stake is used to relativize stake values in the
     # leadership lottery.
-    inferred_total_stake: int
+    inferred_total_active_stake: int
 
     def verify_eligible_to_lead_due_to_age(self, commitment: Id) -> bool:
         # A coin is eligible to lead if it was committed to before the the stake
@@ -365,12 +365,12 @@ class EpochState:
         # NOTE: `ledger_state.commitments_spend` is a super-set of `ledger_state.commitments_lead`
         return self.stake_distribution_snapshot.verify_eligible_to_spend(commitment)
 
-    def total_stake(self) -> int:
+    def total_active_stake(self) -> int:
         """
         Returns the inferred total stake participating in consensus.
-        Total stake is used to reletivize a coin's value in leadership proofs.
+        Total active stake is used to reletivize a coin's value in leadership proofs.
         """
-        return self.inferred_total_stake
+        return self.inferred_total_active_stake
 
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
@@ -584,7 +584,7 @@ class Follower:
             return EpochState(
                 stake_distribution_snapshot=self.genesis_state,
                 nonce_snapshot=self.genesis_state,
-                inferred_total_stake=self.config.initial_total_stake,
+                inferred_total_active_stake=self.config.initial_total_active_stake,
             )
 
         stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, chain)
@@ -599,20 +599,20 @@ class Follower:
         # was calculated last epoch. Thus we recurse here to retreive the previous
         # estimate of total stake.
         prev_epoch = self.compute_epoch_state(epoch.prev(), chain)
-        inferred_total_stake = self._infer_total_stake(
+        inferred_total_active_stake = self._infer_total_active_stake(
             prev_epoch, nonce_snapshot, stake_distribution_snapshot
         )
 
         state = EpochState(
             stake_distribution_snapshot=stake_distribution_snapshot,
             nonce_snapshot=nonce_snapshot,
-            inferred_total_stake=inferred_total_stake,
+            inferred_total_active_stake=inferred_total_active_stake,
         )
 
         self.epoch_state[(epoch, memo_block_id)] = state
         return state
 
-    def _infer_total_stake(
+    def _infer_total_active_stake(
         self,
         prev_epoch: EpochState,
         nonce_snapshot: LedgerState,
@@ -631,11 +631,11 @@ class Follower:
         expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
         blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
         h = (
-            self.config.total_stake_learning_rate
-            * prev_epoch.inferred_total_stake
+            self.config.total_active_stake_learning_rate
+            * prev_epoch.inferred_total_active_stake
             / expected_blocks_per_slot
         )
-        return int(prev_epoch.inferred_total_stake - h * blocks_per_slot_err)
+        return int(prev_epoch.inferred_total_active_stake - h * blocks_per_slot_err)
 
 
 def phi(f: float, alpha: float) -> float:
@@ -682,7 +682,7 @@ class Leader:
             return MockLeaderProof.new(self.coin, slot, parent)
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
-        relative_stake = self.coin.value / epoch.total_stake()
+        relative_stake = self.coin.value / epoch.total_active_stake()
 
         r = MOCK_LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
 

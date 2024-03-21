@@ -41,8 +41,8 @@ class TestStakeRelativization(TestCase):
     def test_inference_on_empty_genesis_epoch(self):
         coin = Coin(sk=0, value=10)
         config = mk_config([coin]).replace(
-            initial_total_stake=20,
-            total_stake_learning_rate=0.5,
+            initial_total_active_stake=20,
+            total_active_stake_learning_rate=0.5,
             active_slot_coeff=0.5,
         )
         genesis = mk_genesis_state([coin])
@@ -57,16 +57,18 @@ class TestStakeRelativization(TestCase):
 
         epoch1_state = node.epoch_state(Slot(config.epoch_length))
 
-        # given learning rate of 0.5 and 0 occupied slots in epoch 0, we should see inferred total stake drop by half in epoch 1
-        assert epoch1_state.inferred_total_stake == 10
+        # given learning rate of 0.5 and 0 occupied slots in epoch 0, we should see
+        # inferred total stake drop by half in epoch 1
+        assert epoch1_state.inferred_total_active_stake == 10
 
         # -- epoch 2 --
         epoch1_state = node.epoch_state(Slot(config.epoch_length * 2))
 
-        # and again, we should see inferred total stake drop by half in epoch 2 given no occupied slots in epoch 1
-        assert epoch1_state.inferred_total_stake == 5
+        # and again, we should see inferred total stake drop by half in epoch 2 given
+        # no occupied slots in epoch 1
+        assert epoch1_state.inferred_total_active_stake == 5
 
-    def test_inferred_total_stake_close_to_true_total_stake(self):
+    def test_inferred_total_active_stake_close_to_true_total_stake(self):
         PRINT_DEBUG = False
 
         seed = 0
@@ -118,16 +120,26 @@ class TestStakeRelativization(TestCase):
             print("seed", seed)
             print(f"T={T}, EPOCHS={EPOCHS}")
             print(
-                f"lottery stats mean={slot_leaders.mean():.3f} var={slot_leaders.var():.3f}"
+                f"lottery stats",
+                f"mean={slot_leaders.mean():.3f}",
+                f"var={slot_leaders.var():.3f}",
             )
             print("true total stake\t", stake.sum())
             print("D_0\t", config.initial_total_stake)
+
+            inferred_stake_by_epoch_by_rep = [
+                [
+                    r.epoch_state(Slot(e * config.epoch_length)).total_stake()
+                    for e in range(EPOCHS + 1)
+                ]
+                for r in reps
+            ]
             print(
                 f"D_{list(range(EPOCHS + 1))}\n\t",
                 "\n\t".join(
                     [
-                        f"Rep {i}: {[r.epoch_state(Slot(e * config.epoch_length)).total_stake() for e in range(EPOCHS + 1)]}"
-                        for i, r in enumerate(reps)
+                        f"Rep {i}: {stakes}"
+                        for i, stakes in inferred_stake_by_epoch_by_rep
                     ]
                 ),
             )
@@ -139,12 +151,14 @@ class TestStakeRelativization(TestCase):
 
         assert all(
             slot_leaders.sum() + 1 == len(n.follower.ledger_state) for n in nodes
-        ), f"Expected={slot_leaders.sum() + 1} got={[len(n.follower.ledger_state) for n in nodes]}"
+        ), f"{slot_leaders.sum() + 1}!={[len(n.follower.ledger_state) for n in nodes]}"
 
         for node in reps:
-            inferred_stake = node.epoch_state(Slot(T)).total_stake()
-            pct_err = abs(stake.sum() - inferred_stake) / config.initial_total_stake
-            eps = (1 - config.total_stake_learning_rate) ** EPOCHS
+            inferred_stake = node.epoch_state(Slot(T)).total_active_stake()
+            pct_err = (
+                abs(stake.sum() - inferred_stake) / config.initial_total_active_stake
+            )
+            eps = (1 - config.total_active_stake_learning_rate) ** EPOCHS
             assert pct_err < eps, f"pct_err={pct_err} < eps={eps}"
 
 
