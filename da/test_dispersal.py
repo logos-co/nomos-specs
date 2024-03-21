@@ -1,14 +1,13 @@
 from hashlib import sha3_256
 from unittest import TestCase
 
-from .encoder import DAEncoderParams, DAEncoder
-from .test_encoder import TestEncoder
-
+from da.encoder import DAEncoderParams, DAEncoder
+from da.test_encoder import TestEncoder
+from da.verifier import DAVerifier, DABlob
 from da.common import NodeId, Attestation, Bitfield
 from da.dispersal import Dispersal, EncodedData, DispersalSettings
-from py_ecc.bls import G2ProofOfPossession as bls_pop
 
-from .verifier import DAVerifier, DABlob
+from py_ecc.bls import G2ProofOfPossession as bls_pop
 
 
 class TestDispersal(TestCase):
@@ -46,12 +45,12 @@ class TestDispersal(TestCase):
         self.assertEqual(certificate.row_commitments, [])
         self.assertIsNotNone(certificate.aggregated_signatures)
         self.assertTrue(
-            bls_pop.AggregateVerify(self.public_keys, [mock_message]*len(self.public_keys), certificate.aggregated_signatures)
+            certificate.verify(self.public_keys)
         )
 
     def test_disperse(self):
         data = self.encoder_test.data
-        encoding_params = DAEncoderParams(column_count=self.n_nodes // 2, bytes_per_field_element=32)
+        encoding_params = DAEncoderParams(column_count=self.n_nodes // 2, bytes_per_chunk=31)
         encoded_data = DAEncoder(encoding_params).encode(data)
 
         # mock send and await method with local verifiers
@@ -64,12 +63,7 @@ class TestDispersal(TestCase):
 
         certificate = self.dispersal.disperse(encoded_data)
         self.assertIsNotNone(certificate)
-        self.assertTrue(
-            bls_pop.AggregateVerify(
-                self.public_keys[:self.dispersal.settings.threshold],
-                [self.dispersal._build_attestation_message(encoded_data)]*self.dispersal.settings.threshold,
-                certificate.aggregated_signatures
-            )
+        self.assertTrue(certificate.verify(self.public_keys)
         )
         self.assertEqual(
             certificate.signers,

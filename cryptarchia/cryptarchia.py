@@ -261,14 +261,11 @@ class Chain:
     def length(self) -> int:
         return len(self.blocks)
 
-    def contains_block(self, block: Id) -> bool:
-        return any(block == b.id() for b in self.blocks)
-
-    def block_position(self, block: Id) -> int:
-        assert self.contains_block(block)
+    def block_position(self, block: Id) -> Optional[int]:
         for i, b in enumerate(self.blocks):
             if b.id() == block:
                 return i
+        return None
 
 
 @dataclass
@@ -488,8 +485,8 @@ class Follower:
 
         chains = self.forks + [self.local_chain]
         for chain in chains:
-            if chain.contains_block(block.parent):
-                block_position = chain.block_position(block.parent)
+            block_position = chain.block_position(block.parent)
+            if block_position is not None:
                 return Chain(
                     blocks=chain.blocks[: block_position + 1],
                     genesis=self.genesis_state.block,

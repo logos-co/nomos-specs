@@ -1,9 +1,7 @@
-from typing import Sequence, List
+from typing import Sequence
 
-import scipy.interpolate
 from eth2spec.deneb.mainnet import BLSFieldElement
-from eth2spec.eip7594.mainnet import interpolate_polynomialcoeff
-from .common import G1, BLS_MODULUS
+from .common import BLS_MODULUS
 from .poly import Polynomial
 
 ExtendedData = Sequence[BLSFieldElement]

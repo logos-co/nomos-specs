@@ -4,7 +4,7 @@ from typing import List, Optional, Generator, Sequence
 
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
-from da.common import Certificate, NodeId, BLSPublickey, Bitfield
+from da.common import Certificate, NodeId, BLSPublickey, Bitfield, build_attestation_message
 from da.encoder import EncodedData
 from da.verifier import DABlob, Attestation
 
@@ -19,9 +19,9 @@ class DispersalSettings:
 class Dispersal:
     def __init__(self, settings: DispersalSettings):
         self.settings = settings
-        # sort nodes_ids and related public keys
+        # sort over public keys
         self.settings.nodes_ids, self.settings.nodes_pubkey = zip(
-            *sorted(zip(self.settings.nodes_ids, self.settings.nodes_pubkey), key=lambda x: x[0])
+            *sorted(zip(self.settings.nodes_ids, self.settings.nodes_pubkey), key=lambda x: x[1])
         )
 
     def _prepare_data(self, encoded_data: EncodedData) -> Generator[DABlob, None, None]:
@@ -71,11 +71,7 @@ class Dispersal:
 
     @staticmethod
     def _build_attestation_message(encoded_data: EncodedData) -> bytes:
-        hasher = sha3_256()
-        hasher.update(bytes(encoded_data.aggregated_column_commitment))
-        for c in encoded_data.row_commitments:
-            hasher.update(bytes(c))
-        return hasher.digest()
+        return build_attestation_message(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
 
     def disperse(self, encoded_data: EncodedData) -> Optional[Certificate]:
         attestations = []
