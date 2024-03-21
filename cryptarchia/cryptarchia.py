@@ -118,9 +118,6 @@ class Slot:
     def __lt__(self, other):
         return self.absolute_slot < other.absolute_slot
 
-    def __str__(self):
-        return f"Slot({self.absolute_slot})"
-
 
 @dataclass
 class Coin:
@@ -593,27 +590,15 @@ class Follower:
         stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, chain)
         nonce_snapshot = self.nonce_snapshot(epoch, chain)
 
+        # we memoize epoch states to avoid recursion killing our performance
         memo_block_id = nonce_snapshot.block
         if state := self.epoch_state.get((epoch, memo_block_id)):
             return state
 
         prev_epoch = self.compute_epoch_state(epoch.prev(), chain)
 
-        # Compute inferred total stake from results of last epoch
-        block_proposals_last_epoch = (
-            nonce_snapshot.leader_count - stake_distribution_snapshot.leader_count
-        )
-        expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
-        h = (
-            self.config.total_stake_learning_rate
-            * prev_epoch.inferred_total_stake
-            / expected_blocks_per_slot
-        )
-        T = self.config.epoch_relative_nonce_slot
-        mean_blocks_per_slot = block_proposals_last_epoch / T
-        blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
-        inferred_total_stake = int(
-            prev_epoch.inferred_total_stake - h * blocks_per_slot_err
+        inferred_total_stake = self._infer_total_stake(
+            prev_epoch, nonce_snapshot, stake_distribution_snapshot
         )
 
         state = EpochState(
@@ -626,34 +611,25 @@ class Follower:
         return state
 
     def _infer_total_stake(
-        self, last_inferred_total_stake, block_proposals, slots
-    ) -> int:
-        last_nonce_snapshot = self.state_at_slot_beginning(
-            chain, Slot(nonce_snapshot.slot.absolute_slot - self.config.epoch_length)
-        )
-
-        prev_epoch_total_stake = self.compute_epoch_state(
-            last_nonce_snapshot.slot, chain
-        ).inferred_total_stake
-
+        self,
+        prev_epoch: EpochState,
+        nonce_snapshot: LedgerState,
+        stake_distribution_snapshot: LedgerState,
+    ):
         # Compute inferred total stake from results of last epoch
         block_proposals_last_epoch = (
-            nonce_snapshot.leader_count - last_nonce_snapshot.leader_count
+            nonce_snapshot.leader_count - stake_distribution_snapshot.leader_count
         )
         expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
-        h = (
-            self.config.total_stake_learning_rate
-            * prev_epoch_total_stake
-            / expected_blocks_per_slot
-        )
-        # T is epoch length in all epochs except for the first epoch.
-        epoch_length = (
-            nonce_snapshot.slot.absolute_slot - last_nonce_snapshot.slot.absolute_slot
-        )
+        T = self.config.epoch_relative_nonce_slot
         mean_blocks_per_slot = block_proposals_last_epoch / T
         blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
-        inferred_total_stake = int(prev_epoch_total_stake - h * blocks_per_slot_err)
-        return inferred_total_stake
+        h = (
+            self.config.total_stake_learning_rate
+            * prev_epoch.inferred_total_stake
+            / expected_blocks_per_slot
+        )
+        return int(prev_epoch.inferred_total_stake - h * blocks_per_slot_err)
 
 
 def phi(f: float, alpha: float) -> float:
