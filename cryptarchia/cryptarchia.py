@@ -5,8 +5,13 @@ from copy import deepcopy
 from itertools import chain
 import functools
 from dataclasses import dataclass, field, replace
+import logging
 
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
+
 
 Id: TypeAlias = bytes
 
@@ -388,7 +393,7 @@ class Follower:
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
         # TODO: verify blocks are not in the 'future'
         if block.parent != chain.tip_id():
-            print("WARN: block parent is not chain tip")
+            logger.warning("block parent is not chain tip")
             return False
 
         current_state = self.ledger_state[block.parent].copy()
@@ -402,7 +407,7 @@ class Follower:
             # We take a shortcut for (1.) by restricting orphans to proofs we've
             # already processed in other branches.
             if orphan.id() not in self.ledger_state:
-                print("WARN: missing orphan proof")
+                logger.warning("missing orphan proof")
                 return False
 
             # we use the proposed block epoch state here instead of the orphan's
@@ -419,7 +424,7 @@ class Follower:
                 epoch_state,
                 current_state,
             ):
-                print("WARN: invalid orphan proof")
+                logger.warning("invalid orphan proof")
                 return False
 
             # if an adopted leadership proof is valid we need to apply its
@@ -495,13 +500,13 @@ class Follower:
             if new_chain is not None:
                 self.forks.append(new_chain)
             else:
-                print("WARN: missing parent block")
+                logger.warning("missing parent block")
                 # otherwise, we're missing the parent block
                 # in that case, just ignore the block
                 return
 
         if not self.validate_header(block, new_chain):
-            print("WARN: invalid header")
+            logger.warning("invalid header")
             return
 
         new_chain.blocks.append(block)
