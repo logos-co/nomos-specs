@@ -380,13 +380,7 @@ class Follower:
         self.local_chain = Chain([], genesis=genesis_state.block)
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block: genesis_state.copy()}
-        self.epoch_state = {
-            (Epoch(0), genesis_state.block): EpochState(
-                stake_distribution_snapshot=genesis_state,
-                nonce_snapshot=genesis_state,
-                inferred_total_stake=config.initial_total_stake,
-            )
-        }
+        self.epoch_state = {}
 
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
         # TODO: verify blocks are not in the 'future'
@@ -526,15 +520,20 @@ class Follower:
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
 
-    def unimported_orphans(self, parent: Id) -> list[BlockHeader]:
+    def unimported_orphans(self, tip: Id) -> list[BlockHeader]:
         """
-        Returns all unimported orphans w.r.t. the given parent state.
+        Returns all unimported orphans w.r.t. the given tip's state.
         Orphans are returned in the order that they should be imported.
         """
-        tip_state = self.ledger_state[parent].copy()
+        tip_state = self.ledger_state[tip].copy()
 
         orphans = []
         for fork in [self.local_chain, *self.forks]:
+            if fork.block_position(tip) is not None:
+                # the tip is a member of this fork, it doesn't make sense
+                # to take orphans from this fork as they are all already "imported"
+                continue
+
             for block in fork.blocks:
                 for b in [*block.orphaned_proofs, block]:
                     if b.leader_proof.nullifier not in tip_state.nullifiers:
