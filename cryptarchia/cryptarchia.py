@@ -275,7 +275,6 @@ class LedgerState:
     """
 
     block: Id = None
-    slot: Slot = field(default_factory=lambda: Slot(0))
 
     # This nonce is used to derive the seed for the slot leader lottery
     # It's updated at every block by hashing the previous nonce with the nullifier
@@ -298,7 +297,6 @@ class LedgerState:
     def copy(self):
         return LedgerState(
             block=self.block,
-            slot=self.slot,
             nonce=self.nonce,
             commitments_spend=deepcopy(self.commitments_spend),
             commitments_lead=deepcopy(self.commitments_lead),
@@ -329,7 +327,6 @@ class LedgerState:
 
         self.nonce = h.digest()
         self.block = block.id()
-        self.slot = block.slot
         for proof in chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
 
