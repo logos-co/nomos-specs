@@ -189,9 +189,9 @@ class MockLeaderProof:
             parent=parent,
         )
 
-    def verify(self, slot: Slot):
+    def verify(self, slot: Slot, parent: Id):
         # TODO: verification not implemented
-        return slot == self.slot
+        return slot == self.slot and parent == self.parent
 
 
 @dataclass
@@ -334,11 +334,13 @@ class LedgerState:
         self.block = block.id()
         self.slot = block.slot
         for proof in chain(block.orphaned_proofs, [block]):
-            proof = proof.leader_proof
-            self.nullifiers.add(proof.nullifier)
-            self.commitments_spend.add(proof.evolved_commitment)
-            self.commitments_lead.add(proof.evolved_commitment)
-            self.leader_count += 1
+            self.apply_leader_proof(proof.leader_proof)
+
+    def apply_leader_proof(self, proof: MockLeaderProof):
+        self.nullifiers.add(proof.nullifier)
+        self.commitments_spend.add(proof.evolved_commitment)
+        self.commitments_lead.add(proof.evolved_commitment)
+        self.leader_count += 1
 
 
 @dataclass
@@ -391,39 +393,65 @@ class Follower:
 
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
         # TODO: verify blocks are not in the 'future'
-        current_state = self.ledger_state[chain.tip_id()].copy()
-        orphaned_commitments = set()
+        if block.parent != chain.tip_id():
+            print("WARN: block parent is not chain tip")
+            return False
+
+        current_state = self.ledger_state[block.parent].copy()
+
         # first, we verify adopted leadership transactions
-        for proof in block.orphaned_proofs:
-            proof = proof.leader_proof
-            # each proof is validated against the last state of the ledger of the chain this block
-            # is being added to before that proof slot
-            parent_state = self.state_at_slot_beginning(chain, proof.slot).copy()
-            # we add effects of previous orphaned proofs to the ledger state
-            parent_state.commitments_lead |= orphaned_commitments
-            epoch_state = self.compute_epoch_state(proof.slot.epoch(self.config), chain)
-            if self.verify_slot_leader(
-                proof.slot, proof, epoch_state, parent_state, current_state
-            ):
-                # if an adopted leadership proof is valid we need to apply its effects to the ledger state
-                orphaned_commitments.add(proof.evolved_commitment)
-                current_state.nullifiers.add(proof.nullifier)
-            else:
-                print("WARN: orphan proof is invalid")
-                # otherwise, the whole block is invalid
+        for orphan in block.orphaned_proofs:
+            # orphan proofs are checked in two ways
+            # 1. ensure they are valid locally in their original branch
+            # 2. ensure it does not conflict with current state
+
+            # We take a shortcut for (1.) by constraining orphans to proofs we've already processed in other branches
+            if orphan.id() not in self.ledger_state:
+                print("WARN: missing orphan proof")
                 return False
 
-        parent_state = self.ledger_state[block.parent].copy()
-        parent_state.commitments_lead |= orphaned_commitments
+            # we use the proposed block epoch state here instead of the orphan's epoch state.
+            # for very old orphans, these states may be different.
+            epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
+
+            # each proof is validated against the current tip state, this will change
+            # once we introduce merkle roots in headers.
+            parent_state = current_state
+
+            # (2.) is checked by verifying the proof against the current state ensuring:
+            # - it is a valid proof
+            # - and the nullifier has not already been spent
+            if not self.verify_slot_leader(
+                orphan.slot,
+                orphan.parent,
+                orphan.leader_proof,
+                epoch_state,
+                parent_state,
+                current_state,
+            ):
+                print("WARN: invalid orphan proof")
+                return False
+
+            # if an adopted leadership proof is valid we need to apply its effects to the ledger state
+            current_state.apply_leader_proof(orphan.leader_proof)
+
+        # For now, we assume parent state and current state are identical this will change once we start putting merkle roots in headers
+        parent_state = current_state
         epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
         # TODO: this is not the full block validation spec, only slot leader is verified
         return self.verify_slot_leader(
-            block.slot, block.leader_proof, epoch_state, parent_state, current_state
+            block.slot,
+            block.parent,
+            block.leader_proof,
+            epoch_state,
+            parent_state,
+            current_state,
         )
 
     def verify_slot_leader(
         self,
         slot: Slot,
+        parent: Id,
         proof: MockLeaderProof,
         # coins are old enough if their commitment is in the stake distribution snapshot
         epoch_state: EpochState,
@@ -433,7 +461,7 @@ class Follower:
         current_state: LedgerState,
     ) -> bool:
         return (
-            proof.verify(slot, parent_state.block)  # verify slot leader proof
+            proof.verify(slot, parent)  # verify slot leader proof
             and (
                 parent_state.verify_eligible_to_lead(proof.commitment)
                 or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
@@ -588,7 +616,9 @@ class Follower:
         T = self.config.epoch_relative_nonce_slot
         mean_blocks_per_slot = block_proposals_last_epoch / T
         blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
-        inferred_total_stake = prev_epoch.inferred_total_stake - h * blocks_per_slot_err
+        inferred_total_stake = int(
+            prev_epoch.inferred_total_stake - h * blocks_per_slot_err
+        )
 
         state = EpochState(
             stake_distribution_snapshot=stake_distribution_snapshot,

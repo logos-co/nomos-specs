@@ -202,10 +202,10 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.tip() == block_2_1
 
     def test_orphaned_proofs(self):
-        coin = Coin(sk=0, value=100)
-        genesis = mk_genesis_state([coin])
+        coin, coin_orphan = Coin(sk=0, value=100), Coin(sk=1, value=100)
+        genesis = mk_genesis_state([coin, coin_orphan])
 
-        follower = Follower(genesis, mk_config([coin]))
+        follower = Follower(genesis, mk_config([coin, coin_orphan]))
 
         block_0_0 = mk_block(slot=0, parent=genesis.block, coin=coin)
         follower.on_block(block_0_0)
@@ -218,24 +218,26 @@ class TestLedgerStateUpdate(TestCase):
         # the coin evolved twice should not be accepted as it is not in the lead commitments
         assert follower.tip() == block_0_0
 
-        # an orphaned proof with an evolved coin for the same slot as the original coin
-        # should not be accepted as the evolved coin is not in the lead commitments at slot 0
+        # An orphaned proof will not be accepted until a node first sees the corresponding block.
+        #
+        # Also, notice that the block is using the evolved orphan coin which is not present on the main
+        # branch. The evolved orphan commitment is added from the orphan prior to validating the block
+        # header as part of orphan importing process
+        orphan = mk_block(parent=genesis.block, slot=0, coin=coin_orphan)
         block_0_1 = mk_block(
             slot=1,
             parent=block_0_0.id(),
-            coin=coin_new_new,
-            orphaned_proofs=[mk_block(parent=genesis.block, slot=0, coin=coin_new)],
+            coin=coin_orphan.evolve(),
+            orphaned_proofs=[orphan],
         )
         follower.on_block(block_0_1)
+
+        # since follower had not seen this orphan prior to being included as
+        # an orphan proof, it will be rejected
         assert follower.tip() == block_0_0
 
-        # the coin evolved twice should be accepted as the evolved coin is in the lead commitments
-        # at slot 1 and processed before that
-        block_0_2 = mk_block(
-            slot=2,
-            parent=block_0_0.id(),
-            coin=coin_new_new,
-            orphaned_proofs=[mk_block(parent=block_0_0.id(), slot=1, coin=coin_new)],
-        )
-        follower.on_block(block_0_2)
-        assert follower.tip() == block_0_2
+        # but all is fine if the follower first sees the orphan block, and then
+        # is imported into the main chain
+        follower.on_block(orphan)
+        follower.on_block(block_0_1)
+        assert follower.tip() == block_0_1

@@ -5,14 +5,39 @@ import itertools
 import numpy as np
 
 from .cryptarchia import Config, Coin, Slot
-from .test_common import mk_config, mk_genesis_state, TestNode
-
-# TODO: tests to implement
-# - sim. based test showing inferrer total stake converges to true total stake
-# - test that orphans are counted correctly
+from .test_common import mk_config, mk_genesis_state, mk_block, TestNode, Follower
 
 
 class TestStakeRelativization(TestCase):
+    def test_ledger_leader_counting(self):
+        coins = [Coin(sk=i, value=10) for i in range(2)]
+        c_a, c_b = coins
+
+        config = mk_config(coins)
+        genesis = mk_genesis_state(coins)
+
+        follower = Follower(genesis, config)
+
+        # initially, there are 0 leaders
+        assert follower.tip_state().leader_count == 0
+
+        # after a block, 1 leader has been observed
+        b1 = mk_block(genesis.block, slot=1, coin=c_a)
+        follower.on_block(b1)
+        assert follower.tip_state().leader_count == 1
+
+        # on fork, tip state is not updated
+        orphan = mk_block(genesis.block, slot=1, coin=c_b)
+        follower.on_block(orphan)
+        assert follower.tip_state().block == b1.id()
+        assert follower.tip_state().leader_count == 1
+
+        # after orphan is adopted, leader count should jumpy by 2 (each orphan counts as a leader)
+        b2 = mk_block(b1.id(), slot=2, coin=c_a.evolve(), orphaned_proofs=[orphan])
+        follower.on_block(b2)
+        assert follower.tip_state().block == b2.id()
+        assert follower.tip_state().leader_count == 3
+
     def test_inference_on_empty_genesis_epoch(self):
         coin = Coin(sk=0, value=10)
         config = mk_config([coin]).replace(
@@ -41,138 +66,88 @@ class TestStakeRelativization(TestCase):
         # and again, we should see inferred total stake drop by half in epoch 2 given no occupied slots in epoch 1
         assert epoch1_state.inferred_total_stake == 5
 
-    def test_fuzz_1(self):
-        np.random.seed(336)
+    def test_inferred_total_stake_close_to_true_total_stake(self):
+        PRINT_DEBUG = False
 
-        stake = np.array((np.random.pareto(10, 2) + 1) * 100, dtype=np.int64)
+        seed = 0
+        N = 3
+        EPOCHS = 2
+
+        np.random.seed(seed)
+
+        stake = np.array((np.random.pareto(10, N) + 1) * 1000, dtype=np.int64)
         coins = [Coin(sk=i, value=int(s)) for i, s in enumerate(stake)]
 
-        config = Config.cryptarchia_v0_0_1(stake.sum() * 2).replace(
-            k=1, active_slot_coeff=0.05
-        )
+        config = Config.cryptarchia_v0_0_1(stake.sum() * 2).replace(k=40)
         genesis = mk_genesis_state(coins)
 
         nodes = [TestNode(config, genesis, c) for c in coins]
 
-        T = config.epoch_length * 2
-        print("T=", T)
+        T = config.epoch_length * EPOCHS
         slot_leaders = np.zeros(T, dtype=np.int32)
         for slot in map(Slot, range(T)):
-            if slot == Slot(341):
-                import pdb
-
-                pdb.set_trace()
-
             proposed_blocks = [n.on_slot(slot) for n in nodes]
-            slot_leaders[slot.absolute_slot] = len(
-                proposed_blocks
-            ) - proposed_blocks.count(None)
-            # for node in nodes:
-            #     if block := node.on_slot(slot):
-            #         proposed_blocks += [block]
+            slot_leaders[slot.absolute_slot] = N - proposed_blocks.count(None)
 
             # now deliver the proposed blocks
             for n_idx, node in enumerate(nodes):
                 # shuffle proposed blocks to simulate random delivery
-                block_order = list(range(len(nodes)))
+                block_order = list(range(N))
                 np.random.shuffle(block_order)
                 for block_idx in block_order:
                     if block := proposed_blocks[block_idx]:
-                        print(f"{slot}: send {block_idx} -> {n_idx}")
                         node.on_block(block)
 
-        print(slot_leaders.sum(), [len(n.follower.ledger_state) for n in nodes])
-        assert all(
-            slot_leaders.sum() + 1 == len(n.follower.ledger_state) for n in nodes
-        )
-
-    def test_inferred_total_stake_close_to_true_total_stake(self):
-        # seed=52,  N=10, k=10 f=0.05 - invalid header
-        # seed=22,  N=3,  k=10 f=0.05 - invalid header
-        # seed=386, N=2,  k=5  f=0.05 - invalid header
-        # seed=278, N=2,  k=2  f=0.05 - missing parent block
-        # seed=543, N=2,  k=1  f=0.05 - crash: division by zero
-        # seed=336, N=2,  k=1  f=0.05 - missing parent block; invalid header
-        # seed=4,   N=2,  k=1, f=0.5  - invalid header
-
-        for seed in range(1000):
-            print("Trying seed", seed)
-            np.random.seed(seed)
-
-            stake = np.array((np.random.pareto(10, 2) + 1) * 100, dtype=np.int64)
-            coins = [Coin(sk=i, value=int(s)) for i, s in enumerate(stake)]
-
-            config = Config.cryptarchia_v0_0_1(stake.sum() * 2).replace(
-                k=1, active_slot_coeff=0.5
-            )
-            assert config.epoch_length == 20, f"{config.epoch_length}"
-            genesis = mk_genesis_state(coins)
-
-            nodes = [TestNode(config, genesis, c) for c in coins]
-
-            T = config.epoch_length * 2
-            print("T=", T)
-            slot_leaders = np.zeros(T, dtype=np.int32)
-            for slot in map(Slot, range(T)):
-                proposed_blocks = [n.on_slot(slot) for n in nodes]
-                slot_leaders[slot.absolute_slot] = len(
-                    proposed_blocks
-                ) - proposed_blocks.count(None)
-                # for node in nodes:
-                #     if block := node.on_slot(slot):
-                #         proposed_blocks += [block]
-
-                # now deliver the proposed blocks
-                for n_idx, node in enumerate(nodes):
-                    # shuffle proposed blocks to simulate random delivery
-                    block_order = list(range(len(nodes)))
-                    np.random.shuffle(block_order)
-                    for block_idx in block_order:
-                        if block := proposed_blocks[block_idx]:
-                            # print(f"{slot}: send {block_idx} -> {n_idx}")
-                            node.on_block(block)
-
-            if any(
-                slot_leaders.sum() + 1 != len(n.follower.ledger_state) for n in nodes
-            ):
-                print("Found broken seed", seed)
-                print(slot_leaders.sum(), [len(n.follower.ledger_state) for n in nodes])
-                break
+        # Instead of inspecting state of each node, we group the nodes by their
+        # tip, and select a representative for each group to inspect.
+        #
+        # This makes debugging with large number of nodes more maneagable.
 
         grouped_by_tip = _group_by(nodes, lambda n: n.follower.tip_id())
         for group in grouped_by_tip.values():
             ref_node = group[0]
             ref_epoch_state = ref_node.epoch_state(Slot(T))
             for node in group:
+                assert node.follower.tip_state() == ref_node.follower.tip_state()
                 assert node.epoch_state(Slot(T)) == ref_epoch_state
 
         reps = [g[0] for g in grouped_by_tip.values()]
 
-        print()
-        print("T", T)
-        print(
-            f"lottery stats mean={slot_leaders.mean():.2f} var={slot_leaders.var():.2f}"
-        )
-        print("true total stake\t", stake.sum())
-        print("D_0\t", config.initial_inferred_total_stake)
-        print(
-            f"D_{Slot(T).epoch(config).epoch}\t",
-            [r.epoch_state(Slot(T)).total_stake() for r in reps],
-        )
-        print("true leader count\t", slot_leaders.sum())
-        print(
-            "follower leader counts\t",
-            [r.follower.tip_state().leader_count for r in reps],
-        )
-
-        import pdb
-
-        pdb.set_trace()
-        for node in reps:
-            multiple_of_true_stake = (
-                node.epoch_state(Slot(T)).total_stake() / stake.sum()
+        if PRINT_DEBUG:
+            print()
+            print("seed", seed)
+            print(f"T={T}, EPOCHS={EPOCHS}")
+            print(
+                f"lottery stats mean={slot_leaders.mean():.3f} var={slot_leaders.var():.3f}"
             )
-            assert 0.97 < multiple_of_true_stake < 1, multiple_of_true_stake
+            print("true total stake\t", stake.sum())
+            print("D_0\t", config.initial_inferred_total_stake)
+            print(
+                f"D_{list(range(EPOCHS + 1))}\n\t",
+                "\n\t".join(
+                    [
+                        f"Rep {i}: {[r.epoch_state(Slot(e * config.epoch_length)).total_stake() for e in range(EPOCHS + 1)]}"
+                        for i, r in enumerate(reps)
+                    ]
+                ),
+            )
+            print("true leader count\t", slot_leaders.sum())
+            print(
+                "follower leader counts\t",
+                [r.follower.tip_state().leader_count for r in reps],
+            )
+
+        assert all(
+            slot_leaders.sum() + 1 == len(n.follower.ledger_state) for n in nodes
+        ), f"Expected={slot_leaders.sum() + 1} got={[len(n.follower.ledger_state) for n in nodes]}"
+
+        for node in reps:
+            inferred_stake = node.epoch_state(Slot(T)).total_stake()
+            pct_err = (
+                abs(stake.sum() - inferred_stake) / config.initial_inferred_total_stake
+            )
+            eps = (1 - config.total_stake_learning_rate) ** EPOCHS
+            assert pct_err < eps, f"pct_err={pct_err} < eps={eps}"
 
 
 def _group_by(iterable, key):
@@ -181,16 +156,3 @@ def _group_by(iterable, key):
     return {
         k: list(group) for k, group in itertools.groupby(sorted(iterable, key=key), key)
     }
-
-
-def run_in_parallel(task, params, workers=12):
-    from concurrent.futures.thread import ThreadPoolExecutor
-
-    def driver(pair):
-        i, p = pair
-        result = task(p)
-        return result
-
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        results = list(executor.map(driver, enumerate(params)))
-    return results
