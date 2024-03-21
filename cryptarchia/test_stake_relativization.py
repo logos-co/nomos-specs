@@ -41,7 +41,7 @@ class TestStakeRelativization(TestCase):
     def test_inference_on_empty_genesis_epoch(self):
         coin = Coin(sk=0, value=10)
         config = mk_config([coin]).replace(
-            initial_inferred_total_stake=20,
+            initial_total_stake=20,
             total_stake_learning_rate=0.5,
             active_slot_coeff=0.5,
         )
@@ -121,7 +121,7 @@ class TestStakeRelativization(TestCase):
                 f"lottery stats mean={slot_leaders.mean():.3f} var={slot_leaders.var():.3f}"
             )
             print("true total stake\t", stake.sum())
-            print("D_0\t", config.initial_inferred_total_stake)
+            print("D_0\t", config.initial_total_stake)
             print(
                 f"D_{list(range(EPOCHS + 1))}\n\t",
                 "\n\t".join(
@@ -143,9 +143,7 @@ class TestStakeRelativization(TestCase):
 
         for node in reps:
             inferred_stake = node.epoch_state(Slot(T)).total_stake()
-            pct_err = (
-                abs(stake.sum() - inferred_stake) / config.initial_inferred_total_stake
-            )
+            pct_err = abs(stake.sum() - inferred_stake) / config.initial_total_stake
             eps = (1 - config.total_stake_learning_rate) ** EPOCHS
             assert pct_err < eps, f"pct_err={pct_err} < eps={eps}"
 

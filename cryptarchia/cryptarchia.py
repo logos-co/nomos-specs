@@ -45,20 +45,20 @@ class Config:
     epoch_period_nonce_stabilization: int
 
     # -- Stake Relativization Params
-    initial_inferred_total_stake: int  # D_0
+    initial_total_stake: int  # D_0
     total_stake_learning_rate: int  # beta
 
     time: TimeConfig
 
     @staticmethod
-    def cryptarchia_v0_0_1(initial_inferred_total_stake) -> "Config":
+    def cryptarchia_v0_0_1(initial_total_stake) -> "Config":
         return Config(
             k=2160,
             active_slot_coeff=0.05,
             epoch_stake_distribution_stabilization=3,
             epoch_period_nonce_buffer=3,
             epoch_period_nonce_stabilization=4,
-            initial_inferred_total_stake=initial_inferred_total_stake,
+            initial_total_stake=initial_total_stake,
             total_stake_learning_rate=0.8,
             time=TimeConfig(
                 slot_duration=1,
@@ -387,7 +387,7 @@ class Follower:
             (Epoch(0), genesis_state.block): EpochState(
                 stake_distribution_snapshot=genesis_state,
                 nonce_snapshot=genesis_state,
-                inferred_total_stake=config.initial_inferred_total_stake,
+                inferred_total_stake=config.initial_total_stake,
             )
         }
 
@@ -591,7 +591,7 @@ class Follower:
             return EpochState(
                 stake_distribution_snapshot=self.genesis_state,
                 nonce_snapshot=self.genesis_state,
-                inferred_total_stake=self.config.initial_inferred_total_stake,
+                inferred_total_stake=self.config.initial_total_stake,
             )
 
         stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, chain)
