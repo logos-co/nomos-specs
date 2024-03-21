@@ -595,8 +595,10 @@ class Follower:
         if state := self.epoch_state.get((epoch, memo_block_id)):
             return state
 
+        # To update our inference of total stake, we need the prior estimate which
+        # was calculated last epoch. Thus we recurse here to retreive the previous
+        # estimate of total stake.
         prev_epoch = self.compute_epoch_state(epoch.prev(), chain)
-
         inferred_total_stake = self._infer_total_stake(
             prev_epoch, nonce_snapshot, stake_distribution_snapshot
         )
@@ -616,13 +618,17 @@ class Follower:
         nonce_snapshot: LedgerState,
         stake_distribution_snapshot: LedgerState,
     ):
-        # Compute inferred total stake from results of last epoch
+        # Infer total stake from empirical block production rate in last epoch
+
+        # Since we need a stable inference of total stake for the start of this epoch,
+        # we limit our look back period to the start of last epoch until when the nonce
+        # snapshot was taken.
         block_proposals_last_epoch = (
             nonce_snapshot.leader_count - stake_distribution_snapshot.leader_count
         )
-        expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
         T = self.config.epoch_relative_nonce_slot
         mean_blocks_per_slot = block_proposals_last_epoch / T
+        expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
         blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
         h = (
             self.config.total_stake_learning_rate
