@@ -90,3 +90,43 @@ class TestFullFlow(TestCase):
         ))
         original_blobs = list(self.dispersal._prepare_data(encoded_data))
         self.assertEqual(blobs, original_blobs)
+
+    def test_same_blob_multiple_indexes(self):
+        app_id = int.to_bytes(1)
+        indexes = [1, 2, 3]  # Different indexes to test with the same blob
+
+        # encoder
+        data = self.encoder_test.data
+        encoding_params = DAEncoderParams(column_count=self.n_nodes // 2, bytes_per_field_element=32)
+        encoded_data = DAEncoder(encoding_params).encode(data)
+
+        # mock send and await method with local verifiers
+        def __send_and_await_response(node: int, blob: DABlob):
+            node = self.api_nodes[int.from_bytes(node)]
+            return node.receive_blob(blob)
+
+        # inject mock send and await method
+        self.dispersal._send_and_await_response = __send_and_await_response
+        certificate = self.dispersal.disperse(encoded_data)
+
+        # Loop through each index and simulate dispersal with the same cert_id but different metadata
+        for index in indexes:
+            vid = VID(
+                certificate.id(),
+                Metadata(app_id, index)
+            )
+
+            # verifier
+            for node in self.api_nodes:
+                node.receive_cert(vid)
+
+        # Verify retrieval for each index
+        for index in indexes:
+            # Notice that we need to sort the api_nodes by their public key to have the blobs sorted in the same fashion
+            # as we do actually do dispersal.
+            blobs = list(chain.from_iterable(
+                node.read(app_id, [index])
+                for node in sorted(self.api_nodes, key=lambda n: bls_pop.SkToPk(n.verifier.sk))
+            ))
+            original_blobs = list(self.dispersal._prepare_data(encoded_data))
+            self.assertEqual(blobs, original_blobs, f"Failed at index {index}")
