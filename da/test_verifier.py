@@ -26,14 +26,12 @@ class TestVerifier(TestCase):
             )
         )
 
-    def test_build_attestation(self):
-        pass
-
     def test_verify(self):
         _ = TestEncoder()
         _.setUp()
         encoded_data = _.encoder.encode(_.data)
         for i, column in enumerate(encoded_data.chunked_data.columns):
+            verifier = DAVerifier(1987)
             da_blob = DABlob(
                 i,
                 Column(column),
@@ -43,4 +41,32 @@ class TestVerifier(TestCase):
                 encoded_data.row_commitments,
                 [row[i] for row in encoded_data.row_proofs],
             )
-            self.assertIsNotNone(self.verifier.verify(da_blob))
+            self.assertIsNotNone(verifier.verify(da_blob))
+
+    def test_verify_duplicated_blob(self):
+        _ = TestEncoder()
+        _.setUp()
+        encoded_data = _.encoder.encode(_.data)
+        columns = enumerate(encoded_data.chunked_data.columns)
+        i, column = next(columns)
+        da_blob = DABlob(
+            i,
+            Column(column),
+            encoded_data.column_commitments[i],
+            encoded_data.aggregated_column_commitment,
+            encoded_data.aggregated_column_proofs[i],
+            encoded_data.row_commitments,
+            [row[i] for row in encoded_data.row_proofs],
+        )
+        self.assertIsNotNone(self.verifier.verify(da_blob))
+        for i, column in columns:
+            da_blob = DABlob(
+                i,
+                Column(column),
+                encoded_data.column_commitments[i],
+                encoded_data.aggregated_column_commitment,
+                encoded_data.aggregated_column_proofs[i],
+                encoded_data.row_commitments,
+                [row[i] for row in encoded_data.row_proofs],
+            )
+            self.assertIsNone(self.verifier.verify(da_blob))

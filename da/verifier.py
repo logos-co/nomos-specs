@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from hashlib import sha3_256
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Set, Dict
 
 from eth2spec.deneb.mainnet import BLSFieldElement
 from eth2spec.eip7594.mainnet import (
@@ -9,6 +9,7 @@ from eth2spec.eip7594.mainnet import (
 )
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
+import da.common
 from da.common import Column, Chunk, Attestation, BLSPrivateKey
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
@@ -25,9 +26,16 @@ class DABlob:
     rows_commitments: List[Commitment]
     rows_proofs: List[Proof]
 
+    def id(self) -> bytes:
+        return da.common.build_attestation_message(self.aggregated_column_commitment, self.rows_commitments)
+
+    def column_id(self) -> bytes:
+        return sha3_256(self.column.as_bytes()).digest()
+
 
 class DAVerifier:
     def __init__(self, sk: BLSPrivateKey):
+        self.attested_blobs: Dict[bytes, (bytes, Attestation)] = dict()
         self.sk = sk
 
     @staticmethod
@@ -79,6 +87,15 @@ class DAVerifier:
         return Attestation(signature=bls_pop.Sign(self.sk, message))
 
     def verify(self, blob: DABlob) -> Optional[Attestation]:
+        blob_id = blob.id()
+        if previous_attestation := self.attested_blobs.get(blob_id):
+            column_id, attestation = previous_attestation
+            # we already attested, is cached so we return it
+            if column_id == blob.column_id():
+                return attestation
+            # we already attested and they are asking us to attest the same data different column
+            # skip
+            return None
         is_column_verified = DAVerifier._verify_column(
             blob.column,
             blob.column_commitment,
@@ -93,4 +110,6 @@ class DAVerifier:
         )
         if not are_chunks_verified:
             return
-        return self._build_attestation(blob)
+        attestation = self._build_attestation(blob)
+        self.attested_blobs[blob_id] = (blob.column_id(), attestation)
+        return attestation
