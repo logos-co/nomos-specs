@@ -7,13 +7,47 @@ from .cryptarchia import (
     BlockHeader,
     LedgerState,
     MockLeaderProof,
+    Leader,
+    Follower,
 )
 
 
-def mk_config() -> Config:
-    return Config.cryptarchia_v0_0_1().replace(
+class TestNode:
+    def __init__(self, config: Config, genesis: LedgerState, coin: Coin):
+        self.config = config
+        self.leader = Leader(coin=coin, config=config)
+        self.follower = Follower(genesis, config)
+
+    def epoch_state(self, slot: Slot):
+        return self.follower.compute_epoch_state(
+            slot.epoch(self.config), self.follower.local_chain
+        )
+
+    def on_slot(self, slot: Slot) -> BlockHeader | None:
+        parent = self.follower.tip_id()
+        epoch_state = self.epoch_state(slot)
+        if leader_proof := self.leader.try_prove_slot_leader(epoch_state, slot, parent):
+            orphans = self.follower.unimported_orphans(parent)
+            self.leader.coin = self.leader.coin.evolve()
+            return BlockHeader(
+                parent=parent,
+                slot=slot,
+                orphaned_proofs=orphans,
+                leader_proof=leader_proof,
+                content_size=0,
+                content_id=bytes(32),
+            )
+        return None
+
+    def on_block(self, block: BlockHeader):
+        self.follower.on_block(block)
+
+
+def mk_config(initial_stake_distribution: list[Coin]) -> Config:
+    initial_inferred_total_stake = sum(c.value for c in initial_stake_distribution)
+    return Config.cryptarchia_v0_0_1(initial_inferred_total_stake).replace(
         k=1,
-        active_slot_coeff=1.0,
+        active_slot_coeff=0.5,
     )
 
 
@@ -21,7 +55,6 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
     return LedgerState(
         block=bytes(32),
         nonce=bytes(32),
-        total_stake=sum(c.value for c in initial_stake_distribution),
         commitments_spend={c.commitment() for c in initial_stake_distribution},
         commitments_lead={c.commitment() for c in initial_stake_distribution},
         nullifiers=set(),

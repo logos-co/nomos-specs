@@ -4,17 +4,25 @@ from math import floor
 from copy import deepcopy
 from itertools import chain
 import functools
-
-# Please note this is still a work in progress
 from dataclasses import dataclass, field, replace
+import logging
+
+import numpy as np
+
+
+logger = logging.getLogger(__name__)
+
 
 Id: TypeAlias = bytes
 
 
-@dataclass
+@dataclass(frozen=True)
 class Epoch:
     # identifier of the epoch, counting incrementally from 0
     epoch: int
+
+    def prev(self) -> "Epoch":
+        return Epoch(self.epoch - 1)
 
 
 @dataclass
@@ -30,27 +38,34 @@ class Config:
     k: int  # The depth of a block before it is considered immutable.
     active_slot_coeff: float  # 'f', the rate of occupied slots
 
-    # The stake distribution is always taken at the beginning of the previous epoch.
+    # The stake distribution is taken at the beginning of the previous epoch.
     # This parameters controls how many slots to wait for it to be stabilized
-    # The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
+    # The value is computed as
+    #     epoch_stake_distribution_stabilization * int(floor(k / f))
     epoch_stake_distribution_stabilization: int
-    # This parameter controls how many slots we wait after the stake distribution
-    # snapshot has stabilized to take the nonce snapshot.
+    # This parameter controls how many `base periods` we wait after stake
+    # distribution snapshot has stabilized to take the nonce snapshot.
     epoch_period_nonce_buffer: int
-    # This parameter controls how many slots we wait for the nonce snapshot to be considered
-    # stabilized
+    # This parameter controls how many `base periods` we wait for the nonce
+    # snapshot to be considered stabilized
     epoch_period_nonce_stabilization: int
+
+    # -- Stake Relativization Params
+    initial_total_active_stake: int  # D_0
+    total_active_stake_learning_rate: int  # beta
 
     time: TimeConfig
 
     @staticmethod
-    def cryptarchia_v0_0_1() -> "Config":
+    def cryptarchia_v0_0_1(initial_total_active_stake) -> "Config":
         return Config(
             k=2160,
             active_slot_coeff=0.05,
             epoch_stake_distribution_stabilization=3,
             epoch_period_nonce_buffer=3,
             epoch_period_nonce_stabilization=4,
+            initial_total_active_stake=initial_total_active_stake,
+            total_active_stake_learning_rate=0.8,
             time=TimeConfig(
                 slot_duration=1,
                 chain_start_time=0,
@@ -62,18 +77,23 @@ class Config:
         return int(floor(self.k / self.active_slot_coeff))
 
     @property
+    def epoch_relative_nonce_slot(self) -> int:
+        return (
+            self.epoch_stake_distribution_stabilization + self.epoch_period_nonce_buffer
+        ) * self.base_period_length
+
+    @property
     def epoch_length(self) -> int:
         return (
-            self.epoch_stake_distribution_stabilization
-            + self.epoch_period_nonce_buffer
-            + self.epoch_period_nonce_stabilization
-        ) * self.base_period_length
+            self.epoch_relative_nonce_slot
+            + self.epoch_period_nonce_stabilization * self.base_period_length
+        )
 
     @property
     def s(self):
         """
-        The Security Paramater. This paramter controls how many slots one must wait before we
-        have high confidence that k blocks have been produced.
+        The Security Paramater. This paramter controls how many slots one must
+        wait before we have high confidence that k blocks have been produced.
         """
         return self.base_period_length * 3
 
@@ -258,11 +278,14 @@ class LedgerState:
     """
 
     block: Id = None
-    # This nonce is used to derive the seed for the slot leader lottery
-    # It's updated at every block by hashing the previous nonce with the nullifier
-    # Note that this does not prevent nonce grinding at the last slot before the nonce snapshot
+
+    # This nonce is used to derive the seed for the slot leader lottery.
+    # It's updated at every block by hashing the previous nonce with the
+    # leader proof's nullifier.
+    #
+    # NOTE that this does not prevent nonce grinding at the last slot
+    # when the nonce snapshot is taken
     nonce: Id = None
-    total_stake: int = None
 
     # set of commitments
     commitments_spend: set[Id] = field(default_factory=set)
@@ -273,15 +296,23 @@ class LedgerState:
     # set of nullified coins
     nullifiers: set[Id] = field(default_factory=set)
 
+    # -- Stake Relativization State
+    # The number of observed leaders (blocks + orphans), this measurement is
+    # used in inferring total active stake in the network.
+    leader_count: int = 0
+
     def copy(self):
         return LedgerState(
             block=self.block,
             nonce=self.nonce,
-            total_stake=self.total_stake,
             commitments_spend=deepcopy(self.commitments_spend),
             commitments_lead=deepcopy(self.commitments_lead),
             nullifiers=deepcopy(self.nullifiers),
+            leader_count=self.leader_count,
         )
+
+    def replace(self, **kwarg) -> "LedgerState":
+        return replace(self, **kwarg)
 
     def verify_eligible_to_spend(self, commitment: Id) -> bool:
         return commitment in self.commitments_spend
@@ -304,10 +335,13 @@ class LedgerState:
         self.nonce = h.digest()
         self.block = block.id()
         for proof in chain(block.orphaned_proofs, [block]):
-            proof = proof.leader_proof
-            self.nullifiers.add(proof.nullifier)
-            self.commitments_spend.add(proof.evolved_commitment)
-            self.commitments_lead.add(proof.evolved_commitment)
+            self.apply_leader_proof(proof.leader_proof)
+
+    def apply_leader_proof(self, proof: MockLeaderProof):
+        self.nullifiers.add(proof.nullifier)
+        self.commitments_spend.add(proof.evolved_commitment)
+        self.commitments_lead.add(proof.evolved_commitment)
+        self.leader_count += 1
 
 
 @dataclass
@@ -315,25 +349,33 @@ class EpochState:
     # for details of snapshot schedule please see:
     # https://github.com/IntersectMBO/ouroboros-consensus/blob/fe245ac1d8dbfb563ede2fdb6585055e12ce9738/docs/website/contents/for-developers/Glossary.md#epoch-structure
 
-    # The stake distribution snapshot is taken at the beginning of the previous epoch
+    # Stake distribution snapshot is taken at the start of the previous epoch
     stake_distribution_snapshot: LedgerState
 
-    # The nonce snapshot is taken 7k/f slots into the previous epoch
+    # Nonce snapshot is taken 6k/f slots into the previous epoch
     nonce_snapshot: LedgerState
+
+    # Total stake is inferred from watching block production rate over the past
+    # epoch. This inferred total stake is used to relativize stake values in the
+    # leadership lottery.
+    inferred_total_active_stake: int
 
     def verify_eligible_to_lead_due_to_age(self, commitment: Id) -> bool:
         # A coin is eligible to lead if it was committed to before the the stake
-        # distribution snapshot was taken or it was produced by a leader proof since the snapshot was taken.
+        # distribution snapshot was taken or it was produced by a leader proof
+        # since the snapshot was taken.
         #
         # This verification is checking that first condition.
         #
         # NOTE: `ledger_state.commitments_spend` is a super-set of `ledger_state.commitments_lead`
-
         return self.stake_distribution_snapshot.verify_eligible_to_spend(commitment)
 
-    def total_stake(self) -> int:
-        """Returns the total stake that will be used to reletivize leadership proofs during this epoch"""
-        return self.stake_distribution_snapshot.total_stake
+    def total_active_stake(self) -> int:
+        """
+        Returns the inferred total stake participating in consensus.
+        Total active stake is used to reletivize a coin's value in leadership proofs.
+        """
+        return self.inferred_total_active_stake
 
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
@@ -346,53 +388,75 @@ class Follower:
         self.local_chain = Chain([], genesis=genesis_state.block)
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block: genesis_state.copy()}
+        self.epoch_state = {}
 
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
         # TODO: verify blocks are not in the 'future'
-        current_state = self.ledger_state[chain.tip_id()].copy()
-        orphaned_commitments = set()
+        if block.parent != chain.tip_id():
+            logger.warning("block parent is not chain tip")
+            return False
+
+        current_state = self.ledger_state[block.parent].copy()
+
         # first, we verify adopted leadership transactions
-        for proof in block.orphaned_proofs:
-            proof = proof.leader_proof
-            # each proof is validated against the last state of the ledger of the chain this block
-            # is being added to before that proof slot
-            parent_state = self.state_at_slot_beginning(chain, proof.slot).copy()
-            # we add effects of previous orphaned proofs to the ledger state
-            parent_state.commitments_lead |= orphaned_commitments
-            epoch_state = self.compute_epoch_state(proof.slot.epoch(self.config), chain)
-            if self.verify_slot_leader(
-                proof.slot, proof, epoch_state, parent_state, current_state
-            ):
-                # if an adopted leadership proof is valid we need to apply its effects to the ledger state
-                orphaned_commitments.add(proof.evolved_commitment)
-                current_state.nullifiers.add(proof.nullifier)
-            else:
-                # otherwise, the whole block is invalid
+        for orphan in block.orphaned_proofs:
+            # orphan proofs are checked in two ways
+            # 1. ensure they are valid locally in their original branch
+            # 2. ensure it does not conflict with current state
+
+            # We take a shortcut for (1.) by restricting orphans to proofs we've
+            # already processed in other branches.
+            if orphan.id() not in self.ledger_state:
+                logger.warning("missing orphan proof")
                 return False
 
-        parent_state = self.ledger_state[block.parent].copy()
-        parent_state.commitments_lead |= orphaned_commitments
+            # we use the proposed block epoch state here instead of the orphan's
+            # epoch state. For very old orphans, these states may be different.
+            epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
+
+            # (2.) is satisfied by verifying the proof against current state ensuring:
+            # - it is a valid proof
+            # - and the nullifier has not already been spent
+            if not self.verify_slot_leader(
+                orphan.slot,
+                orphan.parent,
+                orphan.leader_proof,
+                epoch_state,
+                current_state,
+            ):
+                logger.warning("invalid orphan proof")
+                return False
+
+            # if an adopted leadership proof is valid we need to apply its
+            # effects to the ledger state
+            current_state.apply_leader_proof(orphan.leader_proof)
+
         epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
         # TODO: this is not the full block validation spec, only slot leader is verified
         return self.verify_slot_leader(
-            block.slot, block.leader_proof, epoch_state, parent_state, current_state
+            block.slot,
+            block.parent,
+            block.leader_proof,
+            epoch_state,
+            current_state,
         )
 
     def verify_slot_leader(
         self,
         slot: Slot,
+        parent: Id,
         proof: MockLeaderProof,
         # coins are old enough if their commitment is in the stake distribution snapshot
         epoch_state: EpochState,
-        # commitments derived from leadership coin evolution are checked in the parent state
-        parent_state: LedgerState,
-        # nullifiers are checked in the current state
+        # nullifiers (and commitments) are checked against the current state.
+        # For now, we assume proof parent state and current state are identical.
+        # This will change once we start putting merkle roots in headers
         current_state: LedgerState,
     ) -> bool:
         return (
-            proof.verify(slot, parent_state.block)  # verify slot leader proof
+            proof.verify(slot, parent)  # verify slot leader proof
             and (
-                parent_state.verify_eligible_to_lead(proof.commitment)
+                current_state.verify_eligible_to_lead(proof.commitment)
                 or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
             )
             and current_state.verify_unspent(proof.nullifier)
@@ -405,7 +469,7 @@ class Follower:
             return self.local_chain
 
         for chain in self.forks:
-            if chain.tip().id() == block.parent:
+            if chain.tip_id() == block.parent:
                 return chain
 
         return None
@@ -436,24 +500,51 @@ class Follower:
             if new_chain is not None:
                 self.forks.append(new_chain)
             else:
+                logger.warning("missing parent block")
                 # otherwise, we're missing the parent block
                 # in that case, just ignore the block
                 return
 
         if not self.validate_header(block, new_chain):
+            logger.warning("invalid header")
             return
 
         new_chain.blocks.append(block)
 
         # We may need to switch forks, lets run the fork choice rule to check.
         new_chain = self.fork_choice()
-        self.local_chain = new_chain
+        if new_chain != self.local_chain:
+            self.forks.remove(new_chain)
+            self.forks.append(self.local_chain)
+            self.local_chain = new_chain
 
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
 
-    # Evaluate the fork choice rule and return the block header of the block that should be the head of the chain
+    def unimported_orphans(self, tip: Id) -> list[BlockHeader]:
+        """
+        Returns all unimported orphans w.r.t. the given tip's state.
+        Orphans are returned in the order that they should be imported.
+        """
+        tip_state = self.ledger_state[tip].copy()
+
+        orphans = []
+        for fork in [self.local_chain, *self.forks]:
+            if fork.block_position(tip) is not None:
+                # the tip is a member of this fork, it doesn't make sense
+                # to take orphans from this fork as they are all already "imported"
+                continue
+
+            for block in fork.blocks:
+                for b in [*block.orphaned_proofs, block]:
+                    if b.leader_proof.nullifier not in tip_state.nullifiers:
+                        tip_state.nullifiers.add(b.leader_proof.nullifier)
+                        orphans += [b]
+
+        return orphans
+
+    # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Chain:
         return maxvalid_bg(
             self.local_chain, self.forks, k=self.config.k, s=self.config.s
@@ -463,10 +554,7 @@ class Follower:
         return self.local_chain.tip()
 
     def tip_id(self) -> Id:
-        if self.local_chain.length() > 0:
-            return self.local_chain.tip().id()
-        else:
-            return self.genesis_state.block
+        return self.local_chain.tip_id()
 
     def tip_state(self) -> LedgerState:
         return self.ledger_state[self.tip_id()]
@@ -478,28 +566,81 @@ class Follower:
 
         return self.genesis_state
 
-    def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
+    def epoch_start_slot(self, epoch) -> Slot:
+        return Slot(epoch.epoch * self.config.epoch_length)
+
+    def stake_distribution_snapshot(self, epoch, chain):
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
-        stake_snapshot_slot = Slot((epoch.epoch - 1) * self.config.epoch_length)
-        stake_distribution_snapshot = self.state_at_slot_beginning(
-            chain, stake_snapshot_slot
-        )
+        slot = Slot(epoch.prev().epoch * self.config.epoch_length)
+        return self.state_at_slot_beginning(chain, slot)
 
-        nonce_slot = Slot(
-            self.config.base_period_length
-            * (
-                self.config.epoch_stake_distribution_stabilization
-                + self.config.epoch_period_nonce_buffer
+    def nonce_snapshot(self, epoch, chain):
+        # nonce snapshot happens partway through the previous epoch after the
+        # stake distribution has stabilized
+        slot = Slot(
+            self.config.epoch_relative_nonce_slot
+            + self.epoch_start_slot(epoch.prev()).absolute_slot
+        )
+        return self.state_at_slot_beginning(chain, slot)
+
+    def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
+        if epoch.epoch == 0:
+            return EpochState(
+                stake_distribution_snapshot=self.genesis_state,
+                nonce_snapshot=self.genesis_state,
+                inferred_total_active_stake=self.config.initial_total_active_stake,
             )
-            + stake_snapshot_slot.absolute_slot
-        )
-        nonce_snapshot = self.state_at_slot_beginning(chain, nonce_slot)
 
-        return EpochState(
+        stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, chain)
+        nonce_snapshot = self.nonce_snapshot(epoch, chain)
+
+        # we memoize epoch states to avoid recursion killing our performance
+        memo_block_id = nonce_snapshot.block
+        if state := self.epoch_state.get((epoch, memo_block_id)):
+            return state
+
+        # To update our inference of total stake, we need the prior estimate which
+        # was calculated last epoch. Thus we recurse here to retreive the previous
+        # estimate of total stake.
+        prev_epoch = self.compute_epoch_state(epoch.prev(), chain)
+        inferred_total_active_stake = self._infer_total_active_stake(
+            prev_epoch, nonce_snapshot, stake_distribution_snapshot
+        )
+
+        state = EpochState(
             stake_distribution_snapshot=stake_distribution_snapshot,
             nonce_snapshot=nonce_snapshot,
+            inferred_total_active_stake=inferred_total_active_stake,
         )
+
+        self.epoch_state[(epoch, memo_block_id)] = state
+        return state
+
+    def _infer_total_active_stake(
+        self,
+        prev_epoch: EpochState,
+        nonce_snapshot: LedgerState,
+        stake_distribution_snapshot: LedgerState,
+    ):
+        # Infer total stake from empirical block production rate in last epoch
+
+        # Since we need a stable inference of total stake for the start of this epoch,
+        # we limit our look back period to the start of last epoch until when the nonce
+        # snapshot was taken.
+        block_proposals_last_epoch = (
+            nonce_snapshot.leader_count - stake_distribution_snapshot.leader_count
+        )
+        T = self.config.epoch_relative_nonce_slot
+        mean_blocks_per_slot = block_proposals_last_epoch / T
+        expected_blocks_per_slot = np.log(1 / (1 - self.config.active_slot_coeff))
+        blocks_per_slot_err = expected_blocks_per_slot - mean_blocks_per_slot
+        h = (
+            self.config.total_active_stake_learning_rate
+            * prev_epoch.inferred_total_active_stake
+            / expected_blocks_per_slot
+        )
+        return int(prev_epoch.inferred_total_active_stake - h * blocks_per_slot_err)
 
 
 def phi(f: float, alpha: float) -> float:
@@ -514,7 +655,7 @@ def phi(f: float, alpha: float) -> float:
 
 
 class MOCK_LEADER_VRF:
-    """NOT SECURE: A mock VRF function where the sk and pk are assummed to be the same"""
+    """NOT SECURE: A mock VRF function"""
 
     ORDER = 2**256
 
@@ -545,15 +686,8 @@ class Leader:
         if self._is_slot_leader(epoch, slot):
             return MockLeaderProof.new(self.coin, slot, parent)
 
-    def propose_block(
-        self, slot: Slot, parent: BlockHeader, orphaned_proofs=[]
-    ) -> BlockHeader:
-        return BlockHeader(
-            parent=parent.id(), slot=slot, orphaned_proofs=orphaned_proofs
-        )
-
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
-        relative_stake = self.coin.value / epoch.total_stake()
+        relative_stake = self.coin.value / epoch.total_active_stake()
 
         r = MOCK_LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
 
