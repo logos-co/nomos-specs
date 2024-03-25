@@ -1,5 +1,7 @@
 from unittest import TestCase
 
+from py_ecc.bls import G2ProofOfPossession as bls_pop
+
 from da.common import Column
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
@@ -11,7 +13,7 @@ from da.verifier import Attestation, DAVerifier, DABlob
 class TestVerifier(TestCase):
 
     def setUp(self):
-        self.verifier = DAVerifier(1987)
+        self.verifier = DAVerifier(1987, [bls_pop.SkToPk(1987)])
 
     def test_verify_column(self):
         column = Column(int.to_bytes(i, length=32) for i in range(8))
@@ -30,10 +32,11 @@ class TestVerifier(TestCase):
         _ = TestEncoder()
         _.setUp()
         encoded_data = _.encoder.encode(_.data)
+        verifiers_sk = [i for i in range(1000, 1000+len(encoded_data.chunked_data[0]))]
+        vefiers_pk = [bls_pop.SkToPk(k) for k in verifiers_sk]
         for i, column in enumerate(encoded_data.chunked_data.columns):
-            verifier = DAVerifier(1987)
+            verifier = DAVerifier(verifiers_sk[i], vefiers_pk)
             da_blob = DABlob(
-                i,
                 Column(column),
                 encoded_data.column_commitments[i],
                 encoded_data.aggregated_column_commitment,
@@ -50,7 +53,6 @@ class TestVerifier(TestCase):
         columns = enumerate(encoded_data.chunked_data.columns)
         i, column = next(columns)
         da_blob = DABlob(
-            i,
             Column(column),
             encoded_data.column_commitments[i],
             encoded_data.aggregated_column_commitment,
@@ -61,7 +63,6 @@ class TestVerifier(TestCase):
         self.assertIsNotNone(self.verifier.verify(da_blob))
         for i, column in columns:
             da_blob = DABlob(
-                i,
                 Column(column),
                 encoded_data.column_commitments[i],
                 encoded_data.aggregated_column_commitment,
