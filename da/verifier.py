@@ -10,7 +10,7 @@ from eth2spec.eip7594.mainnet import (
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
 import da.common
-from da.common import Column, Chunk, Attestation, BLSPrivateKey
+from da.common import Column, Chunk, Attestation, BLSPrivateKey, BLSPublicKey
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import ROOTS_OF_UNITY, GLOBAL_PARAMETERS, BLS_MODULUS
@@ -18,7 +18,6 @@ from da.kzg_rs.common import ROOTS_OF_UNITY, GLOBAL_PARAMETERS, BLS_MODULUS
 
 @dataclass
 class DABlob:
-    index: int
     column: Column
     column_commitment: Commitment
     aggregated_column_commitment: Commitment
@@ -34,9 +33,10 @@ class DABlob:
 
 
 class DAVerifier:
-    def __init__(self, sk: BLSPrivateKey):
+    def __init__(self, sk: BLSPrivateKey, nodes_pks: List[BLSPublicKey]):
         self.attested_blobs: Dict[bytes, (bytes, Attestation)] = dict()
         self.sk = sk
+        self.index = nodes_pks.index(bls_pop.SkToPk(self.sk))
 
     @staticmethod
     def _verify_column(
@@ -101,12 +101,12 @@ class DAVerifier:
             blob.column_commitment,
             blob.aggregated_column_commitment,
             blob.aggregated_column_proof,
-            blob.index
+            self.index
         )
         if not is_column_verified:
             return
         are_chunks_verified = DAVerifier._verify_chunks(
-            blob.column, blob.rows_commitments, blob.rows_proofs, blob.index
+            blob.column, blob.rows_commitments, blob.rows_proofs, self.index
         )
         if not are_chunks_verified:
             return

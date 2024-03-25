@@ -16,6 +16,10 @@ class TestDispersal(TestCase):
         self.nodes_ids = [NodeId(x.to_bytes(length=32, byteorder='big')) for x in range(self.n_nodes)]
         self.secret_keys = list(range(1, self.n_nodes+1))
         self.public_keys = [bls_pop.SkToPk(sk) for sk in self.secret_keys]
+        # sort by pk as we do in dispersal
+        self.secret_keys, self.public_keys = zip(
+            *sorted(zip(self.secret_keys, self.public_keys), key=lambda x: x[1])
+        )
         dispersal_settings = DispersalSettings(
             self.nodes_ids,
             self.public_keys,
@@ -56,7 +60,7 @@ class TestDispersal(TestCase):
         # mock send and await method with local verifiers
         def __send_and_await_response(node: NodeId, blob: DABlob):
             sk = self.secret_keys[int.from_bytes(node)]
-            verifier = DAVerifier(sk)
+            verifier = DAVerifier(sk, self.public_keys)
             return verifier.verify(blob)
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response

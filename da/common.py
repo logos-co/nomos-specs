@@ -34,7 +34,7 @@ class ChunksMatrix(List[Row | Column]):
         return ChunksMatrix(self.columns)
 
 
-BLSPublickey = bytes
+BLSPublicKey = bytes
 BLSPrivateKey = int
 BLSSignature = bytes
 
@@ -58,7 +58,7 @@ class Certificate:
     def id(self) -> bytes:
         return build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
 
-    def verify(self, nodes_public_keys: List[BLSPublickey]) -> bool:
+    def verify(self, nodes_public_keys: List[BLSPublicKey]) -> bool:
         """
         List of nodes public keys should be a trusted list of verified proof of possession keys.
         Otherwise, we could fall under the Rogue Key Attack

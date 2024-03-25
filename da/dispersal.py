@@ -4,7 +4,7 @@ from typing import List, Optional, Generator, Sequence
 
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
-from da.common import Certificate, NodeId, BLSPublickey, Bitfield, build_attestation_message
+from da.common import Certificate, NodeId, BLSPublicKey, Bitfield, build_attestation_message
 from da.encoder import EncodedData
 from da.verifier import DABlob, Attestation
 
@@ -12,7 +12,7 @@ from da.verifier import DABlob, Attestation
 @dataclass
 class DispersalSettings:
     nodes_ids: List[NodeId]
-    nodes_pubkey: List[BLSPublickey]
+    nodes_pubkey: List[BLSPublicKey]
     threshold: int
 
 
@@ -33,10 +33,9 @@ class Dispersal:
         rows_proofs = encoded_data.row_proofs
         aggregated_column_commitment = encoded_data.aggregated_column_commitment
         aggregated_column_proofs = encoded_data.aggregated_column_proofs
-        blobs_data = enumerate(zip(columns, column_commitments, zip(*rows_proofs), aggregated_column_proofs))
-        for index, (column, column_commitment, row_proofs, column_proof) in blobs_data:
+        blobs_data = zip(columns, column_commitments, zip(*rows_proofs), aggregated_column_proofs)
+        for (column, column_commitment, row_proofs, column_proof) in blobs_data:
             blob = DABlob(
-                index,
                 column,
                 column_commitment,
                 aggregated_column_commitment,
@@ -66,7 +65,7 @@ class Dispersal:
         )
 
     @staticmethod
-    def _verify_attestation(public_key: BLSPublickey, attested_message: bytes, attestation: Attestation) -> bool:
+    def _verify_attestation(public_key: BLSPublicKey, attested_message: bytes, attestation: Attestation) -> bool:
         return bls_pop.Verify(public_key, attested_message, attestation.signature)
 
     @staticmethod

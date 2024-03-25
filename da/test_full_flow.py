@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from py_ecc.bls import G2ProofOfPossession as bls_pop
 
-from da.common import NodeId, build_attestation_message
+from da.common import NodeId, build_attestation_message, BLSPublicKey
 from da.api.common import DAApi, VID, Metadata
 from da.verifier import DAVerifier, DABlob 
 from da.api.test_flow import MockStore
@@ -14,10 +14,10 @@ from da.encoder import DAEncoderParams, DAEncoder
 
 
 class DAVerifierWApi:
-    def __init__(self, sk: int):
+    def __init__(self, sk: int, public_keys: List[BLSPublicKey]):
         self.store = MockStore()
         self.api = DAApi(self.store)
-        self.verifier = DAVerifier(sk)
+        self.verifier = DAVerifier(sk, public_keys)
 
     def receive_blob(self, blob: DABlob):
         if attestation := self.verifier.verify(blob):
@@ -43,6 +43,10 @@ class TestFullFlow(TestCase):
         self.nodes_ids = [NodeId(x.to_bytes(length=32, byteorder='big')) for x in range(self.n_nodes)]
         self.secret_keys = list(range(1, self.n_nodes+1))
         self.public_keys = [bls_pop.SkToPk(sk) for sk in self.secret_keys]
+        # sort by pk as we do in dispersal
+        self.secret_keys, self.public_keys = zip(
+            *sorted(zip(self.secret_keys, self.public_keys), key=lambda x: x[1])
+        )
         dispersal_settings = DispersalSettings(
             self.nodes_ids,
             self.public_keys,
@@ -52,7 +56,7 @@ class TestFullFlow(TestCase):
         self.encoder_test = TestEncoder()
         self.encoder_test.setUp()
 
-        self.api_nodes = [DAVerifierWApi(k) for k in self.secret_keys]
+        self.api_nodes = [DAVerifierWApi(k, self.public_keys) for k in self.secret_keys]
 
     def test_full_flow(self):
         app_id = int.to_bytes(1)
