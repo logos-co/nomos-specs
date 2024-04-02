@@ -1,10 +1,10 @@
-from typing import Sequence
+from typing import Sequence, Optional
 
 from eth2spec.deneb.mainnet import BLSFieldElement
 from .common import BLS_MODULUS
 from .poly import Polynomial
 
-ExtendedData = Sequence[BLSFieldElement]
+ExtendedData = Sequence[Optional[BLSFieldElement]]
 
 
 def encode(polynomial: Polynomial, factor: int, roots_of_unity: Sequence[int]) -> ExtendedData:
@@ -35,5 +35,6 @@ def decode(encoded: ExtendedData, roots_of_unity: Sequence[BLSFieldElement], ori
     Returns:
         Polynomial: original polynomial
     """
+    encoded, roots_of_unity = zip(*((point, root) for point, root in zip(encoded, roots_of_unity) if point is not None))
     coefs = Polynomial.interpolate(list(map(int, encoded)), list(map(int, roots_of_unity)))[:original_len]
     return Polynomial([int(c) for c in coefs], BLS_MODULUS)
