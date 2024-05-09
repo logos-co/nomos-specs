@@ -7,3 +7,4 @@ pysphinx==0.0.1
 scipy==1.11.4
 black==23.12.1
 sympy==1.12
+simpy==4.1.1
