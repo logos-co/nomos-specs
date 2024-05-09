@@ -1,13 +1,22 @@
-from mixnet.v2.sim.node import Node
-from mixnet.v2.sim.simulation import Simulation
+import random
+
+import simpy
 
 
 class P2p:
-    def __init__(self, sim: Simulation, nodes: list[Node]):
-        self.sim = sim
-        self.nodes = nodes
+    def __init__(self, env: simpy.Environment):
+        self.env = env
+        self.nodes = []
+
+    def add_node(self, nodes):
+        self.nodes.extend(nodes)
 
     def broadcast(self, msg):
+        print("Broadcasting a message at time %d" % self.env.now)
+        yield self.env.timeout(1)
         # TODO: gossipsub or something similar
         for node in self.nodes:
-            self.sim.env.process(node.receive_message(msg))
+            self.env.process(node.receive_message(msg))
+
+    def get_nodes(self, n: int):
+        return random.choices(self.nodes, k=n)
