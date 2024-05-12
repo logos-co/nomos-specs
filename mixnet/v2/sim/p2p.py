@@ -2,7 +2,7 @@ import random
 
 import simpy
 
-from mixnet.v2.sim.sphinx import SphinxPacket
+from sphinx import SphinxPacket
 
 
 class P2p:

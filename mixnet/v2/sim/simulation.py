@@ -1,7 +1,7 @@
 import simpy
 
-from mixnet.v2.sim.node import Node
-from mixnet.v2.sim.p2p import P2p
+from node import Node
+from p2p import P2p
 
 
 class Simulation:
