@@ -8,7 +8,7 @@ class Simulation:
     def __init__(self):
         self.env = simpy.Environment()
         self.p2p = P2p(self.env)
-        self.nodes = [Node(str(i), self.env, self.p2p) for i in range(2)]
+        self.nodes = [Node(i, self.env, self.p2p) for i in range(2)]
         self.p2p.add_node(self.nodes)
 
     def run(self, until):
