@@ -9,18 +9,18 @@ from p2p import P2p
 
 
 class Node:
-    N_MIXES_IN_PATH = 2
     INCENTIVE_TX_SIZE = 512
     REAL_PAYLOAD = b"BLOCK"
     COVER_PAYLOAD = b"COVER"
     PADDING_SEPARATOR = b'\x01'
 
-    def __init__(self, id: int, env: simpy.Environment, p2p: P2p):
+    def __init__(self, id: int, env: simpy.Environment, p2p: P2p, num_mix_layers: int):
         self.id = id
         self.env = env
         self.p2p = p2p
         self.private_key = X25519PrivateKey.generate()
         self.public_key = self.private_key.public_key()
+        self.num_mix_layers = num_mix_layers
         self.action = self.env.process(self.send_message())
 
     def send_message(self):
@@ -31,7 +31,7 @@ class Node:
             msg = self.create_message()
             # TODO: Use the realistic cover traffic emission rate
             yield self.env.timeout(2)
-            print("Sending a message at time %d" % self.env.now)
+            self.log("Sending a message to the mixnet")
             self.env.process(self.p2p.broadcast(msg))
 
     def create_message(self) -> SphinxPacket:
@@ -39,7 +39,7 @@ class Node:
         Creates a message using the Sphinx format
         @return:
         """
-        mixes = self.p2p.get_nodes(self.N_MIXES_IN_PATH)
+        mixes = self.p2p.get_nodes(self.num_mix_layers)
         public_keys = [mix.public_key for mix in mixes]
         # TODO: replace with realistic tx
         incentive_txs = [Node.create_incentive_tx(mix.public_key) for mix in mixes]
