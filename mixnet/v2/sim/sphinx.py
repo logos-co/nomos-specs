@@ -18,7 +18,7 @@ class SphinxPacket:
     def __bytes__(self):
         return bytes(self.header) + self.payload
 
-    def size(self) -> int:
+    def __len__(self):
         return len(bytes(self))
 
     def unwrap(self, private_key: X25519PrivateKey) -> tuple[SphinxPacket, Attachment]:

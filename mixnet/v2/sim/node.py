@@ -12,6 +12,7 @@ class Node:
     N_MIXES_IN_PATH = 2
     REAL_PAYLOAD = b"BLOCK"
     COVER_PAYLOAD = b"COVER"
+    INCENTIVE_TX_SIZE = 512
 
     def __init__(self, id: int, env: simpy.Environment, p2p: P2p):
         self.id = id
@@ -67,10 +68,12 @@ class Node:
         else:
             self.log("Received original message: %s" % msg)
 
+    # TODO: This is a dummy logic
     @classmethod
     def create_incentive_tx(cls, mix_public_key: X25519PublicKey) -> Attachment:
-        return Attachment(
-            mix_public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw))
+        public_key = mix_public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
+        public_key += bytes(cls.INCENTIVE_TX_SIZE - len(public_key))
+        return Attachment(public_key)
 
     def is_my_incentive_tx(self, tx: Attachment) -> bool:
         return tx == Node.create_incentive_tx(self.public_key)

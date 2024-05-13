@@ -15,7 +15,7 @@ class P2p:
 
     # TODO: This should accept only bytes, but SphinxPacket is also accepted until we implement the Sphinx serde
     def broadcast(self, msg: SphinxPacket | bytes):
-        self.log("Broadcasting a msg")
+        self.log("Broadcasting a msg: %d bytes" % len(msg))
         yield self.env.timeout(1)
         # TODO: gossipsub or something similar
         for node in self.nodes:
