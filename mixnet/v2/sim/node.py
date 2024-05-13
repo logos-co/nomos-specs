@@ -28,6 +28,7 @@ class Node:
         """
         while True:
             msg = self.create_message()
+            # TODO: Use cover traffic emission rate
             yield self.env.timeout(2)
             print("Sending a message at time %d" % self.env.now)
             self.env.process(self.p2p.broadcast(msg))
