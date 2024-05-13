@@ -13,6 +13,7 @@ class Node:
     INCENTIVE_TX_SIZE = 512
     REAL_PAYLOAD = b"BLOCK"
     COVER_PAYLOAD = b"COVER"
+    PADDING_SEPARATOR = b'\x01'
 
     def __init__(self, id: int, env: simpy.Environment, p2p: P2p):
         self.id = id
@@ -60,7 +61,12 @@ class Node:
                 self.log("Receiving SphinxPacket. It's mine!")
                 if msg.is_all_unwrapped():
                     if msg.payload == self.REAL_PAYLOAD:
-                        self.env.process(self.p2p.broadcast(msg.payload))
+                        # Pad the final msg to the same size as a SphinxPacket,
+                        # assuming that the final msg is going to be sent via secure channels (TLS, Noise, etc.)
+                        final_padded_msg = (msg.payload
+                                            + self.PADDING_SEPARATOR
+                                            + bytes(len(msg) - len(msg.payload) - len(self.PADDING_SEPARATOR)))
+                        self.env.process(self.p2p.broadcast(final_padded_msg))
                 else:
                     # TODO: use Poisson delay
                     yield self.env.timeout(random.randint(0, 5))
@@ -68,7 +74,8 @@ class Node:
             else:
                 self.log("Receiving SphinxPacket, but not mine")
         else:
-            self.log("Received original message: %s" % msg)
+            final_msg = msg[:msg.rfind(self.PADDING_SEPARATOR)]
+            self.log("Received final message: %s" % final_msg)
 
     # TODO: This is a dummy logic
     @classmethod
