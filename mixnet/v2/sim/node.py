@@ -23,8 +23,7 @@ class Node:
         """
         Creates/encapsulate a message and send it to the network through the mixnet
         """
-        # while True:
-        if self.id == 0:
+        while True:
             msg = self.create_message()
             yield self.env.timeout(2)
             print("Sending a message at time %d" % self.env.now)
