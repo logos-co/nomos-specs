@@ -10,6 +10,8 @@ from p2p import P2p
 
 class Node:
     N_MIXES_IN_PATH = 2
+    REAL_PAYLOAD = b"BLOCK"
+    COVER_PAYLOAD = b"COVER"
 
     def __init__(self, id: int, env: simpy.Environment, p2p: P2p):
         self.id = id
@@ -38,7 +40,8 @@ class Node:
         public_keys = [mix.public_key for mix in mixes]
         # TODO: replace with realistic tx
         incentive_txs = [Node.create_incentive_tx(mix.public_key) for mix in mixes]
-        return SphinxPacket(public_keys, incentive_txs, b"Hello, world!")
+        payload = random.choice([self.REAL_PAYLOAD, self.COVER_PAYLOAD])
+        return SphinxPacket(public_keys, incentive_txs, payload)
 
     def receive_message(self, msg: SphinxPacket | bytes):
         """
@@ -53,7 +56,7 @@ class Node:
             msg, incentive_tx = msg.unwrap(self.private_key)
             if self.is_my_incentive_tx(incentive_tx):
                 self.log("Receiving SphinxPacket. It's mine!")
-                if msg.is_all_unwrapped():
+                if msg.is_all_unwrapped() and msg.payload == self.REAL_PAYLOAD:
                     self.env.process(self.p2p.broadcast(msg.payload))
                 else:
                     # TODO: use Poisson delay
