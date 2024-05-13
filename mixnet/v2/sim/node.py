@@ -29,7 +29,7 @@ class Node:
         """
         while True:
             msg = self.create_message()
-            # TODO: Use cover traffic emission rate
+            # TODO: Use the realistic cover traffic emission rate
             yield self.env.timeout(2)
             print("Sending a message at time %d" % self.env.now)
             self.env.process(self.p2p.broadcast(msg))
@@ -68,7 +68,7 @@ class Node:
                                             + bytes(len(msg) - len(msg.payload) - len(self.PADDING_SEPARATOR)))
                         self.env.process(self.p2p.broadcast(final_padded_msg))
                 else:
-                    # TODO: use Poisson delay
+                    # TODO: use Poisson delay or something else
                     yield self.env.timeout(random.randint(0, 5))
                     self.env.process(self.p2p.broadcast(msg))
             else:
