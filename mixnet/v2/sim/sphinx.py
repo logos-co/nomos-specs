@@ -7,28 +7,40 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey, X2
 
 
 class SphinxPacket:
+    PADDED_PAYLOAD_SIZE = 321
+    PAYLOAD_TRAIL_PADDING_SEPARATOR = b'\x01'
+
     def __init__(self, public_keys: list[X25519PublicKey], attachments: list[Attachment], payload: bytes):
         assert len(public_keys) == len(attachments)
+        if len(payload) > self.PADDED_PAYLOAD_SIZE - len(self.PAYLOAD_TRAIL_PADDING_SEPARATOR):
+            raise ValueError("payload too long", len(payload))
+        payload += (self.PAYLOAD_TRAIL_PADDING_SEPARATOR
+                    + bytes(self.PADDED_PAYLOAD_SIZE - len(payload) - len(self.PAYLOAD_TRAIL_PADDING_SEPARATOR)))
+
         ephemeral_private_key = X25519PrivateKey.generate()
         ephemeral_public_key = ephemeral_private_key.public_key()
         shared_keys = [SharedSecret(ephemeral_private_key, pk) for pk in public_keys]
-        self.header = SphinxHeader(ephemeral_public_key, shared_keys, attachments)
-        self.payload = payload  # TODO: encrypt payload
+        self._header = SphinxHeader(ephemeral_public_key, shared_keys, attachments)
+        self._payload = payload  # TODO: encrypt payload
 
     def __bytes__(self):
-        return bytes(self.header) + self.payload
+        return bytes(self._header) + self._payload
 
     def __len__(self):
         return len(bytes(self))
 
     def unwrap(self, private_key: X25519PrivateKey) -> tuple[SphinxPacket, Attachment]:
         packet = deepcopy(self)
-        attachment = packet.header.unwrap_inplace(private_key)
-        # TODO: decrypt packet.payload
+        attachment = packet._header.unwrap_inplace(private_key)
+        # TODO: decrypt packet._payload
         return packet, attachment
 
     def is_all_unwrapped(self) -> bool:
-        return self.header.is_all_unwrapped()
+        return self._header.is_all_unwrapped()
+
+    @property
+    def payload(self) -> bytes:
+        return self._payload[:self._payload.rfind(self.PAYLOAD_TRAIL_PADDING_SEPARATOR)]
 
 
 class SphinxHeader:
