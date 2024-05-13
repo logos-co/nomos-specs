@@ -26,14 +26,21 @@ TODO: Add more details
 
 ## Development Status
 
-- [x] Modified Sphinx without encryption
-- [x] Naive P2P 1:N broadcasting
+- Modified Sphinx
+    - [x] Without encryption
+    - [ ] With encryption
+- P2P Broadcasting
+  - [x] Naive 1:N
+  - [ ] More realistic broadcasting (e.g. gossipsub)
 - [x] Forwarding messages through mixes, and then broadcasting messages to all nodes
-- [x] Naive cover traffic with a constant rate 
-- [x] Naive random delays in mix
-- [ ] [Adversary simulations](https://www.notion.so/Mixnet-v2-Proof-of-Concept-102d0563e75345a3a6f1c11791fbd746?pvs=4#c5ffa49486ce47ed81d25028bc0d9d40)
-- [ ] Reporting & Visualization
-- [ ] More realistic P2P broadcasting (e.g. gossipsub)
-- [ ] More sophisticated cover traffic (e.g. based on the approximate block interval)
-- [ ] More sophisticated mix delays (e.g. Poisson)
-- [ ] Modified Sphinx with encryption
+- Cover traffic
+  - [x] With a constant rate 
+  - [ ] More sophisticated rate (e.g. based on the approximate block interval)
+- Mix delays
+  - [x] Naive random delays
+  - [ ] More sophisticated delays (e.g. Poisson)
+- [Adversary simulations](https://www.notion.so/Mixnet-v2-Proof-of-Concept-102d0563e75345a3a6f1c11791fbd746?pvs=4#c5ffa49486ce47ed81d25028bc0d9d40)
+  - [ ] Observing message emission patterns
+  - [ ] Correlating senders-receivers based on timing
+  - [ ] Active attacks
+  - [ ] Reporting & Visualization
