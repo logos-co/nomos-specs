@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey, X2
 
 
 class SphinxPacket:
+    # TODO: define max path length
     PADDED_PAYLOAD_SIZE = 321
     PAYLOAD_TRAIL_PADDING_SEPARATOR = b'\x01'
 
