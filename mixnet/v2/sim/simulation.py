@@ -1,15 +1,17 @@
 import simpy
 
+from config import Config
 from node import Node
 from p2p import P2p
 
 
 class Simulation:
-    def __init__(self, num_nodes: int, node_params: Node.Parameters):
+    def __init__(self, config: Config):
+        self.config = config
         self.env = simpy.Environment()
         self.p2p = P2p(self.env)
-        self.nodes = [Node(i, self.env, self.p2p, node_params) for i in range(num_nodes)]
+        self.nodes = [Node(i, self.env, self.p2p, config) for i in range(config.num_nodes)]
         self.p2p.add_node(self.nodes)
 
-    def run(self, until):
-        self.env.run(until=until)
+    def run(self):
+        self.env.run(until=self.config.running_time)

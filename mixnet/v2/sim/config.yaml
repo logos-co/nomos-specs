@@ -1,0 +1,6 @@
+running_time: 30
+num_nodes: 5
+num_mix_layers: 3
+message_interval: 1
+message_prob: 0.2
+max_message_prep_time: 0.3
