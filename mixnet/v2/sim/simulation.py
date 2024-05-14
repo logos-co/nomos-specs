@@ -5,10 +5,10 @@ from p2p import P2p
 
 
 class Simulation:
-    def __init__(self, num_nodes: int, num_mix_layers: int):
+    def __init__(self, num_nodes: int, node_params: Node.Parameters):
         self.env = simpy.Environment()
         self.p2p = P2p(self.env)
-        self.nodes = [Node(i, self.env, self.p2p, num_mix_layers) for i in range(num_nodes)]
+        self.nodes = [Node(i, self.env, self.p2p, node_params) for i in range(num_nodes)]
         self.p2p.add_node(self.nodes)
 
     def run(self, until):

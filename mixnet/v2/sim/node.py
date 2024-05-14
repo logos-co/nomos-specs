@@ -1,4 +1,5 @@
 import random
+from dataclasses import dataclass
 
 import simpy
 from cryptography.hazmat.primitives import serialization
@@ -14,13 +15,21 @@ class Node:
     COVER_PAYLOAD = b"COVER"
     PADDING_SEPARATOR = b'\x01'
 
-    def __init__(self, id: int, env: simpy.Environment, p2p: P2p, num_mix_layers: int):
+    @dataclass
+    class Parameters:
+        num_mix_layers: int
+        message_interval: int
+        message_prob: float
+        max_message_prep_time: int
+
+
+    def __init__(self, id: int, env: simpy.Environment, p2p: P2p, params: Parameters):
         self.id = id
         self.env = env
         self.p2p = p2p
         self.private_key = X25519PrivateKey.generate()
         self.public_key = self.private_key.public_key()
-        self.num_mix_layers = num_mix_layers
+        self.params = params
         self.action = self.env.process(self.send_message())
 
     def send_message(self):
@@ -39,7 +48,7 @@ class Node:
         Creates a message using the Sphinx format
         @return:
         """
-        mixes = self.p2p.get_nodes(self.num_mix_layers)
+        mixes = self.p2p.get_nodes(self.params.num_mix_layers)
         public_keys = [mix.public_key for mix in mixes]
         # TODO: replace with realistic tx
         incentive_txs = [Node.create_incentive_tx(mix.public_key) for mix in mixes]
@@ -88,4 +97,4 @@ class Node:
         return tx == Node.create_incentive_tx(self.public_key)
 
     def log(self, msg):
-        print("Node:%d at %d: %s" % (self.id, self.env.now, msg))
+        print("Node:%d at %g: %s" % (self.id, self.env.now, msg))

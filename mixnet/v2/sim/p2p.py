@@ -28,4 +28,4 @@ class P2p:
         return random.sample(self.nodes, n)
 
     def log(self, msg):
-        print("P2P at %d: %s" % (self.env.now, msg))
+        print("P2P at %g: %s" % (self.env.now, msg))
