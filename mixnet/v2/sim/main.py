@@ -1,5 +1,9 @@
 import argparse
 
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn
+
 from simulation import Simulation
 
 if __name__ == "__main__":
@@ -11,4 +15,13 @@ if __name__ == "__main__":
 
     sim = Simulation(args.num_nodes, args.num_mix_layers)
     sim.run(until=args.running_time)
+
+    df = pd.DataFrame(sim.p2p.message_sizes, columns=["message_size"])
+    print(df.describe())
+    plt.figure(figsize=(10, 6))
+    seaborn.boxplot(y=df["message_size"])
+    plt.title("Message size distribution")
+    plt.ylabel("Message Size (bytes)")
+    plt.show()
+
     print("Simulation complete!")

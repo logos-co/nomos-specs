@@ -8,3 +8,6 @@ scipy==1.11.4
 black==23.12.1
 sympy==1.12
 simpy==4.1.1
+pandas==2.2.2
+matplotlib==3.8.4
+seaborn==0.13.2
