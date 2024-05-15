@@ -19,7 +19,10 @@ class P2p:
         self.log("Broadcasting a msg: %d bytes" % len(msg))
         self.message_sizes.append(len(msg))
 
-        yield self.env.timeout(1)
+        # Yield 0 to ensure that the broadcast is done in the same time step.
+        # Without this, SimPy complains that the broadcast func is not a generator.
+        yield self.env.timeout(0)
+
         # TODO: gossipsub or something similar
         for node in self.nodes:
             self.env.process(node.receive_message(msg))
