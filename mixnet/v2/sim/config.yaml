@@ -1,3 +1,4 @@
+# The simulation uses a virtual time. Please see README for more details.
 running_time: 30
 num_nodes: 100
 num_mix_layers: 3
