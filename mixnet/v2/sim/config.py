@@ -11,7 +11,7 @@ class Config:
     num_nodes: int
     num_mix_layers: int
     message_interval: int
-    real_message_prob: float
+    real_message_prob: float  # TODO: should be proportional to its stake
     cover_message_prob: float
     max_message_prep_time: float
 

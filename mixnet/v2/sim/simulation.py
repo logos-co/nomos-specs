@@ -12,7 +12,7 @@ class Simulation:
         random.seed()
         self.config = config
         self.env = simpy.Environment()
-        self.p2p = P2p(self.env)
+        self.p2p = P2p(self.env, config)
         self.nodes = [Node(i, self.env, self.p2p, config) for i in range(config.num_nodes)]
         self.p2p.add_node(self.nodes)
 

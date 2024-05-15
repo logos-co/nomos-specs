@@ -40,7 +40,7 @@ class Node:
 
             self.log("Sending a message to the mixnet")
             msg = self.create_message(payload)
-            self.env.process(self.p2p.broadcast(msg))
+            self.env.process(self.p2p.broadcast(self, msg))
 
     def payload_to_send(self) -> bytes | None:
         rnd = random.random()
@@ -82,13 +82,13 @@ class Node:
                         final_padded_msg = (msg.payload
                                             + self.PADDING_SEPARATOR
                                             + bytes(len(msg) - len(msg.payload) - len(self.PADDING_SEPARATOR)))
-                        self.env.process(self.p2p.broadcast(final_padded_msg))
+                        self.env.process(self.p2p.broadcast(self, final_padded_msg))
                     else:
                         self.log("Dropping a cover message: %s" % msg.payload)
                 else:
                     # TODO: use Poisson delay or something else
                     yield self.env.timeout(random.randint(0, 5))
-                    self.env.process(self.p2p.broadcast(msg))
+                    self.env.process(self.p2p.broadcast(self, msg))
             else:
                 self.log("Receiving SphinxPacket, but not mine")
         else:

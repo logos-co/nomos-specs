@@ -1,9 +1,9 @@
 running_time: 30
-num_nodes: 5
+num_nodes: 100
 num_mix_layers: 3
 message_interval: 1
 # (real_message_prob + cover_message_prob) should be <= 1
 # If the sum is < 1, then the remaining probability is for sending nothing.
-real_message_prob: 0.1
-cover_message_prob: 0.4
+real_message_prob: 0.01
+cover_message_prob: 0.2
 max_message_prep_time: 0.3
