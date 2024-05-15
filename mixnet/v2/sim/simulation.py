@@ -1,3 +1,5 @@
+import random
+
 import simpy
 
 from config import Config
@@ -7,6 +9,7 @@ from p2p import P2p
 
 class Simulation:
     def __init__(self, config: Config):
+        random.seed()
         self.config = config
         self.env = simpy.Environment()
         self.p2p = P2p(self.env)
