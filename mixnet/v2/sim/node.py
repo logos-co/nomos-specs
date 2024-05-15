@@ -29,23 +29,29 @@ class Node:
         Creates/encapsulate a message and send it to the network through the mixnet
         """
         while True:
-            # TODO: Use the realistic cover traffic emission rate
             yield self.env.timeout(self.config.message_interval)
 
-            if not self.is_message_sender():
+            payload = self.payload_to_send()
+            if payload is None:  # nothing to send in this turn
                 continue
 
             prep_time = random.uniform(0, self.config.max_message_prep_time)
             yield self.env.timeout(prep_time)
 
             self.log("Sending a message to the mixnet")
-            msg = self.create_message()
+            msg = self.create_message(payload)
             self.env.process(self.p2p.broadcast(msg))
 
-    def is_message_sender(self) -> bool:
-        return random.random() < self.config.message_prob
+    def payload_to_send(self) -> bytes | None:
+        rnd = random.random()
+        if rnd < self.config.real_message_prob:
+            return self.REAL_PAYLOAD
+        elif rnd < self.config.real_message_prob + self.config.cover_message_prob:
+            return self.COVER_PAYLOAD
+        else:
+            return None
 
-    def create_message(self) -> SphinxPacket:
+    def create_message(self, payload: bytes) -> SphinxPacket:
         """
         Creates a message using the Sphinx format
         @return:
@@ -54,7 +60,6 @@ class Node:
         public_keys = [mix.public_key for mix in mixes]
         # TODO: replace with realistic tx
         incentive_txs = [Node.create_incentive_tx(mix.public_key) for mix in mixes]
-        payload = random.choice([self.REAL_PAYLOAD, self.COVER_PAYLOAD])
         return SphinxPacket(public_keys, incentive_txs, payload)
 
     def receive_message(self, msg: SphinxPacket | bytes):
@@ -78,6 +83,8 @@ class Node:
                                             + self.PADDING_SEPARATOR
                                             + bytes(len(msg) - len(msg.payload) - len(self.PADDING_SEPARATOR)))
                         self.env.process(self.p2p.broadcast(final_padded_msg))
+                    else:
+                        self.log("Dropping a cover message: %s" % msg.payload)
                 else:
                     # TODO: use Poisson delay or something else
                     yield self.env.timeout(random.randint(0, 5))
