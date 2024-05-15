@@ -10,9 +10,17 @@ class Config:
     running_time: int
     num_nodes: int
     num_mix_layers: int
+    # An interval of sending a new real/cover message
+    # A probability of actually sending a message depends on the following parameters.
     message_interval: int
-    real_message_prob: float  # TODO: should be proportional to its stake
+    # A probability of sending a real message within one cycle
+    real_message_prob: float
+    # A weight of real message emission probability of some nodes
+    # The length of the list should be <= num_nodes.
+    real_message_prob_weights: list[float]
+    # A probability of sending a cover message within one cycle if not sending a real message
     cover_message_prob: float
+    # A maximum preparation time (delay) before sending the message
     max_message_prep_time: float
 
     @classmethod
@@ -26,9 +34,11 @@ class Config:
         assert config.num_nodes > 0
         assert 0 < config.num_mix_layers <= config.num_nodes
         assert config.message_interval > 0
-        assert config.real_message_prob >= 0
+        assert config.real_message_prob > 0
+        assert len(config.real_message_prob_weights) <= config.num_nodes
+        for weight in config.real_message_prob_weights:
+            assert weight >= 1
         assert config.cover_message_prob >= 0
-        assert config.real_message_prob + config.cover_message_prob <= 1
         assert config.max_message_prep_time >= 0
 
         return config

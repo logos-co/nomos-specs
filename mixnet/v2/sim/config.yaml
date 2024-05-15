@@ -1,9 +1,15 @@
 running_time: 30
 num_nodes: 100
 num_mix_layers: 3
+# An interval of sending a new real/cover message
+# A probability of actually sending a message depends on the following parameters.
 message_interval: 1
-# (real_message_prob + cover_message_prob) should be <= 1
-# If the sum is < 1, then the remaining probability is for sending nothing.
-real_message_prob: 0.01
+# A probability of sending a real message within a cycle
+real_message_prob: 0.1
+# A weight of real message emission probability of some nodes
+# The length of the list should be <= num_nodes.
+real_message_prob_weights: [10, 8, 12]
+# A probability of sending a cover message within a cycle if not sending a real message
 cover_message_prob: 0.2
+# A maximum preparation time (delay) before sending the message
 max_message_prep_time: 0.3

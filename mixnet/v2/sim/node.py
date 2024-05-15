@@ -44,12 +44,17 @@ class Node:
 
     def payload_to_send(self) -> bytes | None:
         rnd = random.random()
-        if rnd < self.config.real_message_prob:
+        if rnd < self.real_message_prob():
             return self.REAL_PAYLOAD
-        elif rnd < self.config.real_message_prob + self.config.cover_message_prob:
+        elif rnd < self.config.cover_message_prob:
             return self.COVER_PAYLOAD
         else:
             return None
+
+    def real_message_prob(self):
+        weight = self.config.real_message_prob_weights[self.id] \
+            if self.id < len(self.config.real_message_prob_weights) else 0
+        return self.config.real_message_prob * weight
 
     def create_message(self, payload: bytes) -> SphinxPacket:
         """
