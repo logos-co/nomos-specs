@@ -29,11 +29,21 @@ class Node:
         Creates/encapsulate a message and send it to the network through the mixnet
         """
         while True:
-            msg = self.create_message()
             # TODO: Use the realistic cover traffic emission rate
-            yield self.env.timeout(2)
+            yield self.env.timeout(self.config.message_interval)
+
+            if not self.is_message_sender():
+                continue
+
+            prep_time = random.uniform(0, self.config.max_message_prep_time)
+            yield self.env.timeout(prep_time)
+
             self.log("Sending a message to the mixnet")
+            msg = self.create_message()
             self.env.process(self.p2p.broadcast(msg))
+
+    def is_message_sender(self) -> bool:
+        return random.random() < self.config.message_prob
 
     def create_message(self) -> SphinxPacket:
         """
