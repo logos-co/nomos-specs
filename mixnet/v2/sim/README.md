@@ -36,7 +36,7 @@ For more details, please see the [Time and Scheduling](https://simpy.readthedocs
     - [x] Without encryption
     - [ ] With encryption
 - P2P Broadcasting
-  - [x] Naive 1:N
+  - [x] Naive 1-to-all
   - [ ] More realistic broadcasting (e.g. gossipsub)
 - [x] Sending a real message to the mixnet at the promised interval
   - Each node has its own probability of sending a real message at each interval.
