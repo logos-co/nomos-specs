@@ -54,5 +54,3 @@ For more details, please see the [Time and Scheduling](https://simpy.readthedocs
   ![](./docs/msgs-around-interval.png)
 - [ ] Correlating senders-receivers based on timing
 - [ ] Active attacks
-- [ ] Reporting & Visualization
-  - With quantifying the effect of attacks above based on parameter changes.
