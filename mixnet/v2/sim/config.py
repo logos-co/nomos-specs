@@ -22,6 +22,8 @@ class Config:
     cover_message_prob: float
     # A maximum preparation time (delay) before sending the message
     max_message_prep_time: float
+    # A maximum network latency between nodes directly connected with each other
+    max_network_latency: float
 
     @classmethod
     def load(cls, yaml_path: str) -> Self:
@@ -40,5 +42,6 @@ class Config:
             assert weight >= 1
         assert config.cover_message_prob >= 0
         assert config.max_message_prep_time >= 0
+        assert config.max_network_latency >= 0
 
         return config

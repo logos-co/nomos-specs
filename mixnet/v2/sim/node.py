@@ -74,7 +74,7 @@ class Node:
         @param msg: the message to be processed
         """
         # simulating network latency
-        yield self.env.timeout(random.randint(0, 3))
+        yield self.env.timeout(random.uniform(0, self.config.max_network_latency))
 
         if isinstance(msg, SphinxPacket):
             msg, incentive_tx = msg.unwrap(self.private_key)

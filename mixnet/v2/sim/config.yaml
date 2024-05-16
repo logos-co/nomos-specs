@@ -14,3 +14,5 @@ real_message_prob_weights: [10, 8, 12]
 cover_message_prob: 0.2
 # A maximum preparation time (delay) before sending the message
 max_message_prep_time: 0.3
+# A maximum network latency between nodes directly connected with each other
+max_network_latency: 0.5
