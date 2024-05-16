@@ -48,6 +48,19 @@ For more details, please see the [Time and Scheduling](https://simpy.readthedocs
   - [ ] More sophisticated delays (e.g. Poisson) if necessary
 
 ## [Adversary Models](https://www.notion.so/Mixnet-v2-Proof-of-Concept-102d0563e75345a3a6f1c11791fbd746?pvs=4#c5ffa49486ce47ed81d25028bc0d9d40)
+- [x] Inspecting message sizes to analyze how far each message has traveled since emitted by the original sender.
+  - Currently, all messages have the same size (including messages broadcasted after being fully unwrapped). Thus, the adversary can learn nothing.
+    ```
+           message_size
+    count        1806.0
+    mean         1937.0
+    std             0.0
+    min          1937.0
+    25%          1937.0
+    50%          1937.0
+    75%          1937.0
+    max          1937.0
+    ```
 - [x] Identifying nodes emitting messages around the promised interval.
   - [ ] With partial visibility
   - [ ] Quantifying how much the expected frequent senders are anonymized by cover traffic
