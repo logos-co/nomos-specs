@@ -16,7 +16,7 @@ The simulation runs during a specified duration, prints the results to the conso
 
 ### Time in simulation
 
-The simulation has been implemented based on [SimPy](https://simpy.readthedocs.io/en/latest/) which is discrete-event simulation framework.
+The simulation is implemented based on [SimPy](https://simpy.readthedocs.io/en/latest/) which is discrete-event simulation framework.
 All events are processed sequentially by a single thread.
 However, multiple parallel events, which should be processed at the same time, can be also simulated by scheduling them at the same "time".
 
