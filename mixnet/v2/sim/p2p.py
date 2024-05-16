@@ -3,7 +3,6 @@ import random
 from collections import defaultdict
 
 import simpy
-from simpy.util import start_delayed
 
 from config import Config
 from sphinx import SphinxPacket
@@ -20,6 +19,9 @@ class P2p:
     def add_node(self, nodes):
         self.nodes.extend(nodes)
 
+    def get_nodes(self, n: int):
+        return random.sample(self.nodes, n)
+
     # TODO: This should accept only bytes, but SphinxPacket is also accepted until we implement the Sphinx serde
     def broadcast(self, sender, msg: SphinxPacket | bytes):
         self.log("Broadcasting a msg: %d bytes" % len(msg))
@@ -35,11 +37,12 @@ class P2p:
 
         # TODO: gossipsub or something similar
         for node in self.nodes:
-            network_delay = random.uniform(0, self.config.max_network_latency)
-            start_delayed(self.env, node.receive_message(msg), delay=network_delay)
+            self.env.process(self.send(msg, node))
 
-    def get_nodes(self, n: int):
-        return random.sample(self.nodes, n)
+    def send(self, msg: SphinxPacket | bytes, node):
+        # simulate network latency
+        yield self.env.timeout(random.uniform(0, self.config.max_network_latency))
+        self.env.process(node.receive_message(msg))
 
     def log(self, msg):
         print("P2P at %g: %s" % (self.env.now, msg))
