@@ -89,7 +89,7 @@ class Node:
                         self.log("Dropping a cover message: %s" % msg.payload)
                 else:
                     # TODO: use Poisson delay or something else
-                    yield self.env.timeout(random.randint(0, 5))
+                    yield self.env.timeout(random.uniform(0, 5.0))
                     self.env.process(self.p2p.broadcast(self, msg))
             else:
                 self.log("Receiving SphinxPacket, but not mine")
