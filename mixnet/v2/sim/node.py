@@ -73,9 +73,6 @@ class Node:
         and forwards it to the next mix or the entire network if necessary.
         @param msg: the message to be processed
         """
-        # simulating network latency
-        yield self.env.timeout(random.uniform(0, self.config.max_network_latency))
-
         if isinstance(msg, SphinxPacket):
             msg, incentive_tx = msg.unwrap(self.private_key)
             if self.is_my_incentive_tx(incentive_tx):

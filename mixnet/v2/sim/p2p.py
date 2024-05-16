@@ -3,6 +3,7 @@ import random
 from collections import defaultdict
 
 import simpy
+from simpy.util import start_delayed
 
 from config import Config
 from sphinx import SphinxPacket
@@ -34,7 +35,8 @@ class P2p:
 
         # TODO: gossipsub or something similar
         for node in self.nodes:
-            self.env.process(node.receive_message(msg))
+            network_delay = random.uniform(0, self.config.max_network_latency)
+            start_delayed(self.env, node.receive_message(msg), delay=network_delay)
 
     def get_nodes(self, n: int):
         return random.sample(self.nodes, n)
