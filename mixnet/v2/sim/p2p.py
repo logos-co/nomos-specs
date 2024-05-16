@@ -13,6 +13,8 @@ class P2p:
         self.env = env
         self.config = config
         self.nodes = []
+        # The followings are for an adversary.
+        # TODO: Move these to a separate class `Adversary`.
         self.message_sizes = []
         self.senders_around_interval = defaultdict(int)
 
