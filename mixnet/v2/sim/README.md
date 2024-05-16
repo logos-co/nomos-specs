@@ -61,9 +61,15 @@ For more details, please see the [Time and Scheduling](https://simpy.readthedocs
     75%          1937.0
     max          1937.0
     ```
-- [x] Identifying nodes emitting messages around the promised interval.
+- Identifying nodes emitting messages around the promised interval.
+  - [x] As the GPA
   - [ ] With partial visibility
   - [ ] Quantifying how much the expected frequent senders are anonymized by cover traffic
   ![](./docs/msgs-around-interval.png)
 - [ ] Correlating senders-receivers based on timing
+  - DRAFT
+    ![](./docs/mixed-msgs-over-time.png)
+    - This can indicate whether a certain node has extremely few messages being mixed in the node.
+      But, I don't think this is the best way to analyze the correlation.
+      I think we need to try to simulate the actual timing attack.
 - [ ] Active attacks

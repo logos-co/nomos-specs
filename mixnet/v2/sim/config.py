@@ -16,7 +16,8 @@ class Config:
     # A probability of sending a real message within one cycle
     real_message_prob: float
     # A weight of real message emission probability of some nodes
-    # The length of the list should be <= num_nodes.
+    # Each weight is assigned to each node in the order of the node ID.
+    # The length of the list should be <= num_nodes. i.e. some nodes won't have a weight.
     real_message_prob_weights: list[float]
     # A probability of sending a cover message within one cycle if not sending a real message
     cover_message_prob: float
@@ -24,6 +25,10 @@ class Config:
     max_message_prep_time: float
     # A maximum network latency between nodes directly connected with each other
     max_network_latency: float
+    # A maximum delay of messages mixed in a mix node
+    max_mix_delay: float
+    # A discrete time window for the adversary to observe inputs and outputs of a certain node
+    io_observation_window: int
 
     @classmethod
     def load(cls, yaml_path: str) -> Self:
@@ -43,5 +48,6 @@ class Config:
         assert config.cover_message_prob >= 0
         assert config.max_message_prep_time >= 0
         assert config.max_network_latency >= 0
+        assert config.io_observation_window >= 0
 
         return config
