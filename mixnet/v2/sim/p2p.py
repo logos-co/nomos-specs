@@ -32,7 +32,7 @@ class P2p:
             self.senders_around_interval[sender] += 1
 
         # Yield 0 to ensure that the broadcast is done in the same time step.
-        # Without this, SimPy complains that the broadcast func is not a generator.
+        # Without any yield, SimPy complains that the broadcast func is not a generator.
         yield self.env.timeout(0)
 
         # TODO: gossipsub or something similar
