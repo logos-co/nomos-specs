@@ -21,12 +21,17 @@ if __name__ == "__main__":
     print(df.describe())
 
     # Visualize the nodes emitted messages around the promised interval
-    df = pd.DataFrame([(node.id, cnt) for node, cnt in sim.p2p.nodes_emitted_msg_around_interval.items()], columns=["node", "count"])
+    df = pd.DataFrame(
+        [(node.id, cnt, node.id < len(config.real_message_prob_weights))
+         for node, cnt in sim.p2p.senders_around_interval.items()],
+        columns=["NodeID", "Count", "Expected"]
+    )
     plt.figure(figsize=(10, 6))
-    seaborn.barplot(x="node", y="count", data=df)
+    seaborn.barplot(data=df, x="NodeID", y="Count", hue="Expected", palette={True: "red", False: "blue"})
     plt.title("Messages emitted around the promised interval")
-    plt.xlabel("Node ID")
+    plt.xlabel("Sender Node ID")
     plt.ylabel("Msg Count")
+    plt.legend(title="Expected")
     plt.show()
 
     print("Simulation complete!")

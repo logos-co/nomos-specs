@@ -14,7 +14,7 @@ class P2p:
         self.config = config
         self.nodes = []
         self.message_sizes = []
-        self.nodes_emitted_msg_around_interval = defaultdict(int)
+        self.senders_around_interval = defaultdict(int)
 
     def add_node(self, nodes):
         self.nodes.extend(nodes)
@@ -26,7 +26,7 @@ class P2p:
 
         now_frac, now_int = math.modf(self.env.now)
         if now_int % self.config.message_interval == 0 and now_frac <= self.config.max_message_prep_time:
-            self.nodes_emitted_msg_around_interval[sender] += 1
+            self.senders_around_interval[sender] += 1
 
         # Yield 0 to ensure that the broadcast is done in the same time step.
         # Without this, SimPy complains that the broadcast func is not a generator.
