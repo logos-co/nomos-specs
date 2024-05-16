@@ -50,7 +50,7 @@ For more details, please see the [Time and Scheduling](https://simpy.readthedocs
 ## [Adversary Models](https://www.notion.so/Mixnet-v2-Proof-of-Concept-102d0563e75345a3a6f1c11791fbd746?pvs=4#c5ffa49486ce47ed81d25028bc0d9d40)
 - [x] Identifying nodes emitting messages around the promised interval.
   - [ ] With partial visibility
-  - [ ] Quantifying how much the expected frequent senders are anonymized
+  - [ ] Quantifying how much the expected frequent senders are anonymized by cover traffic
   - Current output
     ![](./docs/msgs-around-interval.png)
 - [ ] Correlating senders-receivers based on timing
