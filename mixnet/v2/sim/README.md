@@ -51,8 +51,7 @@ For more details, please see the [Time and Scheduling](https://simpy.readthedocs
 - [x] Identifying nodes emitting messages around the promised interval.
   - [ ] With partial visibility
   - [ ] Quantifying how much the expected frequent senders are anonymized by cover traffic
-  - Current output
-    ![](./docs/msgs-around-interval.png)
+  ![](./docs/msgs-around-interval.png)
 - [ ] Correlating senders-receivers based on timing
 - [ ] Active attacks
 - [ ] Reporting & Visualization
