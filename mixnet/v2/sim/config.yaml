@@ -5,6 +5,8 @@ simulation:
 mixnet:
   num_nodes: 100
   num_mix_layers: 3
+  # A size of a message payload in bytes (e.g. the size of a block proposal)
+  payload_size: 320
   # An interval of sending a new real/cover message
   # A probability of actually sending a message depends on the following parameters.
   message_interval: 1

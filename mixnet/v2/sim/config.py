@@ -42,6 +42,8 @@ class SimulationConfig:
 class MixnetConfig:
     num_nodes: int
     num_mix_layers: int
+    # A size of a message payload in bytes (e.g. the size of a block proposal)
+    payload_size: int
     # An interval of sending a new real/cover message
     # A probability of actually sending a message depends on the following parameters.
     message_interval: int
@@ -61,6 +63,7 @@ class MixnetConfig:
     def validate(self):
         assert self.num_nodes > 0
         assert 0 < self.num_mix_layers <= self.num_nodes
+        assert self.payload_size > 0
         assert self.message_interval > 0
         assert self.real_message_prob > 0
         assert len(self.real_message_prob_weights) <= self.num_nodes

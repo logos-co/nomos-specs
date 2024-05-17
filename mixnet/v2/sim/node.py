@@ -15,7 +15,6 @@ from p2p import P2p
 
 class Node:
     INCENTIVE_TX_SIZE = 512
-    PAYLOAD = b"BLOCK"
     PADDING_SEPARATOR = b'\x01'
 
     def __init__(self, id: int, env: simpy.Environment, p2p: P2p, config: Config):
@@ -72,7 +71,7 @@ class Node:
             # Set invalid txs for a cover message,
             # so that nobody will recognize that as a real message to be forwarded to the next mix.
             incentive_txs = [Attachment(os.urandom(len(bytes(tx)))) for tx in incentive_txs]
-        return SphinxPacket(public_keys, incentive_txs, self.PAYLOAD)
+        return SphinxPacket(public_keys, incentive_txs, self.build_payload())
 
     def receive_message(self, msg: SphinxPacket | bytes):
         """
@@ -85,15 +84,12 @@ class Node:
             if self.is_my_incentive_tx(incentive_tx):
                 self.log("Receiving SphinxPacket. It's mine!")
                 if msg.is_all_unwrapped():
-                    if msg.payload == self.PAYLOAD:
-                        # Pad the final msg to the same size as a SphinxPacket,
-                        # assuming that the final msg is going to be sent via secure channels (TLS, Noise, etc.)
-                        final_padded_msg = (msg.payload
-                                            + self.PADDING_SEPARATOR
-                                            + bytes(len(msg) - len(msg.payload) - len(self.PADDING_SEPARATOR)))
-                        self.env.process(self.p2p.broadcast(self, final_padded_msg))
-                    else:
-                        self.log("Dropping a cover message: %s" % msg.payload)
+                    # Pad the final msg to the same size as a SphinxPacket,
+                    # assuming that the final msg is going to be sent via secure channels (TLS, Noise, etc.)
+                    final_padded_msg = (msg.payload
+                                        + self.PADDING_SEPARATOR
+                                        + bytes(len(msg) - len(msg.payload) - len(self.PADDING_SEPARATOR)))
+                    self.env.process(self.p2p.broadcast(self, final_padded_msg))
                 else:
                     # TODO: use Poisson delay or something else, if necessary
                     yield self.env.timeout(random.uniform(0, self.config.mixnet.max_mix_delay))
@@ -103,6 +99,9 @@ class Node:
         else:
             final_msg = msg[:msg.rfind(self.PADDING_SEPARATOR)]
             self.log("Received final message: %s" % final_msg)
+
+    def build_payload(self) -> bytes:
+        return b"P" + bytes(self.config.mixnet.payload_size - len(b"P"))
 
     # TODO: This is a dummy logic
     @classmethod
