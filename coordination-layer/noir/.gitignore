@@ -1,0 +1,4 @@
+crates/*/Prover.toml
+crates/*/Verifier.toml
+proofs/*.proof
+target/*
