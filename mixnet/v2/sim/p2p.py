@@ -1,10 +1,15 @@
+from __future__ import annotations
 import random
+from typing import TYPE_CHECKING
 
 import simpy
 
 from adversary import Adversary
 from config import Config
 from sphinx import SphinxPacket
+
+if TYPE_CHECKING:
+    from node import Node
 
 
 class P2p:
@@ -14,10 +19,10 @@ class P2p:
         self.nodes = []
         self.adversary = Adversary(env, config)
 
-    def add_node(self, nodes):
+    def add_node(self, nodes: list["Node"]):
         self.nodes.extend(nodes)
 
-    def get_nodes(self, n: int):
+    def get_nodes(self, n: int) -> list["Node"]:
         return random.sample(self.nodes, n)
 
     # This should accept only bytes in practice,

@@ -1,11 +1,15 @@
 import math
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import simpy
 from simpy.core import SimTime
 
 from config import Config
 from sphinx import SphinxPacket
+
+if TYPE_CHECKING:
+    from node import Node
 
 
 class Adversary:
@@ -20,10 +24,10 @@ class Adversary:
     def inspect_message_size(self, msg: SphinxPacket | bytes):
         self.message_sizes.append(len(msg))
 
-    def observe_incoming_message(self, node):
+    def observe_incoming_message(self, node: "Node"):
         self.mixed_msgs_per_window[-1][node] += 1
 
-    def observe_outgoing_message(self, node):
+    def observe_outgoing_message(self, node: "Node"):
         self.mixed_msgs_per_window[-1][node] -= 1
         if self.is_around_message_interval(self.env.now):
             self.senders_around_interval[node] += 1

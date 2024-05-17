@@ -100,7 +100,8 @@ class Node:
     # TODO: This is a dummy logic
     @classmethod
     def create_incentive_tx(cls, mix_public_key: X25519PublicKey) -> Attachment:
-        public_key = mix_public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
+        public_key = mix_public_key.public_bytes(encoding=serialization.Encoding.Raw,
+                                                 format=serialization.PublicFormat.Raw)
         public_key += bytes(cls.INCENTIVE_TX_SIZE - len(public_key))
         return Attachment(public_key)
 
