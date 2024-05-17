@@ -30,6 +30,20 @@ class NoirProof:
 
 
 class NoirConstraint:
+    """
+    Provides a wrapper around the `nargo` command for interacting with a constraint
+    written in Noir.
+
+    E.g. NoirConstraint("bigger") corresponds to the noir circuit defined
+    in "./noir/crates/bigger/".
+
+    Calling API methods on this object will map to shelling out to `nargo` to execute
+    the relevant `nargo` action.
+
+    Efforts are taken to make this wrapper thread safe.To prevent any race
+    conditions we limit one action at any one time across the `./noir` directory.
+    """
+
     def __init__(self, name: str):
         self.name = name
         assert self.noir_package_dir.exists() and self.noir_package_dir.is_dir()
@@ -40,6 +54,14 @@ class NoirConstraint:
         return CONSTRAINTS_DIR / self.name
 
     def prove(self, params: dict) -> NoirProof:
+        """
+        Attempts to prove the noir constraint with the given paramaters.
+        1. Write the paramaters to the noir Prover.toml file
+        2. execute `nargo prove`
+        3. Retreive the proof written by nargo.
+
+        Returns the NoirProof containing the proof of the statment.
+        """
         with portalocker.TemporaryFileLock(LOCK_FILE):
             with open(self.noir_package_dir / "Prover.toml", "w") as prover_f:
                 toml.dump(params, prover_f)
@@ -51,6 +73,13 @@ class NoirConstraint:
                 return NoirProof(proof.read())
 
     def verify(self, params: dict, proof: NoirProof):
+        """
+        Attempts to verify a proof given the public paramaters.
+        1. Write the public paramaters to the Verifier.toml
+        2. Write the proof to the location nargo expects it
+        3. Execute `nargo verify`
+        4. Check the process exit code.
+        """
         with portalocker.TemporaryFileLock(LOCK_FILE):
             with open(self.noir_package_dir / "Verifier.toml", "w") as verifier_f:
                 toml.dump(params, verifier_f)
@@ -64,6 +93,9 @@ class NoirConstraint:
         return NARGO(*args, **kwargs, _cwd=self.noir_package_dir)
 
     def _prepare(self):
+        """
+        Verify that the Noir circuit is well defined.
+        """
         check = self._nargo("check", _return_cmd=True)
         assert check.exit_code == 0
         compile = self._nargo("compile", _return_cmd=True)
