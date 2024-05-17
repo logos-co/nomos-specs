@@ -15,13 +15,13 @@ class Analysis:
         self.mixed_messages_per_node_over_time()
 
     def message_size_distribution(self):
-        df = pd.DataFrame(self.sim.p2p.message_sizes, columns=["message_size"])
+        df = pd.DataFrame(self.sim.p2p.adversary.message_sizes, columns=["message_size"])
         print(df.describe())
 
     def messages_emitted_around_interval(self):
         df = pd.DataFrame(
             [(node.id, cnt, node.id < len(self.sim.config.real_message_prob_weights))
-             for node, cnt in self.sim.p2p.senders_around_interval.items()],
+             for node, cnt in self.sim.p2p.adversary.senders_around_interval.items()],
             columns=["node_id", "msg_count", "expected"]
         )
         plt.figure(figsize=(10, 6))
@@ -34,7 +34,7 @@ class Analysis:
 
     def mixed_messages_per_node_over_time(self):
         dataframes = []
-        for mixed_msgs_per_node in self.sim.p2p.mixed_msgs_per_window:
+        for mixed_msgs_per_node in self.sim.p2p.adversary.mixed_msgs_per_window:
             df = pd.DataFrame([(node.id, cnt) for node, cnt in mixed_msgs_per_node.items()],
                               columns=["node_id", "msg_count"])
             dataframes.append(df)

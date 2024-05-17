@@ -1,7 +1,7 @@
 import argparse
 
 from config import Config
-from mixnet.v2.sim.analysis import Analysis
+from analysis import Analysis
 from simulation import Simulation
 
 if __name__ == "__main__":
