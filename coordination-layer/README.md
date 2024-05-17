@@ -21,5 +21,5 @@ noirup
 From the repository root run:
 
 ```bash
-python -m unittest -v coordination-layer/test_*
+python -m unittest discover -v coordination-layer
 ```

@@ -4,7 +4,6 @@ This module provides the interface for loading, proving and verifying constraint
 The assumptions of this module:
 - noir constraints are defined as a noir package in `./noir/crates/<constraint>/`
 - ./noir is relative to this file
-- noir constraints have already been compiled.
 
 For ergonomics, one should provide python wrappers that understands the API of
 the corresponding constraint.
@@ -26,7 +25,7 @@ NARGO = sh.Command("nargo")
 
 
 @dataclass
-class Proof:
+class NoirProof:
     proof: str
 
 
@@ -40,7 +39,7 @@ class NoirConstraint:
     def noir_package_dir(self):
         return CONSTRAINTS_DIR / self.name
 
-    def prove(self, params: dict):
+    def prove(self, params: dict) -> NoirProof:
         with portalocker.TemporaryFileLock(LOCK_FILE):
             with open(self.noir_package_dir / "Prover.toml", "w") as prover_f:
                 toml.dump(params, prover_f)
@@ -49,9 +48,9 @@ class NoirConstraint:
             assert prove_res.exit_code == 0
 
             with open(NOIR_DIR / "proofs" / f"{self.name}.proof", "r") as proof:
-                return Proof(proof.read())
+                return NoirProof(proof.read())
 
-    def verify(self, params: dict, proof: Proof):
+    def verify(self, params: dict, proof: NoirProof):
         with portalocker.TemporaryFileLock(LOCK_FILE):
             with open(self.noir_package_dir / "Verifier.toml", "w") as verifier_f:
                 toml.dump(params, verifier_f)
