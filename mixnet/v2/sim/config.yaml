@@ -25,6 +25,10 @@ p2p:
   # A maximum network latency between nodes directly connected with each other
   max_network_latency: 0.5
 
+measurement:
+    # How many times in simulation represent 1 second in real time
+    sim_time_per_second: 1
+
 adversary:
   # A discrete time window for the adversary to observe inputs and outputs of a certain node
   io_observation_window: 1

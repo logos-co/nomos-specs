@@ -6,6 +6,7 @@ import simpy
 
 from adversary import Adversary
 from config import Config
+from measurement import Measurement
 from sphinx import SphinxPacket
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ class P2p:
         self.env = env
         self.config = config
         self.nodes = []
+        self.measurement = Measurement(env, config)
         self.adversary = Adversary(env, config)
 
     def add_node(self, nodes: list["Node"]):
@@ -27,10 +29,11 @@ class P2p:
 
     # This should accept only bytes in practice,
     # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
-    def broadcast(self, sender, msg: SphinxPacket | bytes):
+    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes):
         self.log("Broadcasting a msg: %d bytes" % len(msg))
 
         # Adversary
+        self.measurement.measure_egress(sender, msg)
         self.adversary.inspect_message_size(msg)
         self.adversary.observe_outgoing_message(sender)
 
@@ -42,10 +45,11 @@ class P2p:
         for node in self.nodes:
             self.env.process(self.send(msg, node))
 
-    def send(self, msg: SphinxPacket | bytes, node):
+    def send(self, msg: SphinxPacket | bytes, node: "Node"):
         # simulate network latency
         yield self.env.timeout(random.uniform(0, self.config.p2p.max_network_latency))
 
+        self.measurement.measure_ingress(node, msg)
         self.adversary.observe_incoming_message(node)
         self.env.process(node.receive_message(msg))
 

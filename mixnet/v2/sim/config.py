@@ -11,6 +11,7 @@ class Config:
     simulation: SimulationConfig
     mixnet: MixnetConfig
     p2p: P2pConfig
+    measurement: MeasurementConfig
     adversary: AdversaryConfig
 
     @classmethod
@@ -23,6 +24,7 @@ class Config:
         config.simulation.validate()
         config.mixnet.validate()
         config.p2p.validate()
+        config.measurement.validate()
         config.adversary.validate()
         
         return config
@@ -79,9 +81,18 @@ class P2pConfig:
 
 
 @dataclass
+class MeasurementConfig:
+    # How many times in simulation represent 1 second in real time
+    sim_time_per_second: float
+
+    def validate(self):
+        assert self.sim_time_per_second > 0
+
+
+@dataclass
 class AdversaryConfig:
     # A discrete time window for the adversary to observe inputs and outputs of a certain node
     io_observation_window: int
 
     def validate(self):
-        assert self.io_observation_window >= 0
+        assert self.io_observation_window >= 1

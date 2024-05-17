@@ -11,10 +11,36 @@ class Analysis:
         self.sim = sim
 
     def run(self):
+        self.bandwidth()
         self.message_size_distribution()
         self.messages_emitted_around_interval()
         self.mixed_messages_per_node_over_time()
         self.node_states()
+
+    def bandwidth(self):
+        dataframes = []
+        for ingress_bandwidths, egress_bandwidths in zip(self.sim.p2p.measurement.ingress_bandwidth_per_time, self.sim.p2p.measurement.egress_bandwidth_per_time):
+            rows = []
+            for node in self.sim.p2p.nodes:
+                rows.append((node.id, ingress_bandwidths[node]/1024.0, egress_bandwidths[node]/1024.0))
+            df = pd.DataFrame(rows, columns=["node_id", "ingress", "egress"])
+            dataframes.append(df)
+        times = range(len(dataframes))
+        df = pd.concat([df.assign(Time=time) for df, time in zip(dataframes, times)], ignore_index=True)
+        df = df.pivot(index="Time", columns="node_id", values=["ingress", "egress"])
+        plt.figure(figsize=(12, 6))
+        for column in df.columns:
+            marker = "x" if column[0] == "ingress" else "o"
+            plt.plot(df.index, df[column], marker=marker, label=column[0])
+        plt.title("Ingress/egress bandwidth of each node over time")
+        plt.xlabel("Time")
+        plt.ylabel("Bandwidth (KiB/s)")
+        # Customize the legend to show only 'ingress' and 'egress' regardless of node_id
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys())
+        plt.grid(True)
+        plt.show()
 
     def message_size_distribution(self):
         df = pd.DataFrame(self.sim.p2p.adversary.message_sizes, columns=["message_size"])

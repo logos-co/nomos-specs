@@ -47,6 +47,13 @@ For more details, please see the [Time and Scheduling](https://simpy.readthedocs
   - [x] Naive random delays
   - [ ] More sophisticated delays (e.g. Poisson) if necessary
 
+## Performance Measurements
+
+- [ ] Bandwidth Usage
+  - DRAFT with the naive 1-to-all broadcasting
+    ![](./docs/bandwidth.png)
+  - Should be measured with realistic parameters and P2P gossiping.
+
 ## [Adversary Models](https://www.notion.so/Mixnet-v2-Proof-of-Concept-102d0563e75345a3a6f1c11791fbd746?pvs=4#c5ffa49486ce47ed81d25028bc0d9d40)
 - [x] Inspecting message sizes to analyze how far each message has traveled since emitted by the original sender.
   - Currently, all messages have the same size (including messages broadcasted after being fully unwrapped). Thus, the adversary can learn nothing.
