@@ -2,6 +2,7 @@ import pandas as pd
 import seaborn
 from matplotlib import pyplot as plt
 
+from adversary import NodeState
 from simulation import Simulation
 
 
@@ -13,6 +14,7 @@ class Analysis:
         self.message_size_distribution()
         self.messages_emitted_around_interval()
         self.mixed_messages_per_node_over_time()
+        self.node_states()
 
     def message_size_distribution(self):
         df = pd.DataFrame(self.sim.p2p.adversary.message_sizes, columns=["message_size"])
@@ -50,3 +52,19 @@ class Analysis:
         plt.legend(title="Node ID")
         plt.grid(True)
         plt.show()
+
+    def node_states(self):
+        rows = []
+        for time, node_states in self.sim.p2p.adversary.node_states.items():
+            for node, state in node_states.items():
+                rows.append((time, node.id, state))
+        df = pd.DataFrame(rows, columns=["time", "node_id", "state"])
+
+        plt.figure(figsize=(10, 6))
+        seaborn.scatterplot(data=df, x="time", y="node_id", hue="state", palette={NodeState.SENDING: "red", NodeState.RECEIVING: "blue"})
+        plt.title("Node states over time")
+        plt.xlabel("Time")
+        plt.ylabel("Node ID")
+        plt.legend(title="state")
+        plt.show()
+
