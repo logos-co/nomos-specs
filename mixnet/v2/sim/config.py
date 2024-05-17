@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
@@ -7,7 +8,36 @@ import yaml
 
 @dataclass
 class Config:
+    simulation: SimulationConfig
+    mixnet: MixnetConfig
+    p2p: P2pConfig
+    adversary: AdversaryConfig
+
+    @classmethod
+    def load(cls, yaml_path: str) -> Self:
+        with open(yaml_path, "r") as f:
+            data = yaml.safe_load(f)
+        config = dacite.from_dict(data_class=Config, data=data)
+
+        # Validations
+        config.simulation.validate()
+        config.mixnet.validate()
+        config.p2p.validate()
+        config.adversary.validate()
+        
+        return config
+
+
+@dataclass
+class SimulationConfig:
     running_time: int
+
+    def validate(self):
+        assert self.running_time > 0
+
+
+@dataclass
+class MixnetConfig:
     num_nodes: int
     num_mix_layers: int
     # An interval of sending a new real/cover message
@@ -23,31 +53,35 @@ class Config:
     cover_message_prob: float
     # A maximum preparation time (delay) before sending the message
     max_message_prep_time: float
-    # A maximum network latency between nodes directly connected with each other
-    max_network_latency: float
     # A maximum delay of messages mixed in a mix node
     max_mix_delay: float
+
+    def validate(self):
+        assert self.num_nodes > 0
+        assert 0 < self.num_mix_layers <= self.num_nodes
+        assert self.message_interval > 0
+        assert self.real_message_prob > 0
+        assert len(self.real_message_prob_weights) <= self.num_nodes
+        for weight in self.real_message_prob_weights:
+            assert weight >= 1
+        assert self.cover_message_prob >= 0
+        assert self.max_message_prep_time >= 0
+        assert self.max_mix_delay >= 0
+
+
+@dataclass
+class P2pConfig:
+    # A maximum network latency between nodes directly connected with each other
+    max_network_latency: float
+
+    def validate(self):
+        assert self.max_network_latency >= 0
+
+
+@dataclass
+class AdversaryConfig:
     # A discrete time window for the adversary to observe inputs and outputs of a certain node
     io_observation_window: int
 
-    @classmethod
-    def load(cls, yaml_path: str) -> Self:
-        with open(yaml_path, "r") as f:
-            data = yaml.safe_load(f)
-        config = dacite.from_dict(data_class=Config, data=data)
-
-        # Validations
-        assert config.running_time > 0
-        assert config.num_nodes > 0
-        assert 0 < config.num_mix_layers <= config.num_nodes
-        assert config.message_interval > 0
-        assert config.real_message_prob > 0
-        assert len(config.real_message_prob_weights) <= config.num_nodes
-        for weight in config.real_message_prob_weights:
-            assert weight >= 1
-        assert config.cover_message_prob >= 0
-        assert config.max_message_prep_time >= 0
-        assert config.max_network_latency >= 0
-        assert config.io_observation_window >= 0
-
-        return config
+    def validate(self):
+        assert self.io_observation_window >= 0

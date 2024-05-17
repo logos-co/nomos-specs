@@ -20,7 +20,7 @@ class Analysis:
 
     def messages_emitted_around_interval(self):
         df = pd.DataFrame(
-            [(node.id, cnt, node.id < len(self.sim.config.real_message_prob_weights))
+            [(node.id, cnt, node.id < len(self.sim.config.mixnet.real_message_prob_weights))
              for node, cnt in self.sim.p2p.adversary.senders_around_interval.items()],
             columns=["node_id", "msg_count", "expected"]
         )

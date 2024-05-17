@@ -44,7 +44,7 @@ class P2p:
 
     def send(self, msg: SphinxPacket | bytes, node):
         # simulate network latency
-        yield self.env.timeout(random.uniform(0, self.config.max_network_latency))
+        yield self.env.timeout(random.uniform(0, self.config.p2p.max_network_latency))
 
         self.adversary.observe_incoming_message(node)
         self.env.process(node.receive_message(msg))

@@ -29,13 +29,13 @@ class Node:
         Creates/encapsulate a message and send it to the network through the mixnet
         """
         while True:
-            yield self.env.timeout(self.config.message_interval)
+            yield self.env.timeout(self.config.mixnet.message_interval)
 
             payload = self.payload_to_send()
             if payload is None:  # nothing to send in this turn
                 continue
 
-            prep_time = random.uniform(0, self.config.max_message_prep_time)
+            prep_time = random.uniform(0, self.config.mixnet.max_message_prep_time)
             yield self.env.timeout(prep_time)
 
             self.log("Sending a message to the mixnet")
@@ -46,22 +46,22 @@ class Node:
         rnd = random.random()
         if rnd < self.real_message_prob():
             return self.REAL_PAYLOAD
-        elif rnd < self.config.cover_message_prob:
+        elif rnd < self.config.mixnet.cover_message_prob:
             return self.COVER_PAYLOAD
         else:
             return None
 
     def real_message_prob(self):
-        weight = self.config.real_message_prob_weights[self.id] \
-            if self.id < len(self.config.real_message_prob_weights) else 0
-        return self.config.real_message_prob * weight
+        weight = self.config.mixnet.real_message_prob_weights[self.id] \
+            if self.id < len(self.config.mixnet.real_message_prob_weights) else 0
+        return self.config.mixnet.real_message_prob * weight
 
     def create_message(self, payload: bytes) -> SphinxPacket:
         """
         Creates a message using the Sphinx format
         @return:
         """
-        mixes = self.p2p.get_nodes(self.config.num_mix_layers)
+        mixes = self.p2p.get_nodes(self.config.mixnet.num_mix_layers)
         public_keys = [mix.public_key for mix in mixes]
         # TODO: replace with realistic tx
         incentive_txs = [Node.create_incentive_tx(mix.public_key) for mix in mixes]
@@ -89,7 +89,7 @@ class Node:
                         self.log("Dropping a cover message: %s" % msg.payload)
                 else:
                     # TODO: use Poisson delay or something else, if necessary
-                    yield self.env.timeout(random.uniform(0, self.config.max_mix_delay))
+                    yield self.env.timeout(random.uniform(0, self.config.mixnet.max_mix_delay))
                     self.env.process(self.p2p.broadcast(self, msg))
             else:
                 self.log("Receiving SphinxPacket, but not mine")

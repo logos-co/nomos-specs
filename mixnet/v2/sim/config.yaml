@@ -1,23 +1,30 @@
-# The simulation uses a virtual time. Please see README for more details.
-running_time: 30
-num_nodes: 100
-num_mix_layers: 3
-# An interval of sending a new real/cover message
-# A probability of actually sending a message depends on the following parameters.
-message_interval: 1
-# A probability of sending a real message within a cycle
-real_message_prob: 0.1
-# A weight of real message emission probability of some nodes
-# Each weight is assigned to each node in the order of the node ID.
-# The length of the list should be <= num_nodes. i.e. some nodes won't have a weight.
-real_message_prob_weights: [10, 8, 12]
-# A probability of sending a cover message within a cycle if not sending a real message
-cover_message_prob: 0.2
-# A maximum preparation time (delay) before sending the message
-max_message_prep_time: 0.3
-# A maximum network latency between nodes directly connected with each other
-max_network_latency: 0.5
-# A maximum delay of messages mixed in a mix node
-max_mix_delay: 3
-# A discrete time window for the adversary to observe inputs and outputs of a certain node
-io_observation_window: 1
+simulation:
+  # The simulation uses a virtual time. Please see README for more details.
+  running_time: 30
+
+mixnet:
+  num_nodes: 100
+  num_mix_layers: 3
+  # An interval of sending a new real/cover message
+  # A probability of actually sending a message depends on the following parameters.
+  message_interval: 1
+  # A probability of sending a real message within a cycle
+  real_message_prob: 0.1
+  # A weight of real message emission probability of some nodes
+  # Each weight is assigned to each node in the order of the node ID.
+  # The length of the list should be <= p2p.num_nodes. i.e. some nodes won't have a weight.
+  real_message_prob_weights: [10, 8, 12]
+  # A probability of sending a cover message within a cycle if not sending a real message
+  cover_message_prob: 0.2
+  # A maximum preparation time (delay) before sending the message
+  max_message_prep_time: 0.3
+  # A maximum delay of messages mixed in a mix node
+  max_mix_delay: 3
+
+p2p:
+  # A maximum network latency between nodes directly connected with each other
+  max_network_latency: 0.5
+
+adversary:
+  # A discrete time window for the adversary to observe inputs and outputs of a certain node
+  io_observation_window: 1

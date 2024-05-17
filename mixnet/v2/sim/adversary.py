@@ -34,9 +34,9 @@ class Adversary:
 
     def is_around_message_interval(self, time: SimTime):
         now_frac, now_int = math.modf(time)
-        return now_int % self.config.message_interval == 0 and now_frac <= self.config.max_message_prep_time
+        return now_int % self.config.mixnet.message_interval == 0 and now_frac <= self.config.mixnet.max_message_prep_time
 
     def update_observation_window(self):
         while True:
             self.mixed_msgs_per_window.append(defaultdict(int))
-            yield self.env.timeout(self.config.io_observation_window)
+            yield self.env.timeout(self.config.adversary.io_observation_window)
