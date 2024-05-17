@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+import os
 import random
+from enum import Enum
 
 import simpy
 from cryptography.hazmat.primitives import serialization
@@ -11,8 +15,7 @@ from p2p import P2p
 
 class Node:
     INCENTIVE_TX_SIZE = 512
-    REAL_PAYLOAD = b"BLOCK"
-    COVER_PAYLOAD = b"COVER"
+    PAYLOAD = b"BLOCK"
     PADDING_SEPARATOR = b'\x01'
 
     def __init__(self, id: int, env: simpy.Environment, p2p: P2p, config: Config):
@@ -31,23 +34,23 @@ class Node:
         while True:
             yield self.env.timeout(self.config.mixnet.message_interval)
 
-            payload = self.payload_to_send()
-            if payload is None:  # nothing to send in this turn
+            message_type = self.message_type_to_send()
+            if message_type is None:  # nothing to send in this turn
                 continue
 
+            msg = self.create_message(message_type)
             prep_time = random.uniform(0, self.config.mixnet.max_message_prep_time)
             yield self.env.timeout(prep_time)
 
             self.log("Sending a message to the mixnet")
-            msg = self.create_message(payload)
             self.env.process(self.p2p.broadcast(self, msg))
 
-    def payload_to_send(self) -> bytes | None:
+    def message_type_to_send(self) -> MessageType | None:
         rnd = random.random()
         if rnd < self.real_message_prob():
-            return self.REAL_PAYLOAD
+            return MessageType.REAL
         elif rnd < self.config.mixnet.cover_message_prob:
-            return self.COVER_PAYLOAD
+            return MessageType.COVER
         else:
             return None
 
@@ -56,16 +59,20 @@ class Node:
             if self.id < len(self.config.mixnet.real_message_prob_weights) else 0
         return self.config.mixnet.real_message_prob * weight
 
-    def create_message(self, payload: bytes) -> SphinxPacket:
+    def create_message(self, message_type: MessageType) -> SphinxPacket | bytes:
         """
-        Creates a message using the Sphinx format
+        Creates a real or cover message
         @return:
         """
         mixes = self.p2p.get_nodes(self.config.mixnet.num_mix_layers)
         public_keys = [mix.public_key for mix in mixes]
         # TODO: replace with realistic tx
         incentive_txs = [Node.create_incentive_tx(mix.public_key) for mix in mixes]
-        return SphinxPacket(public_keys, incentive_txs, payload)
+        if message_type == MessageType.COVER:
+            # Set invalid txs for a cover message,
+            # so that nobody will recognize that as a real message to be forwarded to the next mix.
+            incentive_txs = [Attachment(os.urandom(len(bytes(tx)))) for tx in incentive_txs]
+        return SphinxPacket(public_keys, incentive_txs, self.PAYLOAD)
 
     def receive_message(self, msg: SphinxPacket | bytes):
         """
@@ -78,7 +85,7 @@ class Node:
             if self.is_my_incentive_tx(incentive_tx):
                 self.log("Receiving SphinxPacket. It's mine!")
                 if msg.is_all_unwrapped():
-                    if msg.payload == self.REAL_PAYLOAD:
+                    if msg.payload == self.PAYLOAD:
                         # Pad the final msg to the same size as a SphinxPacket,
                         # assuming that the final msg is going to be sent via secure channels (TLS, Noise, etc.)
                         final_padded_msg = (msg.payload
@@ -110,3 +117,8 @@ class Node:
 
     def log(self, msg):
         print("Node:%d at %g: %s" % (self.id, self.env.now, msg))
+
+
+class MessageType(Enum):
+    REAL = 0
+    COVER = 1
