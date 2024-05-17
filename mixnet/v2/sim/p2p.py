@@ -3,6 +3,7 @@ import random
 from collections import defaultdict
 
 import simpy
+from simpy.core import SimTime
 
 from config import Config
 from sphinx import SphinxPacket
@@ -30,11 +31,11 @@ class P2p:
     # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
     def broadcast(self, sender, msg: SphinxPacket | bytes):
         self.log("Broadcasting a msg: %d bytes" % len(msg))
+
+        # Adversary
         self.message_sizes.append(len(msg))
         self.mixed_msgs_per_window[-1][sender] -= 1
-
-        now_frac, now_int = math.modf(self.env.now)
-        if now_int % self.config.message_interval == 0 and now_frac <= self.config.max_message_prep_time:
+        if self.is_around_message_interval(self.env.now):
             self.senders_around_interval[sender] += 1
 
         # Yield 0 to ensure that the broadcast is done in the same time step.
@@ -51,6 +52,11 @@ class P2p:
 
         self.mixed_msgs_per_window[-1][node] += 1
         self.env.process(node.receive_message(msg))
+
+    # TODO: Move to a separate class `Adversary`.
+    def is_around_message_interval(self, time: SimTime):
+        now_frac, now_int = math.modf(time)
+        return now_int % self.config.message_interval == 0 and now_frac <= self.config.max_message_prep_time
 
     # TODO: Move to a separate class `Adversary`.
     def update_observation_window(self):
