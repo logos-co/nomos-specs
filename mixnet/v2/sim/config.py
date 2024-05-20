@@ -62,7 +62,7 @@ class MixnetConfig:
 
     def validate(self):
         assert self.num_nodes > 0
-        assert 0 < self.num_mix_layers <= self.num_nodes
+        assert 0 <= self.num_mix_layers <= self.num_nodes
         assert self.payload_size > 0
         assert self.message_interval > 0
         assert self.real_message_prob > 0
