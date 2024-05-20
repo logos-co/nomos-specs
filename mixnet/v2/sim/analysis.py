@@ -35,6 +35,7 @@ class Analysis:
         plt.title("Ingress/egress bandwidth of each node over time")
         plt.xlabel("Time")
         plt.ylabel("Bandwidth (KiB/s)")
+        plt.ylim(bottom=0)
         # Customize the legend to show only 'ingress' and 'egress' regardless of node_id
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
@@ -75,6 +76,7 @@ class Analysis:
         plt.title("Mixed messages in each mix over time")
         plt.xlabel("Time")
         plt.ylabel("Msg Count")
+        plt.ylim(bottom=0)
         plt.legend(title="Node ID")
         plt.grid(True)
         plt.show()

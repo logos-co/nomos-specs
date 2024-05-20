@@ -13,9 +13,9 @@ mixnet:
   # A probability of sending a real message within a cycle
   real_message_prob: 0.1
   # A weight of real message emission probability of some nodes
-  # Each weight is assigned to each node in the order of the node ID.
+  # Each weight is multiplied to the real_message_prob of the node being at the same position in the node list.
   # The length of the list should be <= p2p.num_nodes. i.e. some nodes won't have a weight.
-  real_message_prob_weights: [10, 8, 12]
+  real_message_prob_weights: [3, 2, 5]
   # A probability of sending a cover message within a cycle if not sending a real message
   cover_message_prob: 0.2
   # A maximum preparation time (delay) before sending the message
