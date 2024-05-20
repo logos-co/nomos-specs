@@ -50,7 +50,7 @@ class MixnetConfig:
     # A probability of sending a real message within one cycle
     real_message_prob: float
     # A weight of real message emission probability of some nodes
-    # Each weight is assigned to each node in the order of the node ID.
+    # Each weight is multiplied to the real_message_prob of the node being at the same position in the node list.
     # The length of the list should be <= num_nodes. i.e. some nodes won't have a weight.
     real_message_prob_weights: list[float]
     # A probability of sending a cover message within one cycle if not sending a real message
