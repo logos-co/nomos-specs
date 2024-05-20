@@ -33,7 +33,6 @@ class P2p:
         self.log("Broadcasting a msg: %d bytes" % len(msg))
 
         # Adversary
-        self.measurement.measure_egress(sender, msg)
         self.adversary.inspect_message_size(msg)
         self.adversary.observe_outgoing_message(sender)
 
@@ -43,6 +42,7 @@ class P2p:
 
         # TODO: gossipsub or something similar
         for node in self.nodes:
+            self.measurement.measure_egress(sender, msg)
             self.env.process(self.send(msg, node))
 
     def send(self, msg: SphinxPacket | bytes, node: "Node"):
