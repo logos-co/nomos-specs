@@ -29,6 +29,12 @@ class Config:
         
         return config
 
+    def description(self):
+        return (
+            f"{self.mixnet.description()}\n"
+            f"{self.p2p.description()}"
+        )
+
 
 @dataclass
 class SimulationConfig:
@@ -55,7 +61,7 @@ class MixnetConfig:
     real_message_prob_weights: list[float]
     # A probability of sending a cover message within one cycle if not sending a real message
     cover_message_prob: float
-    # A maximum preparation time (delay) before sending the message
+    # A maximum preparation time (computation time) for a message sender before sending the message
     max_message_prep_time: float
     # A maximum delay of messages mixed in a mix node
     max_mix_delay: float
@@ -73,6 +79,20 @@ class MixnetConfig:
         assert self.max_message_prep_time >= 0
         assert self.max_mix_delay >= 0
 
+    def description(self):
+        return (
+            f"payload: {self.payload_size} bytes\n"
+            f"num_nodes: {self.num_nodes}\n"
+            f"num_mix_layers: {self.num_mix_layers}\n"
+            f"max_mix_delay: {self.max_mix_delay}\n"
+            f"msg_interval: {self.message_interval}\n"
+            f"real_msg_prob: {self.real_message_prob:.2f}\n"
+            f"cover_msg_prob: {self.cover_message_prob:.2f}"
+        )
+
+    def is_mixing_on(self) -> bool:
+        return self.num_mix_layers > 0
+
 
 @dataclass
 class P2pConfig:
@@ -81,6 +101,11 @@ class P2pConfig:
 
     def validate(self):
         assert self.max_network_latency >= 0
+
+    def description(self):
+        return (
+            f"max_net_latency: {self.max_network_latency:.2f}"
+        )
 
 
 @dataclass

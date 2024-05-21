@@ -20,7 +20,7 @@ mixnet:
   real_message_prob_weights: [3, 2, 5]
   # A probability of sending a cover message within a cycle if not sending a real message
   cover_message_prob: 0.2
-  # A maximum preparation time (delay) before sending the message
+  # A maximum preparation time (computation time) for a message sender before sending the message
   max_message_prep_time: 0.05
   # A maximum delay of messages mixed in a mix node
   max_mix_delay: 3

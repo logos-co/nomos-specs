@@ -3,28 +3,41 @@ import seaborn
 from matplotlib import pyplot as plt
 
 from adversary import NodeState
+from config import Config
 from simulation import Simulation
 
 
 class Analysis:
-    def __init__(self, sim: Simulation):
+    def __init__(self, sim: Simulation, config: Config):
         self.sim = sim
+        self.config = config
 
     def run(self):
-        self.bandwidth()
-        self.message_size_distribution()
+        message_size_df = self.message_size_distribution()
+        self.bandwidth(message_size_df)
         self.messages_emitted_around_interval()
-        self.mixed_messages_per_node_over_time()
+        if self.config.mixnet.is_mixing_on():
+            self.mixed_messages_per_node_over_time()
         self.node_states()
 
-    def bandwidth(self):
+    def bandwidth(self, message_size_df: pd.DataFrame):
         dataframes = []
-        for ingress_bandwidths, egress_bandwidths in zip(self.sim.p2p.measurement.ingress_bandwidth_per_time, self.sim.p2p.measurement.egress_bandwidth_per_time):
+        nonzero_ingresses = []
+        nonzero_egresses = []
+        for ingress_bandwidths, egress_bandwidths in zip(self.sim.p2p.measurement.ingress_bandwidth_per_time,
+                                                         self.sim.p2p.measurement.egress_bandwidth_per_time):
             rows = []
             for node in self.sim.p2p.nodes:
-                rows.append((node.id, ingress_bandwidths[node]/1024.0, egress_bandwidths[node]/1024.0))
+                ingress = ingress_bandwidths[node] / 1024.0
+                egress = egress_bandwidths[node] / 1024.0
+                rows.append((node.id, ingress, egress))
+                if ingress > 0:
+                    nonzero_ingresses.append(ingress)
+                if egress > 0:
+                    nonzero_egresses.append(egress)
             df = pd.DataFrame(rows, columns=["node_id", "ingress", "egress"])
             dataframes.append(df)
+
         times = range(len(dataframes))
         df = pd.concat([df.assign(Time=time) for df, time in zip(dataframes, times)], ignore_index=True)
         df = df.pivot(index="Time", columns="node_id", values=["ingress", "egress"])
@@ -41,11 +54,25 @@ class Analysis:
         by_label = dict(zip(labels, handles))
         plt.legend(by_label.values(), by_label.keys())
         plt.grid(True)
+
+        # Adding descriptions on the right size of the plot
+        ingress_series = pd.Series(nonzero_ingresses)
+        egress_series = pd.Series(nonzero_egresses)
+        desc = (
+            f"message: {message_size_df["message_size"].mean():.0f} bytes\n"
+            f"{self.config.description()}\n\n"
+            f"[ingress(>0)]\nmean: {ingress_series.mean():.2f} KiB/s\nmax: {ingress_series.max():.2f} KiB/s\n\n"
+            f"[egress(>0)]\nmean: {egress_series.mean():.2f} KiB/s\nmax: {egress_series.max():.2f} KiB/s"
+        )
+        plt.text(1.02, 0.5, desc, transform=plt.gca().transAxes, verticalalignment="center", fontsize=12)
+        plt.subplots_adjust(right=0.8)  # Adjust layout to make room for the text
+
         plt.show()
 
-    def message_size_distribution(self):
+    def message_size_distribution(self) -> pd.DataFrame:
         df = pd.DataFrame(self.sim.p2p.adversary.message_sizes, columns=["message_size"])
         print(df.describe())
+        return df
 
     def messages_emitted_around_interval(self):
         df = pd.DataFrame(
@@ -89,10 +116,10 @@ class Analysis:
         df = pd.DataFrame(rows, columns=["time", "node_id", "state"])
 
         plt.figure(figsize=(10, 6))
-        seaborn.scatterplot(data=df, x="time", y="node_id", hue="state", palette={NodeState.SENDING: "red", NodeState.RECEIVING: "blue"})
+        seaborn.scatterplot(data=df, x="time", y="node_id", hue="state",
+                            palette={NodeState.SENDING: "red", NodeState.RECEIVING: "blue"})
         plt.title("Node states over time")
         plt.xlabel("Time")
         plt.ylabel("Node ID")
         plt.legend(title="state")
         plt.show()
-

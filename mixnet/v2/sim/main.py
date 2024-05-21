@@ -13,6 +13,6 @@ if __name__ == "__main__":
     sim = Simulation(config)
     sim.run()
 
-    Analysis(sim).run()
+    Analysis(sim, config).run()
 
     print("Simulation complete!")

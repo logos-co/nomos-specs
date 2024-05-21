@@ -63,7 +63,7 @@ class Node:
         Creates a real or cover message
         @return:
         """
-        if self.config.mixnet.num_mix_layers == 0:  # if mixing is turned off
+        if not self.config.mixnet.is_mixing_on():
             return self.build_payload()
 
         mixes = self.p2p.get_nodes(self.config.mixnet.num_mix_layers)
