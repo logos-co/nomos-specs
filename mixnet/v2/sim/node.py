@@ -87,11 +87,7 @@ class Node:
             if self.is_my_incentive_tx(incentive_tx):
                 self.log("Receiving SphinxPacket. It's mine!")
                 if msg.is_all_unwrapped():
-                    # Pad the final msg to the same size as a SphinxPacket,
-                    # assuming that the final msg is going to be sent via secure channels (TLS, Noise, etc.)
-                    final_padded_msg = (msg.payload
-                                        + self.PADDING_SEPARATOR
-                                        + bytes(len(msg) - len(msg.payload) - len(self.PADDING_SEPARATOR)))
+                    final_padded_msg = self.pad_payload(msg.payload, len(msg))
                     self.env.process(self.p2p.broadcast(self, final_padded_msg))
                 else:
                     # TODO: use Poisson delay or something else, if necessary
@@ -105,6 +101,15 @@ class Node:
 
     def build_payload(self) -> bytes:
         return b"P" + bytes(self.config.mixnet.payload_size - len(b"P"))
+
+    def pad_payload(self, payload: bytes, target_size: int) -> bytes:
+        """
+        Pad the final msg to the target size (e.g. the same size as a SphinxPacket),
+        assuming that the final msg is going to be sent via secure channels (TLS, Noise, etc.)
+        """
+        return (payload
+                + self.PADDING_SEPARATOR
+                + bytes(target_size - len(payload) - len(self.PADDING_SEPARATOR)))
 
     # TODO: This is a dummy logic
     @classmethod
