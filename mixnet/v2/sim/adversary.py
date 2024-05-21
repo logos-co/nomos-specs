@@ -31,14 +31,13 @@ class Adversary:
 
     def observe_incoming_message(self, node: "Node"):
         self.mixed_msgs_per_window[-1][node] += 1
-        # TODO: check duplications. Two events at the same time?
-        self.node_states[self.env.now][node] = NodeState.RECEIVING
+        if node not in self.node_states[self.env.now]:
+            self.node_states[self.env.now][node] = NodeState.RECEIVING
 
     def observe_outgoing_message(self, node: "Node"):
         self.mixed_msgs_per_window[-1][node] -= 1
         if self.is_around_message_interval(self.env.now):
             self.senders_around_interval[node] += 1
-        # TODO: check duplications. Two events at the same time?
         self.node_states[self.env.now][node] = NodeState.SENDING
 
     def is_around_message_interval(self, time: SimTime):
