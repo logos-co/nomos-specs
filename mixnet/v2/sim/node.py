@@ -55,7 +55,7 @@ class Node:
 
     def real_message_prob(self):
         weight = self.config.mixnet.real_message_prob_weights[self.id] \
-            if self.id < len(self.config.mixnet.real_message_prob_weights) else 0
+            if self.id < len(self.config.mixnet.real_message_prob_weights) else 1
         return self.config.mixnet.real_message_prob * weight
 
     def create_message(self, message_type: MessageType) -> SphinxPacket | bytes:
