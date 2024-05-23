@@ -25,8 +25,8 @@ class P2P(ABC):
         self.measurement = Measurement(env, config)
         self.adversary = Adversary(env, config)
 
-    def add_node(self, nodes: list["Node"]):
-        self.nodes.extend(nodes)
+    def set_nodes(self, nodes: list["Node"]):
+        self.nodes = nodes
 
     def get_nodes(self, n: int) -> list["Node"]:
         return random.sample(self.nodes, n)
@@ -57,6 +57,7 @@ class P2P(ABC):
 class NaiveBroadcastP2P(P2P):
     def __init__(self, env: simpy.Environment, config: Config):
         super().__init__(env, config)
+        self.nodes = []
 
     # This should accept only bytes in practice,
     # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
@@ -78,6 +79,24 @@ class GossipP2P(P2P):
         self.topology = defaultdict(set)
         self.message_cache = defaultdict(set)
 
+    def set_nodes(self, nodes: list["Node"]):
+        super().set_nodes(nodes)
+        for i, node in enumerate(nodes):
+            # Each node is chained with the right neighbor, so that no node is not orphaned.
+            # And then, each node is connected to a random subset of other nodes.
+            front, back = nodes[:i], nodes[i + 1:]
+            if len(back) > 0:
+                neighbor = back[0]
+                back = back[1:]
+            else:
+                neighbor = front[0]
+                front = front[1:]
+            others = front + back
+            n = min(self.config.p2p.connection_density - 1, len(others))
+            conns = set(random.sample(others, n))
+            conns.add(neighbor)
+            self.topology[node] = conns
+
     def broadcast(self, sender: "Node", msg: SphinxPacket | bytes):
         yield from super().broadcast(sender, msg)
         self.log("Gossiping a msg: %d bytes" % len(msg))
@@ -92,3 +111,5 @@ class GossipP2P(P2P):
         if msg_hash not in self.message_cache[receiver]:
             self.message_cache[receiver].add(msg_hash)
             self.env.process(receiver.receive_message(msg))
+            # gossiping
+            self.env.process(self.broadcast(receiver, msg))

@@ -12,9 +12,9 @@ class Simulation:
         random.seed()
         self.config = config
         self.env = simpy.Environment()
-        self.p2p = NaiveBroadcastP2P(self.env, config)
-        self.nodes = [Node(i, self.env, self.p2p, config) for i in range(config.mixnet.num_nodes)]
-        self.p2p.add_node(self.nodes)
+        self.p2p = Simulation.init_p2p(self.env, config)
+        nodes = [Node(i, self.env, self.p2p, config) for i in range(config.mixnet.num_nodes)]
+        self.p2p.set_nodes(nodes)
 
     def run(self):
         self.env.run(until=self.config.simulation.running_time)

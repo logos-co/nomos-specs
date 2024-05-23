@@ -27,7 +27,9 @@ mixnet:
 
 p2p:
   # Broadcasting type: naive | gossip
-  type: "naive"
+  type: "gossip"
+  # A connection density, only if the type is gossip
+  connection_density: 10
   # A maximum network latency between nodes directly connected with each other
   max_network_latency: 0.5
 
