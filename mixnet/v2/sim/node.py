@@ -24,6 +24,7 @@ class Node:
         self.private_key = X25519PrivateKey.generate()
         self.public_key = self.private_key.public_key()
         self.config = config
+        self.payload_id = 0
         self.action = self.env.process(self.send_message())
 
     def send_message(self):
@@ -100,7 +101,9 @@ class Node:
             self.log("Received final message: %s" % final_msg)
 
     def build_payload(self) -> bytes:
-        return b"P" + bytes(self.config.mixnet.payload_size - len(b"P"))
+        payload = bytes(f"{self.id}-{self.payload_id}", "utf-8")
+        self.payload_id += 1
+        return payload + bytes(self.config.mixnet.payload_size - len(payload))
 
     def pad_payload(self, payload: bytes, target_size: int) -> bytes:
         """
