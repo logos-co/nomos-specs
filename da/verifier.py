@@ -7,10 +7,9 @@ from eth2spec.eip7594.mainnet import (
     KZGCommitment as Commitment,
     KZGProof as Proof,
 )
-from py_ecc.bls import G2ProofOfPossession as bls_pop
 
 import da.common
-from da.common import Column, Chunk, Attestation, BLSPrivateKey, BLSPublicKey
+from da.common import Column, Chunk, Attestation, BLSPrivateKey, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import ROOTS_OF_UNITY, GLOBAL_PARAMETERS, BLS_MODULUS
