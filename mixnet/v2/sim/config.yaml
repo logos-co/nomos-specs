@@ -26,6 +26,8 @@ mixnet:
   max_mix_delay: 3
 
 p2p:
+  # Broadcasting type: naive | gossip
+  type: "naive"
   # A maximum network latency between nodes directly connected with each other
   max_network_latency: 0.5
 

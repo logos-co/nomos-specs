@@ -2,9 +2,9 @@ import random
 
 import simpy
 
-from config import Config
+from config import Config, P2PConfig
 from node import Node
-from p2p import NaiveBroadcastP2P
+from p2p import NaiveBroadcastP2P, GossipP2P
 
 
 class Simulation:
@@ -18,3 +18,13 @@ class Simulation:
 
     def run(self):
         self.env.run(until=self.config.simulation.running_time)
+
+    @classmethod
+    def init_p2p(cls, env: simpy.Environment, config: Config):
+        match config.p2p.type:
+            case P2PConfig.TYPE_NAIVE:
+                return NaiveBroadcastP2P(env, config)
+            case P2PConfig.TYPE_GOSSIP:
+                return GossipP2P(env, config)
+            case _:
+                raise ValueError("Unknown P2P type")

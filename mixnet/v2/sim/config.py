@@ -10,7 +10,7 @@ import yaml
 class Config:
     simulation: SimulationConfig
     mixnet: MixnetConfig
-    p2p: P2pConfig
+    p2p: P2PConfig
     measurement: MeasurementConfig
     adversary: AdversaryConfig
 
@@ -95,15 +95,22 @@ class MixnetConfig:
 
 
 @dataclass
-class P2pConfig:
+class P2PConfig:
+    # Broadcasting type: naive | gossip
+    type: str
     # A maximum network latency between nodes directly connected with each other
     max_network_latency: float
 
+    TYPE_NAIVE = "naive"
+    TYPE_GOSSIP = "gossip"
+
     def validate(self):
+        assert self.type in [self.TYPE_NAIVE, self.TYPE_GOSSIP]
         assert self.max_network_latency >= 0
 
     def description(self):
         return (
+            f"p2p_type: {self.type}\n"
             f"max_net_latency: {self.max_network_latency:.2f}"
         )
 
