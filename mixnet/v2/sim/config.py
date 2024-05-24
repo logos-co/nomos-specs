@@ -115,7 +115,7 @@ class P2PConfig:
     def description(self):
         return (
             f"p2p_type: {self.type}\n"
-            f"conn_density: {self.connection_density}"
+            f"conn_density: {self.connection_density}\n"
             f"max_net_latency: {self.max_network_latency:.2f}"
         )
 
