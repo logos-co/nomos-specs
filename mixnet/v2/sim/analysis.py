@@ -18,7 +18,7 @@ class Analysis:
         self.messages_emitted_around_interval()
         if self.config.mixnet.is_mixing_on():
             self.mixed_messages_per_node_over_time()
-        self.node_states()
+        # self.node_states()
 
     def bandwidth(self, message_size_df: pd.DataFrame):
         dataframes = []
