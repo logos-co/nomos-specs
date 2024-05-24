@@ -51,7 +51,7 @@ class P2P(ABC):
         self.adversary.observe_incoming_message(receiver)
 
     def log(self, msg):
-        print(f"t={self.env.now}: P2P: {msg}")
+        print(f"t={self.env.now:.3f}: P2P: {msg}")
 
 
 class NaiveBroadcastP2P(P2P):
