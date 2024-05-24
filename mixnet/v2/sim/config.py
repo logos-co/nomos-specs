@@ -96,18 +96,18 @@ class MixnetConfig:
 
 @dataclass
 class P2PConfig:
-    # Broadcasting type: naive | gossip
+    # Broadcasting type: 1-to-all | gossip
     type: str
     # A connection density, only if the type is gossip
     connection_density: int
     # A maximum network latency between nodes directly connected with each other
     max_network_latency: float
 
-    TYPE_NAIVE = "naive"
+    TYPE_ONE_TO_ALL = "1-to-all"
     TYPE_GOSSIP = "gossip"
 
     def validate(self):
-        assert self.type in [self.TYPE_NAIVE, self.TYPE_GOSSIP]
+        assert self.type in [self.TYPE_ONE_TO_ALL, self.TYPE_GOSSIP]
         if self.type == self.TYPE_GOSSIP:
             assert self.connection_density > 0
         assert self.max_network_latency >= 0

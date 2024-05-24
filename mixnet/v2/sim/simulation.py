@@ -22,7 +22,7 @@ class Simulation:
     @classmethod
     def init_p2p(cls, env: simpy.Environment, config: Config):
         match config.p2p.type:
-            case P2PConfig.TYPE_NAIVE:
+            case P2PConfig.TYPE_ONE_TO_ALL:
                 return NaiveBroadcastP2P(env, config)
             case P2PConfig.TYPE_GOSSIP:
                 return GossipP2P(env, config)
