@@ -92,7 +92,7 @@ class GossipP2P(P2P):
                 neighbor = front[0]
                 front = front[1:]
             else:
-                return
+                continue
 
             others = front + back
             n = min(self.config.p2p.connection_density - 1, len(others))
