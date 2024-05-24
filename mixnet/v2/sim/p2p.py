@@ -88,9 +88,12 @@ class GossipP2P(P2P):
             if len(back) > 0:
                 neighbor = back[0]
                 back = back[1:]
-            else:
+            elif len(front) > 0:
                 neighbor = front[0]
                 front = front[1:]
+            else:
+                return
+
             others = front + back
             n = min(self.config.p2p.connection_density - 1, len(others))
             conns = set(random.sample(others, n))
@@ -100,6 +103,10 @@ class GossipP2P(P2P):
     def broadcast(self, sender: "Node", msg: SphinxPacket | bytes):
         yield from super().broadcast(sender, msg)
         self.log(f"Node:{sender.id}: Gossiping a msg: {len(msg)} bytes")
+
+        msg_hash = hashlib.sha256(bytes(msg)).digest()
+        self.message_cache[sender].add(msg_hash)
+
         for receiver in self.topology[sender]:
             self.measurement.measure_egress(sender, msg)
             self.env.process(self.send(msg, receiver))
