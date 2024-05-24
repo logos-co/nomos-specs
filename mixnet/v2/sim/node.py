@@ -126,7 +126,7 @@ class Node:
         return tx == Node.create_incentive_tx(self.public_key)
 
     def log(self, msg):
-        print("Node:%d at %g: %s" % (self.id, self.env.now, msg))
+        print(f"t={self.env.now}: Node:{self.id}: {msg}")
 
 
 class MessageType(Enum):

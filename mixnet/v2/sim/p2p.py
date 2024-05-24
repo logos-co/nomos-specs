@@ -51,7 +51,7 @@ class P2P(ABC):
         self.adversary.observe_incoming_message(receiver)
 
     def log(self, msg):
-        print("P2P at %g: %s" % (self.env.now, msg))
+        print(f"t={self.env.now}: P2P: {msg}")
 
 
 class NaiveBroadcastP2P(P2P):
@@ -63,7 +63,7 @@ class NaiveBroadcastP2P(P2P):
     # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
     def broadcast(self, sender: "Node", msg: SphinxPacket | bytes):
         yield from super().broadcast(sender, msg)
-        self.log("Broadcasting a msg: %d bytes" % len(msg))
+        self.log(f"Node:{sender.id}: Broadcasting a msg: {len(msg)} bytes")
         for node in self.nodes:
             self.measurement.measure_egress(sender, msg)
             self.env.process(self.send(msg, node))
@@ -99,7 +99,7 @@ class GossipP2P(P2P):
 
     def broadcast(self, sender: "Node", msg: SphinxPacket | bytes):
         yield from super().broadcast(sender, msg)
-        self.log("Gossiping a msg: %d bytes" % len(msg))
+        self.log(f"Node:{sender.id}: Gossiping a msg: {len(msg)} bytes")
         for receiver in self.topology[sender]:
             self.measurement.measure_egress(sender, msg)
             self.env.process(self.send(msg, receiver))
@@ -111,5 +111,4 @@ class GossipP2P(P2P):
         if msg_hash not in self.message_cache[receiver]:
             self.message_cache[receiver].add(msg_hash)
             self.env.process(receiver.receive_message(msg))
-            # gossiping
             self.env.process(self.broadcast(receiver, msg))
