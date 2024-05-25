@@ -39,12 +39,18 @@ def bulk_run():
 
     for p2p_type in [P2PConfig.TYPE_ONE_TO_ALL, P2PConfig.TYPE_GOSSIP]:
         config.p2p.type = p2p_type
-        for num_nodes in [10, 100, 1000]:
+
+        num_nodes_list = [10, 100, 1000]
+        for i, num_nodes in enumerate(num_nodes_list):
             config.mixnet.num_nodes = num_nodes
             sim = Simulation(config)
             sim.run()
+
             if message_size_df is None:
                 message_size_df = Analysis(sim, config).message_size_distribution()
+
+            if i == len(num_nodes_list) - 1:
+                Analysis(sim, config).run()
 
             nonzero_ingresses, nonzero_egresses = [], []
             for ingress_bandwidths, egress_bandwidths in zip(sim.p2p.measurement.ingress_bandwidth_per_time,

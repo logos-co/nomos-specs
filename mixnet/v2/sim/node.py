@@ -86,7 +86,7 @@ class Node:
         if isinstance(msg, SphinxPacket):
             msg, incentive_tx = msg.unwrap(self.private_key)
             if self.is_my_incentive_tx(incentive_tx):
-                self.log("Receiving SphinxPacket. It's mine!")
+                # self.log("Receiving SphinxPacket. It's mine!")
                 if msg.is_all_unwrapped():
                     final_padded_msg = self.pad_payload(msg.payload, len(msg))
                     self.env.process(self.p2p.broadcast(self, final_padded_msg))
@@ -94,8 +94,8 @@ class Node:
                     # TODO: use Poisson delay or something else, if necessary
                     yield self.env.timeout(random.uniform(0, self.config.mixnet.max_mix_delay))
                     self.env.process(self.p2p.broadcast(self, msg))
-            else:
-                self.log("Receiving SphinxPacket, but not mine")
+            # else:
+            #     self.log("Receiving SphinxPacket, but not mine")
         else:
             final_msg = msg[:msg.rfind(self.PADDING_SEPARATOR)]
             self.log("Received final message: %s" % final_msg)
