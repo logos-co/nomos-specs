@@ -26,7 +26,7 @@ mixnet:
   max_mix_delay: 3
 
 p2p:
-  # Broadcasting type: naive | gossip
+  # Broadcasting type: 1-to-all | gossip
   type: "gossip"
   # A connection density, only if the type is gossip
   connection_density: 10
