@@ -1,23 +1,16 @@
 import argparse
+from datetime import datetime
 
 import pandas as pd
-import seaborn
 from matplotlib import pyplot as plt
 
 from config import P2PConfig, Config
-from analysis import Analysis
 from simulation import Simulation
 
-COL_P2P_TYPE = "P2P Type"
-COL_NUM_NODES = "Num Nodes"
-COL_TRAFFIC_TYPE = "Traffic Type"
-COL_STAT = "Stat"
-COL_BANDWIDTH = "Bandwidth"
-
-TRAFFIC_TYPE_INGRESS = "Ingress"
-TRAFFIC_TYPE_EGRESS = "Egress"
-STAT_MEAN = "mean"
-STAT_MAX = "max"
+# https://matplotlib.org/stable/api/markers_api.html
+MARKERS = ['o', 'x', 'v', '^', '<', '>']
+NUM_NODES_SET = [10, 200, 400, 600, 800, 1000]
+NUM_MIX_LAYERS_SET = [0, 2, 4]
 
 
 def bulk_run():
@@ -27,104 +20,111 @@ def bulk_run():
     args = parser.parse_args()
     config = Config.load(args.config)
 
-    data = {
-        COL_P2P_TYPE: [],
-        COL_NUM_NODES: [],
-        COL_TRAFFIC_TYPE: [],
-        COL_STAT: [],
-        COL_BANDWIDTH: [],
-    }
+    results = []
 
-    message_size_df = None
+    for num_nodes in NUM_NODES_SET:
+        config.mixnet.num_nodes = num_nodes
 
-    for p2p_type in [P2PConfig.TYPE_ONE_TO_ALL, P2PConfig.TYPE_GOSSIP]:
-        config.p2p.type = p2p_type
+        for p2p_type in [P2PConfig.TYPE_GOSSIP]:
+            config.p2p.type = p2p_type
 
-        num_nodes_list = [10, 100, 1000]
-        for i, num_nodes in enumerate(num_nodes_list):
-            config.mixnet.num_nodes = num_nodes
-            sim = Simulation(config)
-            sim.run()
+            for num_mix_layers in NUM_MIX_LAYERS_SET:
+                config.mixnet.num_mix_layers = num_mix_layers
 
-            if message_size_df is None:
-                message_size_df = Analysis(sim, config).message_size_distribution()
+                for cover_message_prob in [0.0, config.mixnet.real_message_prob * 2]:
+                    config.mixnet.cover_message_prob = cover_message_prob
 
-            if i == len(num_nodes_list) - 1:
-                Analysis(sim, config).run()
+                    sim = Simulation(config)
+                    sim.run()
 
-            nonzero_ingresses, nonzero_egresses = [], []
-            for ingress_bandwidths, egress_bandwidths in zip(sim.p2p.measurement.ingress_bandwidth_per_time,
-                                                             sim.p2p.measurement.egress_bandwidth_per_time):
-                for node in sim.p2p.nodes:
-                    ingress = ingress_bandwidths[node] / 1024.0
-                    egress = egress_bandwidths[node] / 1024.0
-                    if ingress > 0:
-                        nonzero_ingresses.append(ingress)
-                    if egress > 0:
-                        nonzero_egresses.append(egress)
+                    ingress, egress = sim.p2p.measurement.bandwidth()
+                    results.append({
+                        "num_nodes": num_nodes,
+                        "config": f"{p2p_type}: {num_mix_layers}: {cover_message_prob}",
+                        "ingress_mean": ingress.mean(),
+                        "ingress_max": ingress.max(),
+                        "egress_mean": egress.mean(),
+                        "egress_max": egress.max(),
+                    })
 
-            ingresses = pd.Series(nonzero_ingresses)
-            add_data(data, p2p_type, num_nodes, TRAFFIC_TYPE_INGRESS, STAT_MEAN, ingresses.mean())
-            add_data(data, p2p_type, num_nodes, TRAFFIC_TYPE_INGRESS, STAT_MAX, ingresses.max())
-            egresses = pd.Series(nonzero_egresses)
-            add_data(data, p2p_type, num_nodes, TRAFFIC_TYPE_EGRESS, STAT_MEAN, egresses.mean())
-            add_data(data, p2p_type, num_nodes, TRAFFIC_TYPE_EGRESS, STAT_MAX, egresses.max())
-
-    df = pd.DataFrame(data)
-    draw_bandwidth_plot(df, TRAFFIC_TYPE_INGRESS, config, message_size_df)
-    draw_bandwidth_plot(df, TRAFFIC_TYPE_EGRESS, config, message_size_df)
+    df = pd.DataFrame(results)
+    df.to_csv(f"{datetime.now().replace(microsecond=0).isoformat()}.csv", index=False)
+    plot(df)
 
 
-def add_data(data: dict, p2p_type: str, num_nodes: int, bandwidth_type: str, stat: str, bandwidth: float):
-    data[COL_P2P_TYPE].append(p2p_type)
-    data[COL_NUM_NODES].append(num_nodes)
-    data[COL_TRAFFIC_TYPE].append(bandwidth_type)
-    data[COL_STAT].append(stat)
-    data[COL_BANDWIDTH].append(bandwidth)
+def load_and_plot():
+    # with skipping the header
+    df = pd.read_csv("2024-05-25T23:16:39.csv")
+    print(df)
+    plot(df)
 
 
-def draw_bandwidth_plot(df: pd.DataFrame, traffic_type: str, config: Config, message_size_df: pd.DataFrame):
-    ingress_df = df[df[COL_TRAFFIC_TYPE] == traffic_type]
-
+def plot(df: pd.DataFrame):
+    ingress_max_df = df.pivot(index='num_nodes', columns='config', values='ingress_max')
     plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots()
+    for config in ingress_max_df.columns:
+        num_mix_layers = int(config.split(":")[1].strip())
+        ax.plot(ingress_max_df.index, ingress_max_df[config], label=config,
+                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
+    plt.title("Ingress Bandwidth (Max)")
+    plt.xlabel("Number of Nodes")
+    plt.ylabel("Max Bandwidth (KiB/s)")
+    plt.legend(title="mode: layers: cover", loc="upper left")
+    plt.tight_layout()
+    plt.grid(True)
+    plt.show()
+    ingress_max_y_lim = ax.get_ylim()
 
-    mean_df = ingress_df[ingress_df[COL_STAT] == STAT_MEAN]
-    seaborn.barplot(data=mean_df, x=COL_NUM_NODES, y=COL_BANDWIDTH, hue=COL_P2P_TYPE, ax=plt.gca(), capsize=0.1)
-    max_df = ingress_df[ingress_df[COL_STAT] == STAT_MAX]
-    barplot = seaborn.barplot(data=max_df, x=COL_NUM_NODES, y=COL_BANDWIDTH, hue=COL_P2P_TYPE, ax=plt.gca(),
-                              capsize=0.1, alpha=0.5)
+    ingress_mean_df = df.pivot(index='num_nodes', columns='config', values='ingress_mean')
+    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots()
+    for config in ingress_mean_df.columns:
+        num_mix_layers = int(config.split(":")[1].strip())
+        ax.plot(ingress_mean_df.index, ingress_mean_df[config], label=config,
+                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
+    plt.title("Ingress Bandwidth (Mean)")
+    plt.xlabel("Number of Nodes")
+    plt.ylabel("Mean Bandwidth (KiB/s)")
+    plt.legend(title="mode: layers: cover", loc="upper left")
+    plt.tight_layout()
+    plt.grid(True)
+    ax.set_ylim(ingress_max_y_lim)
+    plt.show()
 
-    # Adding labels to each bar
-    for p in barplot.patches:
-        height = p.get_height()
-        if height > 0:  # Only label bars with positive height
-            barplot.annotate(format(height, ".2f"),
-                             (p.get_x() + p.get_width() / 2., height),
-                             ha="center", va="center",
-                             xytext=(0, 9),
-                             textcoords="offset points")
+    egress_max_df = df.pivot(index='num_nodes', columns='config', values='egress_max')
+    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots()
+    for config in egress_max_df.columns:
+        num_mix_layers = int(config.split(":")[1].strip())
+        ax.plot(egress_max_df.index, egress_max_df[config], label=config,
+                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
+    plt.title("Egress Bandwidth (Max)")
+    plt.xlabel("Number of Nodes")
+    plt.ylabel("Max Bandwidth (KiB/s)")
+    plt.legend(title="mode: layers: cover", loc="upper left")
+    plt.tight_layout()
+    plt.grid(True)
+    plt.show()
+    ingress_max_y_lim = ax.get_ylim()
 
-    plt.title(f"{traffic_type} Bandwidth")
-    plt.xlabel(COL_NUM_NODES)
-    plt.ylabel(f"{COL_BANDWIDTH} (KB/s)")
-
-    # Custom legend to show Mean and Max
-    handles, labels = barplot.get_legend_handles_labels()
-    for i in range(len(labels) // 2):
-        labels[i] = labels[i] + f" ({STAT_MEAN})"
-    for i in range(len(labels) // 2, len(labels)):
-        labels[i] = labels[i] + f" ({STAT_MAX})"
-    plt.legend(handles=handles, labels=labels, loc="upper left")
-
-    desc = (
-        f"message: {message_size_df["message_size"].mean():.0f} bytes\n"
-        f"{config.description()}"
-    )
-    plt.text(1.02, 0.5, desc, transform=plt.gca().transAxes, verticalalignment="center", fontsize=12)
-    plt.subplots_adjust(right=0.8)  # Adjust layout to make room for the text
-
+    egress_mean_df = df.pivot(index='num_nodes', columns='config', values='egress_mean')
+    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots()
+    for config in egress_mean_df.columns:
+        num_mix_layers = int(config.split(":")[1].strip())
+        ax.plot(egress_mean_df.index, egress_mean_df[config], label=config,
+                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
+    plt.title("Egress Bandwidth (Mean)")
+    plt.xlabel("Number of Nodes")
+    plt.ylabel("Mean Bandwidth (KiB/s)")
+    plt.legend(title="mode: layers: cover", loc="upper left")
+    plt.tight_layout()
+    plt.grid(True)
+    ax.set_ylim(ingress_max_y_lim)
     plt.show()
 
 
 if __name__ == "__main__":
     bulk_run()
+    # load_and_plot()

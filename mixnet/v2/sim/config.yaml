@@ -6,32 +6,32 @@ mixnet:
   num_nodes: 100
   # A number of mix nodes selected by a message sender through which the Sphinx message goes through
   # If 0, the message is broadcast directly to all nodes without being Sphinx-encoded.
-  num_mix_layers: 3
+  num_mix_layers: 0
   # A size of a message payload in bytes (e.g. the size of a block proposal)
   payload_size: 320
   # An interval of sending a new real/cover message
   # A probability of actually sending a message depends on the following parameters.
   message_interval: 1
   # A probability of sending a real message within a cycle
-  real_message_prob: 0.1
+  real_message_prob: 0.01
   # A weight of real message emission probability of some nodes
   # Each weight is multiplied to the real_message_prob of the node being at the same position in the node list.
   # The length of the list should be <= p2p.num_nodes. i.e. some nodes won't have a weight.
-  real_message_prob_weights: [3, 2, 5]
+  real_message_prob_weights: []
   # A probability of sending a cover message within a cycle if not sending a real message
-  cover_message_prob: 0.2
+  cover_message_prob: 0
   # A maximum preparation time (computation time) for a message sender before sending the message
-  max_message_prep_time: 0.05
+  max_message_prep_time: 0
   # A maximum delay of messages mixed in a mix node
-  max_mix_delay: 3
+  max_mix_delay: 0
 
 p2p:
   # Broadcasting type: 1-to-all | gossip
   type: "gossip"
   # A connection density, only if the type is gossip
-  connection_density: 10
+  connection_density: 6
   # A maximum network latency between nodes directly connected with each other
-  max_network_latency: 0.5
+  max_network_latency: 0.20
 
 measurement:
     # How many times in simulation represent 1 second in real time
