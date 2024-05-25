@@ -29,12 +29,12 @@ class Adversary:
     def inspect_message_size(self, msg: SphinxPacket | bytes):
         self.message_sizes.append(len(msg))
 
-    def observe_incoming_message(self, node: "Node"):
+    def observe_receiving_node(self, node: "Node"):
         self.mixed_msgs_per_window[-1][node] += 1
         # if node not in self.node_states[self.env.now]:
         #     self.node_states[self.env.now][node] = NodeState.RECEIVING
 
-    def observe_outgoing_message(self, node: "Node"):
+    def observe_sending_node(self, node: "Node"):
         self.mixed_msgs_per_window[-1][node] -= 1
         if self.is_around_message_interval(self.env.now):
             self.senders_around_interval[node] += 1
