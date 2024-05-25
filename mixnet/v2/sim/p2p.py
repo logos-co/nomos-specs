@@ -73,8 +73,9 @@ class NaiveBroadcastP2P(P2P):
     def receive(self, msg: SphinxPacket | bytes, sender: "Node", receiver: "Node"):
         yield from super().receive(msg, sender, receiver)
 
-        # Measurement and adversary
+        # Measurement
         self.measurement.measure_ingress(receiver, msg)
+        # Adversary
         self.adversary.observe_incoming_message(receiver)
 
         self.env.process(receiver.receive_message(msg))
@@ -133,16 +134,17 @@ class GossipP2P(P2P):
     def receive(self, msg: SphinxPacket | bytes, sender: "Node", receiver: "Node"):
         yield from super().receive(msg, sender, receiver)
 
+        # Measure ingress regardless of whether the message has been received before,
+        # because the node doesn't know if the message is a duplicate before receiving it from the network.
+        self.measurement.measure_ingress(receiver, msg)
+        # Adversary
+        self.adversary.observe_incoming_message(receiver)
+
         # Receive/gossip the msg only if it hasn't been received before. If not, just ignore the msg.
         # i.e. each message is received/gossiped at most once by each node.
         msg_hash = hashlib.sha256(bytes(msg)).digest()
         if msg_hash not in self.message_cache[receiver]:
             self.message_cache[receiver][msg_hash] = sender
-
-            # Measurement and adversary
-            self.measurement.measure_ingress(receiver, msg)
-            self.adversary.observe_incoming_message(receiver)
-
             # Receive and gossip
             self.env.process(receiver.receive_message(msg))
             self.env.process(self.broadcast(receiver, msg))
