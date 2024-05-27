@@ -2,9 +2,7 @@ from itertools import chain
 from unittest import TestCase
 from typing import List, Optional
 
-from py_ecc.bls import G2ProofOfPossession as bls_pop
-
-from da.common import NodeId, build_attestation_message, BLSPublicKey
+from da.common import NodeId, build_attestation_message, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
 from da.api.common import DAApi, VID, Metadata
 from da.verifier import DAVerifier, DABlob 
 from da.api.test_flow import MockStore
