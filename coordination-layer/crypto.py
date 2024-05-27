@@ -1,4 +1,4 @@
-from keum import grumpkin
+from keum import grumpkin, PrimeFiniteField
 import poseidon
 
 
@@ -7,6 +7,10 @@ import poseidon
 
 Point = grumpkin.AffineWeierstrass
 Field = grumpkin.Fq
+
+
+class Field(PrimeFiniteField):
+    ORDER = poseidon.prime_64
 
 
 def poseidon_grumpkin_field():
@@ -19,11 +23,23 @@ def poseidon_grumpkin_field():
     #     t=9,
     # )
     h, _ = poseidon.case_simple()
+    # h, _ = poseidon.case_neptune()
+    # h = poseidon.Poseidon(
+    #     p=Field.ORDER,
+    #     security_level=128,
+    #     alpha=5,
+    #     input_rate=3,
+    #     t=9,
+    # )
 
-    # TODO: this is a hack to make poseidon take in arbitrary input length.
+    # TODO: this is hacks on hacks to make poseidon take in arbitrary input length.
     # Fix is to implement a sponge as described in section 2.1 of
     # https://eprint.iacr.org/2019/458.pdf
     def inner(data):
+        assert all(
+            isinstance(d, Field) for d in data
+        ), f"{data}\n{[type(d) for d in data]}"
+        data = [d.v for d in data]
         digest = 0
         for i in range(0, len(data), h.input_rate - 1):
             digest = h.run_hash([digest, *data[i : i + h.input_rate - 1]])
@@ -36,7 +52,7 @@ POSEIDON = poseidon_grumpkin_field()
 
 
 def prf(domain, *elements):
-    return POSEIDON(str_to_vec(domain) + elements)
+    return POSEIDON([*_str_to_vec(domain), *elements])
 
 
 def comm(*elements):
@@ -46,6 +62,10 @@ def comm(*elements):
     The commitmtent can be opened at index 0..len(elements)
     """
     raise NotImplementedError()
+
+
+def pederson_commit(value: Field, blinding: Field, domain: Point) -> Point:
+    return value * Point.generator() + blinding * domain
 
 
 def merkle_root(data) -> Field:
@@ -64,8 +84,8 @@ def _pad_to_power_of_2(data):
     if 2**max_lower_bound == len(data):
         return data
     to_pad = 2 ** (max_lower_bound + 1) - len(data)
-    return data + [0] * to_pad
+    return data + [Field.zero()] * to_pad
 
 
 def _str_to_vec(s):
-    return list(map(ord, s))
+    return [Field(ord(c)) for c in s]

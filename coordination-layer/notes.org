@@ -1,0 +1,73 @@
+* Open Issues
+
+** Why does PartialTransaction have a "blinding"?
+
+I believe it should only have a derived balance field.
+
+** Poseidon Constants for Grumpkin Field
+
+Generating the poseidon constants for the Grumpkin curve is very slow, like takes 1 minute.
+
+I need to pre-generate these to make the curve work.
+
+
+** Solvers need the value of a note in order to solve it
+
+- do users provide a merkle proof showing the value is legit?
+
+- merkle proofs also reveal positional information.
+- if we are to reveal partial information to solvers
+  we will need to blind the other leaf nodes of the tree:
+
+  Note = VALUE || UNIT || ....
+
+  com =      ..root..
+          /          \
+   h(h(V), h(U))     ...
+     /     \
+ h(VALUE) h(UNIT)
+    |       |
+  VALUE    UNIT
+
+  Revealing the value's merkle path would reveal h(UNIT) and since UNIT is well known, h(UNIT) is also easily computable.
+
+  Thus each component of the Note should have a blinding factor
+  Note = (r1, VALUE) || (r1, UNIT) || ....
+
+** Transferring requires recipients sk
+
+We need to be able to create a partial transaction where we don't know the output note's nullifier.
+
+What we need: A public note + balance commitment
+
+balance commitment is computed as
+
+```
+value <- known by transaction builder
+unit <- known by transaction builder
+blinding <- PRF_r(nullifier) !!!! <-- this is where the issue is
+funge <- hash_to_curve(Unit)
+balance_commit <- pedersen_commit(value, blinding, funge)
+```
+
+Why is the blinding a PRF of the nullifier? Can't we simply use the randomness of the transaction to derive a blinding factor?
+
+*** How does zcash solve this?
+
+They provide specific randomness for this when building the transaction.
+
+
+** Note Unit should be a string hashed to curve point when needed.
+We want human readable units (i.e. "ETH" "NMO")
+
+I've gone and denoted it as bytes.
+
+
+* Solved
+** Do we need note.randomness?
+
+It's currently used in the note commitment. But perhaps it's not really necessary?
+
+- it allows you to get away form content based addressing, this may be necessary for total privacy.
+
+Yes, we need this
