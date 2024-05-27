@@ -22,6 +22,13 @@ def bulk_run():
 
     results = []
 
+    config.simulation.running_time = 30
+    config.mixnet.payload_size = 320
+    config.mixnet.real_message_prob = 0.01
+    config.mixnet.real_message_prob_weights = []
+    config.mixnet.max_message_prep_time = 0
+    config.mixnet.max_mix_delay = 0
+
     for num_nodes in NUM_NODES_SET:
         config.mixnet.num_nodes = num_nodes
 
