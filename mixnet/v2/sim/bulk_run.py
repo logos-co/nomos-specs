@@ -49,82 +49,48 @@ def bulk_run():
 
     df = pd.DataFrame(results)
     df.to_csv(f"{datetime.now().replace(microsecond=0).isoformat()}.csv", index=False)
-    plot(df)
+    draw_plots(df)
 
 
 def load_and_plot():
     # with skipping the header
     df = pd.read_csv("2024-05-25T23:16:39.csv")
     print(df)
-    plot(df)
+    draw_plots(df)
 
 
-def plot(df: pd.DataFrame):
-    egress_max_df = df.pivot(index='num_nodes', columns='config', values='egress_max')
+def draw_plots(df: pd.DataFrame):
+    max_ylim = draw_plot(df, "num_nodes", "config", "egress_max", "Egress Bandwidth (Max)",
+                                "Number of Nodes", "Max Bandwidth (KiB/s)")
+    draw_plot(df, "num_nodes", "config", "egress_mean", "Egress Bandwidth (Mean)",
+              "Number of Nodes", "Mean Bandwidth (KiB/s)", max_ylim)
+
+    max_ylim = draw_plot(df, "num_nodes", "config", "ingress_max", "Ingress Bandwidth (Max)",
+                         "Number of Nodes", "Max Bandwidth (KiB/s)")
+    draw_plot(df, "num_nodes", "config", "ingress_mean", "Ingress Bandwidth (Mean)",
+              "Number of Nodes", "Mean Bandwidth (KiB/s)", max_ylim)
+
+
+def draw_plot(df: pd.DataFrame, index: str, column: str, value: str, title: str, xlabel: str, ylabel: str,
+              ylim: float = None) -> float:
+    df_pivot = df.pivot(index=index, columns=column, values=value)
     plt.figure(figsize=(12, 6))
     fig, ax = plt.subplots()
-    for config in egress_max_df.columns:
-        num_mix_layers = int(config.split(":")[1].strip())
-        ax.plot(egress_max_df.index, egress_max_df[config], label=config,
-                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
-    plt.title("Egress Bandwidth (Max)")
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Max Bandwidth (KiB/s)")
+    for i, config in enumerate(df_pivot.columns):
+        marker = MARKERS[NUM_MIX_LAYERS_SET.index(int(config.split(":")[1].strip()))]
+        ax.plot(df_pivot.index, df_pivot[config], label=config, marker=marker)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.legend(title="mode: layers: cover", loc="upper left")
     plt.tight_layout()
     plt.grid(True)
+    if ylim is not None:
+        ax.set_ylim(ylim)
     plt.show()
-    ingress_max_y_lim = ax.get_ylim()
-
-    egress_mean_df = df.pivot(index='num_nodes', columns='config', values='egress_mean')
-    plt.figure(figsize=(12, 6))
-    fig, ax = plt.subplots()
-    for config in egress_mean_df.columns:
-        num_mix_layers = int(config.split(":")[1].strip())
-        ax.plot(egress_mean_df.index, egress_mean_df[config], label=config,
-                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
-    plt.title("Egress Bandwidth (Mean)")
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Mean Bandwidth (KiB/s)")
-    plt.legend(title="mode: layers: cover", loc="upper left")
-    plt.tight_layout()
-    plt.grid(True)
-    ax.set_ylim(ingress_max_y_lim)
-    plt.show()
-
-    ingress_max_df = df.pivot(index='num_nodes', columns='config', values='ingress_max')
-    plt.figure(figsize=(12, 6))
-    fig, ax = plt.subplots()
-    for config in ingress_max_df.columns:
-        num_mix_layers = int(config.split(":")[1].strip())
-        ax.plot(ingress_max_df.index, ingress_max_df[config], label=config,
-                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
-    plt.title("Ingress Bandwidth (Max)")
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Max Bandwidth (KiB/s)")
-    plt.legend(title="mode: layers: cover", loc="upper left")
-    plt.tight_layout()
-    plt.grid(True)
-    plt.show()
-    ingress_max_y_lim = ax.get_ylim()
-
-    ingress_mean_df = df.pivot(index='num_nodes', columns='config', values='ingress_mean')
-    plt.figure(figsize=(12, 6))
-    fig, ax = plt.subplots()
-    for config in ingress_mean_df.columns:
-        num_mix_layers = int(config.split(":")[1].strip())
-        ax.plot(ingress_mean_df.index, ingress_mean_df[config], label=config,
-                marker=MARKERS[NUM_MIX_LAYERS_SET.index(num_mix_layers)])
-    plt.title("Ingress Bandwidth (Mean)")
-    plt.xlabel("Number of Nodes")
-    plt.ylabel("Mean Bandwidth (KiB/s)")
-    plt.legend(title="mode: layers: cover", loc="upper left")
-    plt.tight_layout()
-    plt.grid(True)
-    ax.set_ylim(ingress_max_y_lim)
-    plt.show()
+    return ax.get_ylim()
 
 
 if __name__ == "__main__":
-    bulk_run()
-    # load_and_plot()
+    # bulk_run()
+    load_and_plot()
