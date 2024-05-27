@@ -16,8 +16,7 @@ class Analysis:
         message_size_df = self.message_size_distribution()
         self.bandwidth(message_size_df)
         self.messages_emitted_around_interval()
-        if self.config.mixnet.is_mixing_on():
-            self.mixed_messages_per_node_over_time()
+        self.messages_in_node_over_time()
         # self.node_states()
 
     def bandwidth(self, message_size_df: pd.DataFrame):
@@ -88,24 +87,25 @@ class Analysis:
         plt.legend(title="expected")
         plt.show()
 
-    def mixed_messages_per_node_over_time(self):
+    def messages_in_node_over_time(self):
         dataframes = []
-        for mixed_msgs_per_node in self.sim.p2p.adversary.mixed_msgs_per_window:
-            df = pd.DataFrame([(node.id, cnt) for node, cnt in mixed_msgs_per_node.items()],
-                              columns=["node_id", "msg_count"])
-            dataframes.append(df)
-        observation_times = range(len(dataframes))
-        df = pd.concat([df.assign(Time=time) for df, time in zip(dataframes, observation_times)], ignore_index=True)
-        df = df.pivot(index="Time", columns="node_id", values="msg_count")
+        for i, msgs_in_node in enumerate(self.sim.p2p.adversary.msgs_in_node_per_window):
+            time = i * self.config.adversary.io_window_moving_interval
+            df = pd.DataFrame([(time, node.id, cnt) for node, cnt in msgs_in_node.items()],
+                              columns=["time", "node_id", "msg_count"])
+            if not df.empty:
+                dataframes.append(df)
+        df = pd.concat(dataframes, ignore_index=True)
+        df_pivot = df.pivot(index="time", columns="node_id", values="msg_count")
         plt.figure(figsize=(12, 6))
-        for column in df.columns:
-            plt.plot(df.index, df[column], marker="o", label=column)
-        plt.title("Mixed messages in each mix over time")
+        for column in df_pivot.columns:
+            plt.plot(df_pivot.index, df_pivot[column], marker=None, label=column)
+        plt.title("Messages in each node over time")
         plt.xlabel("Time")
         plt.ylabel("Msg Count")
         plt.ylim(bottom=0)
-        plt.legend(title="Node ID")
         plt.grid(True)
+        plt.tight_layout()
         plt.show()
 
     def node_states(self):

@@ -38,5 +38,8 @@ measurement:
     sim_time_per_second: 1
 
 adversary:
-  # A discrete time window for the adversary to observe inputs and outputs of a certain node
-  io_observation_window: 1
+  # A time window for the adversary to observe inputs and outputs of each node
+  io_window_size: 0.20
+  # A moving interval of the time window for the adversary to observe inputs and outputs of each node
+  # This must be smaller or equal to io_window_size.
+  io_window_moving_interval: 0.10

@@ -131,8 +131,12 @@ class MeasurementConfig:
 
 @dataclass
 class AdversaryConfig:
-    # A discrete time window for the adversary to observe inputs and outputs of a certain node
-    io_observation_window: int
+    # A time window for the adversary to observe inputs and outputs of each node
+    io_window_size: float
+    # A moving interval of the time window for the adversary to observe inputs and outputs of each node
+    # This must be smaller or equal to io_window_size.
+    io_window_moving_interval: float
 
     def validate(self):
-        assert self.io_observation_window >= 1
+        assert self.io_window_size > 0
+        assert 0 < self.io_window_moving_interval <= self.io_window_size

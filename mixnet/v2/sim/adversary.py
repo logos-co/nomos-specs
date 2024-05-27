@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections import defaultdict
+from collections import defaultdict, deque
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -21,7 +21,8 @@ class Adversary:
         self.config = config
         self.message_sizes = []
         self.senders_around_interval = defaultdict(int)
-        self.mixed_msgs_per_window = []
+        self.msgs_in_node_per_window = []  # [<node, int>]
+        self.cur_window_per_node = defaultdict(lambda: deque())  # <node, [(time, int)]>: int is + or -.
         # self.node_states = defaultdict(dict)
 
         self.env.process(self.update_observation_window())
@@ -30,12 +31,12 @@ class Adversary:
         self.message_sizes.append(len(msg))
 
     def observe_receiving_node(self, node: "Node"):
-        self.mixed_msgs_per_window[-1][node] += 1
+        self.cur_window_per_node[node].append((self.env.now, 1))
         # if node not in self.node_states[self.env.now]:
         #     self.node_states[self.env.now][node] = NodeState.RECEIVING
 
     def observe_sending_node(self, node: "Node"):
-        self.mixed_msgs_per_window[-1][node] -= 1
+        self.cur_window_per_node[node].append((self.env.now, -1))
         if self.is_around_message_interval(self.env.now):
             self.senders_around_interval[node] += 1
         # self.node_states[self.env.now][node] = NodeState.SENDING
@@ -46,8 +47,19 @@ class Adversary:
 
     def update_observation_window(self):
         while True:
-            self.mixed_msgs_per_window.append(defaultdict(int))
-            yield self.env.timeout(self.config.adversary.io_observation_window)
+            yield self.env.timeout(self.config.adversary.io_window_moving_interval)
+
+            self.msgs_in_node_per_window.append(defaultdict(int))  # <node, int>
+            for node, queue in self.cur_window_per_node.items():
+                msg_cnt = 0.0
+                # Pop old events that are out of the new window, and accumulate msg_cnt
+                while queue and queue[0][0] < self.env.now - self.config.adversary.io_window_size:
+                    _, delta = queue.popleft()
+                    msg_cnt += delta
+                # Iterate remaining events that will remain in the new window, and accumulate msg_cnt
+                for _, delta in queue:
+                    msg_cnt += delta
+                self.msgs_in_node_per_window[-1][node] = msg_cnt
 
 
 class NodeState(Enum):
