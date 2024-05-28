@@ -42,14 +42,14 @@ class P2P(ABC):
     def send(self, msg: SphinxPacket | bytes, sender: "Node", receiver: "Node", is_first_of_msg: bool):
         if is_first_of_msg:
             self.adversary.inspect_message_size(msg)
-            self.adversary.observe_sending_node(sender)
+            self.adversary.observe_sending_node(sender, receiver)
         self.measurement.measure_egress(sender, msg)
 
         # simulate network latency
         yield self.env.timeout(random.uniform(0, self.config.p2p.max_network_latency))
 
         self.measurement.measure_ingress(receiver, msg)
-        self.adversary.observe_receiving_node(receiver)
+        self.adversary.observe_receiving_node(sender, receiver)
         self.receive(msg, sender, receiver)
 
     @abstractmethod

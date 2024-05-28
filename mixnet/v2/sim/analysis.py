@@ -91,18 +91,30 @@ class Analysis:
         dataframes = []
         for i, msgs_in_node in enumerate(self.sim.p2p.adversary.msgs_in_node_per_window):
             time = i * self.config.adversary.io_window_moving_interval
-            df = pd.DataFrame([(time, node.id, cnt) for node, cnt in msgs_in_node.items()],
-                              columns=["time", "node_id", "msg_count"])
+            df = pd.DataFrame([(time, node.id, msg_cnt, sender_cnt) for node, (msg_cnt, sender_cnt) in msgs_in_node.items()],
+                              columns=["time", "node_id", "msg_cnt", "sender_cnt"])
             if not df.empty:
                 dataframes.append(df)
         df = pd.concat(dataframes, ignore_index=True)
-        df_pivot = df.pivot(index="time", columns="node_id", values="msg_count")
+        df_pivot = df.pivot(index="time", columns="node_id", values="msg_cnt")
         plt.figure(figsize=(12, 6))
         for column in df_pivot.columns:
             plt.plot(df_pivot.index, df_pivot[column], marker=None, label=column)
         plt.title("Messages in each node over time")
         plt.xlabel("Time")
         plt.ylabel("Msg Count")
+        plt.ylim(bottom=0)
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+        df_pivot = df.pivot(index="time", columns="node_id", values="sender_cnt")
+        plt.figure(figsize=(12, 6))
+        for column in df_pivot.columns:
+            plt.plot(df_pivot.index, df_pivot[column], marker=None, label=column)
+        plt.title("Senders of messages in each node over time")
+        plt.xlabel("Time")
+        plt.ylabel("Sender Count")
         plt.ylim(bottom=0)
         plt.grid(True)
         plt.tight_layout()
