@@ -55,6 +55,21 @@ def prf(domain, *elements) -> Field:
     return Field(int(POSEIDON([*_str_to_vec(domain), *elements])))
 
 
+def hash_to_curve(domain, *elements) -> Point:
+    # HACK: we don't currently have a proper hash_to_curve implementation
+    # so we hack the Point.random() function.
+    #
+    # Point.random() calls into the global `random` module to generate a
+    # point. We will seed the random module with the result of hashing the
+    # elements and then call Point.random() to retreive the point
+    # corresponding to the mentioned elements.
+
+    r = prf(f"HASH_TO_CURVE_{domain}", *elements)
+
+    import random
+
+    random.seed(r.v)
+    return Point.random()
 
 
 def comm(*elements):
