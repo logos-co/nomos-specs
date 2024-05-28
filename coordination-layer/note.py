@@ -1,6 +1,14 @@
 from dataclasses import dataclass
 
-from crypto import Field, Point, prf
+from crypto import (
+    Field,
+    Point,
+    prf,
+    pederson_commit,
+    _str_to_vec,
+    merkle_root,
+    hash_to_curve,
+)
 
 from constraints import Constraint
 
@@ -19,6 +27,10 @@ class Nullifier:
 
 def nf_pk(nf_sk) -> Field:
     return prf("CL_NOTE_NF", nf_sk)
+
+
+def balance_commitment(value: Field, tx_rand: Field, funge: Point):
+    return pederson_commit(value, tx_rand, funge)
 
 
 @dataclass(unsafe_hash=True)
@@ -40,15 +52,15 @@ class InnerNote:
     @property
     def fungibility_domain(self) -> Field:
         """The fungibility domain of this note"""
-        return crypto.prf(
-            "CL_NOTE_NULL", self.birth_constraint.hash(), *crypto.str_to_vec(unit)
+        return hash_to_curve(
+            "CL_NOTE_NULL", self.birth_constraint.hash(), *_str_to_vec(self.unit)
         )
 
     def death_constraints_root(self) -> Field:
         """
         Returns the merkle root over the set of death constraints
         """
-        return crypto.merkle_root(self.death_constraints)
+        return merkle_root(self.death_constraints)
 
 
 @dataclass(unsafe_hash=True)
@@ -56,13 +68,23 @@ class PublicNote:
     note: InnerNote
     nf_pk: Field
 
-    def blinding(self, rand: Field) -> Field:
+    def blinding(self, tx_rand: Field) -> Field:
         """Blinding factor used in balance commitments"""
-        return prf("CL_NOTE_BAL_BLIND", rand, self.nonce, self.nf_pk)
+        return prf("CL_NOTE_BAL_BLIND", tx_rand, self.note.nonce, self.nf_pk)
+
+    def balance(self, rand):
+        """
+        Returns the pederson commitment to the notes value.
+        """
+        return balance_commitment(
+            self.note.value,
+            self.blinding(rand),
+            self.note.fungibility_domain,
+        )
 
     def commit(self) -> Field:
         # blinding factors between data elems ensure no information is leaked in merkle paths
-        return crypto.merkle_root(
+        return merkle_root(
             self.note.r(0),
             self.note.birth_constraint.hash(),
             self.note.r(1),
@@ -96,19 +118,9 @@ class SecretNote:
         """
         return prf("NULLIFIER", self.nonce, self.nf_sk)
 
-    def balance(self, rand):
-        """
-        Returns the pederson commitment to the notes value.
-        """
-        return crypto.pederson_commit(
-            self.note.value, self.blinding(rand), self.note.fungibility_domain
-        )
-
     def zero(self, rand):
         """
         Returns the pederson commitment to zero using the same blinding as the balance
         commitment.
         """
-        return crypto.pederson_commit(
-            0, self.blinding(rand), self.note.fungibility_domain
-        )
+        return pederson_commit(0, self.blinding(rand), self.note.fungibility_domain)
