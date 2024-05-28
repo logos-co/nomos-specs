@@ -43,6 +43,24 @@ class InnerNote:
     nonce: Field
     rand: Field  # source of randomness for note commitment
 
+    def __post_init__(self):
+        if isinstance(self.value, int):
+            self.value = Field(self.value)
+        assert isinstance(self.value, Field), f"value is {type(self.value)}"
+        assert isinstance(self.unit, str), f"unit is {type(self.unit)}"
+        assert isinstance(
+            self.birth_constraint, Constraint
+        ), f"birth_constraint is {type(self.birth_constraint)}"
+        assert isinstance(
+            self.death_constraints, list
+        ), f"death_constraints is {type(self.death_constraints)}"
+        assert all(
+            isinstance(d, Constraint) for d in self.death_constraints
+        ), f"{[type(d) for d in self.death_constraints]}"
+        assert isinstance(self.state, Field), f"state is {type(self.state)}"
+        assert isinstance(self.nonce, Field), f"nonce is {type(self.nonce)}"
+        assert isinstance(self.rand, Field), f"rand is {type(self.rand)}"
+
     def r(self, index: int):
         prf("CL_NOTE_COMM_RAND", self.rand, index)
 

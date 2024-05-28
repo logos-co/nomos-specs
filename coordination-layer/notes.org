@@ -1,5 +1,13 @@
 * Open Issues
 
+** provided commitment to zero may removing the blinding of the pederson commitment
+
+Since you can subtract the randomness from the commitment to get just the binding part.
+
+** Rename transaction randonmness to tx_rand and commitment randomness to cm_rand
+
+Currently they are both called "rand" and it's confusing.
+
 ** Why does PartialTransaction have a "blinding"?
 
 I believe it should only have a derived balance field.
@@ -10,6 +18,7 @@ Generating the poseidon constants for the Grumpkin curve is very slow, like take
 
 I need to pre-generate these to make the curve work.
 
+- I tried the other large curve where the params are already generated and it is still slow. Need to dig into this.
 
 ** Solvers need the value of a note in order to solve it
 
@@ -19,7 +28,7 @@ I need to pre-generate these to make the curve work.
 - if we are to reveal partial information to solvers
   we will need to blind the other leaf nodes of the tree:
 
-  Note = VALUE || UNIT || ....
+  Note = VALUE || UNIT || ... 
 
   com =      ..root..
           /          \
