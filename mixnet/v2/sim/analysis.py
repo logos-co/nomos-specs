@@ -96,10 +96,11 @@ class Analysis:
             if not df.empty:
                 dataframes.append(df)
         df = pd.concat(dataframes, ignore_index=True)
-        df_pivot = df.pivot(index="time", columns="node_id", values="msg_cnt")
+
+        msg_cnt_df = df.pivot(index="time", columns="node_id", values="msg_cnt")
         plt.figure(figsize=(12, 6))
-        for column in df_pivot.columns:
-            plt.plot(df_pivot.index, df_pivot[column], marker=None, label=column)
+        for column in msg_cnt_df.columns:
+            plt.plot(msg_cnt_df.index, msg_cnt_df[column], marker=None, label=column)
         plt.title("Messages in each node over time")
         plt.xlabel("Time")
         plt.ylabel("Msg Count")
@@ -108,15 +109,27 @@ class Analysis:
         plt.tight_layout()
         plt.show()
 
-        df_pivot = df.pivot(index="time", columns="node_id", values="sender_cnt")
+        sender_cnt_df = df.pivot(index="time", columns="node_id", values="sender_cnt")
         plt.figure(figsize=(12, 6))
-        for column in df_pivot.columns:
-            plt.plot(df_pivot.index, df_pivot[column], marker=None, label=column)
+        for column in sender_cnt_df.columns:
+            plt.plot(sender_cnt_df.index, sender_cnt_df[column], marker=None, label=column)
         plt.title("Senders of messages in each node over time")
         plt.xlabel("Time")
         plt.ylabel("Sender Count")
         plt.ylim(bottom=0)
         plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+        plt.figure(figsize=(12, 6))
+        df.boxplot(column="sender_cnt", by="time", medianprops={"color": "red", "linewidth": 2.5})
+        plt.title("Distribution of senders of messages in each node over time")
+        plt.suptitle("")
+        plt.xticks([])
+        plt.xlabel("Time")
+        plt.ylabel("Sender Count")
+        plt.ylim(bottom=0)
+        plt.grid(axis="x")
         plt.tight_layout()
         plt.show()
 
