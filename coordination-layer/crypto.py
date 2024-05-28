@@ -51,8 +51,10 @@ def poseidon_grumpkin_field():
 POSEIDON = poseidon_grumpkin_field()
 
 
-def prf(domain, *elements):
-    return POSEIDON([*_str_to_vec(domain), *elements])
+def prf(domain, *elements) -> Field:
+    return Field(int(POSEIDON([*_str_to_vec(domain), *elements])))
+
+
 
 
 def comm(*elements):
@@ -65,7 +67,7 @@ def comm(*elements):
 
 
 def pederson_commit(value: Field, blinding: Field, domain: Point) -> Point:
-    return value * Point.generator() + blinding * domain
+    return Point.generator().mul(value) + domain.mul(blinding)
 
 
 def merkle_root(data) -> Field:
