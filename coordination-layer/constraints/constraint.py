@@ -7,7 +7,9 @@ The logic of a constraint is implemented in a ZK Circuit, and then wrapped in a 
 for interacting with the rest of the the system.
 """
 
-from dataclasses import dataclass
+
+class Proof:
+    pass
 
 
 class Constraint:

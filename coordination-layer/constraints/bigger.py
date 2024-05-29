@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from noir_constraint import NoirConstraint, NoirProof
+from .noir_constraint import NoirConstraint, NoirProof
 
 
 @dataclass

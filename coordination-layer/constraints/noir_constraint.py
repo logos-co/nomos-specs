@@ -17,7 +17,10 @@ import portalocker
 import tempfile
 import toml
 
-NOIR_DIR = Path(__file__).resolve().parent / "noir"
+
+from constraints import Proof
+
+NOIR_DIR = Path(__file__).resolve().parent.parent / "noir"
 LOCK_FILE = NOIR_DIR / ".CL.lock"
 CONSTRAINTS_DIR = NOIR_DIR / "crates"
 
@@ -25,7 +28,7 @@ NARGO = sh.Command("nargo")
 
 
 @dataclass
-class NoirProof:
+class NoirProof(Proof):
     proof: str
 
 

@@ -1,6 +1,4 @@
-from noir_constraint import NoirProof
-
-from constraints import Constraint
+from constraints import Constraint, Proof
 from crypto import Field
 
 
@@ -13,8 +11,8 @@ class Vacuous(Constraint):
         # chosen by a fair 2**64 sided die.
         return Field(14500592324922987342)
 
-    def prove(self) -> NoirProof:
-        return NoirProof("vacuous")
+    def prove(self) -> Proof:
+        return Proof()
 
-    def verify(self, _proof: NoirProof):
+    def verify(self, _proof: Proof):
         return True

@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from noir_constraint import NoirConstraint
+from .noir_constraint import NoirConstraint
 
 
 class TestNoirCoinstraint(TestCase):

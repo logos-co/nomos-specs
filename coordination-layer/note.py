@@ -13,6 +13,7 @@ from crypto import (
 from constraints import Constraint
 
 
+# TODO: is this used?
 @dataclass
 class NoteCommitment:
     cm: Field
@@ -20,6 +21,7 @@ class NoteCommitment:
     zero: Field
 
 
+# TODO: is this used?
 @dataclass
 class Nullifier:
     nf: bytes

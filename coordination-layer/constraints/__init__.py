@@ -1,2 +1,3 @@
-from .constraint import Constraint
+from .constraint import Constraint, Proof
+
 from .vacuous import Vacuous
