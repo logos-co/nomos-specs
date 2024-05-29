@@ -90,14 +90,20 @@ class PublicNote:
         """Blinding factor used in balance commitments"""
         return prf("CL_NOTE_BAL_BLIND", tx_rand, self.note.nonce, self.nf_pk)
 
-    def balance(self, rand):
+    def balance(self, tx_rand):
         """
         Returns the pederson commitment to the notes value.
         """
         return balance_commitment(
-            self.note.value,
-            self.blinding(rand),
-            self.note.fungibility_domain,
+            self.note.value, self.blinding(tx_rand), self.note.fungibility_domain
+        )
+
+    def zero(self, tx_rand):
+        """
+        Returns the pederson commitment to the notes value.
+        """
+        return balance_commitment(
+            Field.zero(), self.blinding(tx_rand), self.note.fungibility_domain
         )
 
     def commit(self) -> Field:
@@ -125,7 +131,7 @@ class SecretNote:
     note: InnerNote
     nf_sk: Field
 
-    def to_public_note(self) -> PublicNote:
+    def to_public(self) -> PublicNote:
         return PublicNote(note=self.note, nf_pk=nf_pk(self.nf_sk))
 
     def nullifier(self):
@@ -136,6 +142,7 @@ class SecretNote:
         """
         return prf("NULLIFIER", self.nonce, self.nf_sk)
 
+    # TODO: is this used?
     def zero(self, rand):
         """
         Returns the pederson commitment to zero using the same blinding as the balance

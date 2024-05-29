@@ -1,4 +1,4 @@
-from keum import grumpkin, PrimeFiniteField
+from keum import grumpkin
 import poseidon
 
 
@@ -9,50 +9,46 @@ Point = grumpkin.AffineWeierstrass
 Field = grumpkin.Fq
 
 
-class Field(PrimeFiniteField):
-    ORDER = poseidon.prime_64
+def fake_algebraic_hash(data) -> Field:
+    """
+    HACK: we'll fake the algebraic hash using sha256(data) % Field.ORDER
+    """
+    assert all(isinstance(d, Field) for d in data), f"{data}\n{[type(d) for d in data]}"
+    data = b"".join(d.v.to_bytes(256 // 8) for d in data)
+
+    from hashlib import sha256
+
+    return Field(int(sha256(data).hexdigest(), 16))
 
 
-def poseidon_grumpkin_field():
-    # TODO: These parameters are made up.
-    # return poseidon.Poseidon(
-    #     p=Field.ORDER,
-    #     security_level=128,
-    #     alpha=5,
-    #     input_rate=3,
-    #     t=9,
-    # )
-    h, _ = poseidon.case_simple()
-    # h, _ = poseidon.case_neptune()
-    # h = poseidon.Poseidon(
-    #     p=Field.ORDER,
-    #     security_level=128,
-    #     alpha=5,
-    #     input_rate=3,
-    #     t=9,
-    # )
+def build_poseidon():
+    h = poseidon.Poseidon(
+        p=Field.ORDER,
+        security_level=128,
+        alpha=5,
+        input_rate=3,
+        t=9,
+    )
 
     # TODO: this is hacks on hacks to make poseidon take in arbitrary input length.
     # Fix is to implement a sponge as described in section 2.1 of
     # https://eprint.iacr.org/2019/458.pdf
     def inner(data):
-        assert all(
-            isinstance(d, Field) for d in data
-        ), f"{data}\n{[type(d) for d in data]}"
-        data = [d.v for d in data]
+
         digest = 0
         for i in range(0, len(data), h.input_rate - 1):
             digest = h.run_hash([digest, *data[i : i + h.input_rate - 1]])
-        return digest
+        return Field(int(digest))
 
     return inner
 
 
-POSEIDON = poseidon_grumpkin_field()
+# HASH = build_poseidon()
+HASH = fake_algebraic_hash
 
 
 def prf(domain, *elements) -> Field:
-    return Field(int(POSEIDON([*_str_to_vec(domain), *elements])))
+    return HASH([*_str_to_vec(domain), *elements])
 
 
 def hash_to_curve(domain, *elements) -> Point:

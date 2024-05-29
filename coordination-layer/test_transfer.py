@@ -60,7 +60,7 @@ class TestTransfer(TestCase):
         )
 
         ptx = PartialTransaction(
-            inputs=[alices_note], outputs=[alices_note], rand=tx_rand
+            inputs=[alices_note], outputs=[tx_output], rand=tx_rand
         )
 
         bundle = TransactionBundle(bundle=[ptx])
