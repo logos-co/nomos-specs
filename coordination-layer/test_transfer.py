@@ -6,7 +6,7 @@ from note import InnerNote, PublicNote, SecretNote, nf_pk
 from partial_transaction import PartialTransaction, InputNote, OutputNote
 from transaction_bundle import TransactionBundle
 
-import constraints
+from constraints import Vacuous
 
 
 class TestTransfer(TestCase):
@@ -28,8 +28,8 @@ class TestTransfer(TestCase):
             note=InnerNote(
                 value=100,
                 unit="NMO",
-                birth_constraint=constraints.Vacuous(),
-                death_constraints=[constraints.Vacuous()],
+                birth_constraint=Vacuous(),
+                death_constraints=[Vacuous()],
                 state=Field.zero(),
                 nonce=Field.random(),
                 rand=Field.random(),
@@ -42,8 +42,8 @@ class TestTransfer(TestCase):
             note=InnerNote(
                 value=100,
                 unit="NMO",
-                birth_constraint=constraints.Vacuous(),
-                death_constraints=[constraints.Vacuous()],
+                birth_constraint=Vacuous(),
+                death_constraints=[Vacuous()],
                 state=Field.zero(),
                 nonce=Field.random(),
                 rand=Field.random(),
@@ -63,13 +63,14 @@ class TestTransfer(TestCase):
             inputs=[
                 InputNote(
                     note=alices_note,
-                    death_proof=constraints.Vacuous().prove(),
+                    death_cm=Vacuous().hash(),
+                    death_proof=Vacuous().prove(),
                 )
             ],
             outputs=[
                 OutputNote(
                     note=bobs_note,
-                    birth_proof=constraints.Vacuous().prove(),
+                    birth_proof=Vacuous().prove(),
                 )
             ],
             rand=tx_rand,

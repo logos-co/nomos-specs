@@ -9,10 +9,12 @@ from crypto import Field, Point
 @dataclass
 class InputNote:
     note: SecretNote
+    death_cm: Field  # commitment to the death constraint we are using
     death_proof: Proof
 
     def verify(self):
-        return self.note.verify_death(self.death_proof)
+        # TODO: note.note is ugly
+        return self.note.note.verify_death(self.death_cm, self.death_proof)
 
 
 @dataclass
@@ -21,7 +23,8 @@ class OutputNote:
     birth_proof: Proof
 
     def verify(self):
-        return self.note.verify_birth(self.birth_proof)
+        # TODO: note.note is ugly
+        return self.note.note.verify_birth(self.birth_proof)
 
 
 # TODO: is this used?
@@ -43,7 +46,7 @@ class PartialTransaction:
     def verify(self) -> bool:
         valid_inputs = all(i.verify() for i in self.inputs)
         valid_outputs = all(o.verify() for o in self.outputs)
-        return valid_inputs and valid_output
+        return valid_inputs and valid_outputs
 
     def balance(self) -> Point:
         output_balance = sum(
@@ -55,10 +58,6 @@ class PartialTransaction:
             start=Point.zero(),
         )
         return output_balance + input_balance.negate()
-
-    # TODO: do we need this?
-    def blinding(self) -> Field:
-        return sum(outputs.blinding(self.rand)) - sum(outputs.blinding(self.rand))
 
     def zero(self) -> Field:
         output_zero = sum(

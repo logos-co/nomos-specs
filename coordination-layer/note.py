@@ -66,9 +66,16 @@ class InnerNote:
         assert isinstance(self.rand, Field), f"rand is {type(self.rand)}"
 
     def verify_death(self, death_cm: Field, death_proof: Proof) -> bool:
-        constraint = [d for d in self.death_constraints if d.hash() == deah_cm][0]
+        constraint = [d for d in self.death_constraints if d.hash() == death_cm]
+        if len(constraint) == 0:
+            # given commitment was not one of the allowed death constraints
+            return False
+
+        constraint = constraint[0]
+
         # TODO: verifying the death constraint should include a commitment to the
-        #       partial transaction.
+        #       partial transaction so that the death constraint can make statements
+        #       regarding the entire transaction.
         return constraint.verify(death_proof)
 
     def verify_birth(self, birth_proof: Proof) -> bool:
@@ -156,11 +163,3 @@ class SecretNote:
         to the nf_pk in the public note commitment.
         """
         return prf("NULLIFIER", self.nonce, self.nf_sk)
-
-    # TODO: is this used?
-    def zero(self, rand):
-        """
-        Returns the pederson commitment to zero using the same blinding as the balance
-        commitment.
-        """
-        return pederson_commit(0, self.blinding(rand), self.note.fungibility_domain)
