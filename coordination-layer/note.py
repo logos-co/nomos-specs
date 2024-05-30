@@ -10,7 +10,7 @@ from crypto import (
     hash_to_curve,
 )
 
-from constraints import Constraint
+from constraints import Constraint, Proof
 
 
 # TODO: is this used?
@@ -39,6 +39,8 @@ def balance_commitment(value: Field, tx_rand: Field, funge: Point):
 class InnerNote:
     value: Field
     unit: str
+    # TODO: inner notes should hold commitments to constraints.
+    #       Constraints themselves will be stored in a key-value store
     birth_constraint: Constraint
     death_constraints: list[Constraint]
     state: Field
@@ -63,11 +65,22 @@ class InnerNote:
         assert isinstance(self.nonce, Field), f"nonce is {type(self.nonce)}"
         assert isinstance(self.rand, Field), f"rand is {type(self.rand)}"
 
-    def r(self, index: int):
-        prf("CL_NOTE_COMM_RAND", self.rand, index)
+    def verify_death(self, death_cm: Field, death_proof: Proof) -> bool:
+        constraint = [d for d in self.death_constraints if d.hash() == deah_cm][0]
+        # TODO: verifying the death constraint should include a commitment to the
+        #       partial transaction.
+        return constraint.verify(death_proof)
+
+    def verify_birth(self, birth_proof: Proof) -> bool:
+        # TODO: Should verifying the birth constraint include a commitment
+        #       to the partial transaction?
+        return self.birth_constraint.verify(birth_proof)
 
     def verify_value(self) -> bool:
         return 0 <= self.value and value <= 2**64
+
+    def r(self, index: int):
+        return prf("CL_NOTE_COMM_RAND", self.rand, index)
 
     @property
     def fungibility_domain(self) -> Field:

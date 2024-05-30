@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from crypto import Field, prf
 from note import InnerNote, PublicNote, SecretNote, nf_pk
-from partial_transaction import PartialTransaction, Output
+from partial_transaction import PartialTransaction, InputNote, OutputNote
 from transaction_bundle import TransactionBundle
 
 import constraints
@@ -50,17 +50,29 @@ class TestTransfer(TestCase):
             ),
             nf_pk=bob.pk,
         )
-        tx_output = Output(
-            note=bobs_note,
-            # TODO: why do we need an Output struct if we can
-            # compute the balance and zero commitment form the
-            # PublicNote itself?
-            balance=bobs_note.balance(tx_rand),
-            zero=bobs_note.zero(tx_rand),
-        )
+        # tx_output = Output(
+        #     note=bobs_note,
+        #     # TODO: why do we need an Output struct if we can
+        #     # compute the balance and zero commitment form the
+        #     # PublicNote itself?
+        #     balance=bobs_note.balance(tx_rand),
+        #     zero=bobs_note.zero(tx_rand),
+        # )
 
         ptx = PartialTransaction(
-            inputs=[alices_note], outputs=[tx_output], rand=tx_rand
+            inputs=[
+                InputNote(
+                    note=alices_note,
+                    death_proof=constraints.Vacuous().prove(),
+                )
+            ],
+            outputs=[
+                OutputNote(
+                    note=bobs_note,
+                    birth_proof=constraints.Vacuous().prove(),
+                )
+            ],
+            rand=tx_rand,
         )
 
         bundle = TransactionBundle(bundle=[ptx])

@@ -1,5 +1,9 @@
 * Open Issues
 
+** Note.verify() should take a proof
+
+We should have two variants, verifyDeath(deathProof) verifyBirth(birthProof)
+
 ** provided commitment to zero may removing the blinding of the pederson commitment
 
 Since you can subtract the randomness from the commitment to get just the binding part.
