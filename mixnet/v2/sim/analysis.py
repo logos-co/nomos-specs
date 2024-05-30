@@ -18,6 +18,7 @@ class Analysis:
         self.messages_emitted_around_interval()
         self.messages_in_node_over_time()
         # self.node_states()
+        self.message_hops()
 
     def bandwidth(self, message_size_df: pd.DataFrame):
         dataframes = []
@@ -147,4 +148,12 @@ class Analysis:
         plt.xlabel("Time")
         plt.ylabel("Node ID")
         plt.legend(title="state")
+        plt.show()
+
+    def message_hops(self):
+        df = pd.DataFrame(self.sim.p2p.measurement.message_hops.values(), columns=["hops"])
+        print(df.describe())
+        plt.figure(figsize=(6, 6))
+        seaborn.boxplot(data=df, y="hops", medianprops={"color": "red", "linewidth": 2.5})
+        plt.title("Message hops distribution")
         plt.show()

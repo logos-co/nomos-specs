@@ -17,6 +17,7 @@ class Measurement:
         self.config = config
         self.egress_bandwidth_per_time = []
         self.ingress_bandwidth_per_time = []
+        self.message_hops = defaultdict(int)  # dict[msg_hash, hops]
 
         self.env.process(self._update_bandwidth_window())
 
@@ -25,6 +26,9 @@ class Measurement:
 
     def measure_ingress(self, node: "Node", msg: SphinxPacket | bytes):
         self.ingress_bandwidth_per_time[-1][node] += len(msg)
+
+    def update_message_hops(self, msg_hash: bytes, hops: int):
+        self.message_hops[msg_hash] = max(hops, self.message_hops[msg_hash])
 
     def _update_bandwidth_window(self):
         while True:
