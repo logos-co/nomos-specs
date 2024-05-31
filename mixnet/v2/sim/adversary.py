@@ -57,11 +57,13 @@ class Adversary:
                 while queue and queue[0][0] < self.env.now - self.config.adversary.io_window_size:
                     _, delta, sender = queue.popleft()
                     msg_cnt += delta
-                    senders.add(sender)
+                    if delta > 0:
+                        senders.add(sender)
                 # Iterate remaining events that will remain in the new window, and accumulate msg_cnt
                 for _, delta, sender in queue:
                     msg_cnt += delta
-                    senders.add(sender)
+                    if delta > 0:
+                        senders.add(sender)
                 self.msgs_in_node_per_window[-1][node] = (msg_cnt, senders)
 
 

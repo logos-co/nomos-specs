@@ -222,6 +222,15 @@ class Analysis:
         plt.title('Original Sender Counts')
         plt.show()
 
+        # Create the bar plot for original sender counts
+        broadcasters = ({node.id: count for node, count in self.sim.p2p.broadcasters.items()})
+        plt.figure(figsize=(12, 8))
+        plt.bar(list(broadcasters.keys()), list(broadcasters.values()))
+        plt.xlabel('Node ID')
+        plt.ylabel('Counts')
+        plt.title('Broadcasters')
+        plt.show()
+
         # Calculate the mean and standard deviation of the counts
         mean = np.mean(values)
         std_dev = np.std(values)
@@ -247,7 +256,7 @@ class Analysis:
         if self.config.p2p.type == self.config.p2p.TYPE_ONE_TO_ALL:
             MAX_HOPS = 1 + self.config.mixnet.num_mix_layers
         else:
-            MAX_HOPS = (1 + self.config.mixnet.num_mix_layers) * 8
+            MAX_HOPS = (1 + self.config.mixnet.num_mix_layers) * 4
 
         for window in range(starting_window - 1, 0, -1):
             if len(nodes_per_hop) >= MAX_HOPS:
