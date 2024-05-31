@@ -50,14 +50,6 @@ class TestTransfer(TestCase):
             ),
             nf_pk=bob.pk,
         )
-        # tx_output = Output(
-        #     note=bobs_note,
-        #     # TODO: why do we need an Output struct if we can
-        #     # compute the balance and zero commitment form the
-        #     # PublicNote itself?
-        #     balance=bobs_note.balance(tx_rand),
-        #     zero=bobs_note.zero(tx_rand),
-        # )
 
         ptx = PartialTransaction(
             inputs=[
