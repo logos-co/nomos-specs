@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 
 from config import Config
+from measurement import Measurement
 from sphinx import SphinxPacket, Attachment
 from p2p import P2P
 
@@ -17,7 +18,7 @@ class Node:
     INCENTIVE_TX_SIZE = 512
     PADDING_SEPARATOR = b'\x01'
 
-    def __init__(self, id: int, env: simpy.Environment, p2p: P2P, config: Config):
+    def __init__(self, id: int, env: simpy.Environment, p2p: P2P, config: Config, measurement: Measurement):
         self.id = id
         self.env = env
         self.p2p = p2p
@@ -25,6 +26,7 @@ class Node:
         self.public_key = self.private_key.public_key()
         self.config = config
         self.payload_id = 0
+        self.measurement = measurement
         self.action = self.env.process(self.send_message())
 
     def send_message(self):
@@ -37,6 +39,8 @@ class Node:
             message_type = self.message_type_to_send()
             if message_type is None:  # nothing to send in this turn
                 continue
+            elif message_type == MessageType.REAL:
+                self.measurement.count_original_sender(self)
 
             msg = self.create_message(message_type)
             prep_time = random.uniform(0, self.config.mixnet.max_message_prep_time)

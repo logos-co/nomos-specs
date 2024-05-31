@@ -1,5 +1,4 @@
-import random
-from collections import defaultdict, Counter
+from collections import Counter
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -102,8 +101,9 @@ class Analysis:
         dataframes = []
         for i, msgs_in_node in enumerate(self.sim.p2p.adversary.msgs_in_node_per_window):
             time = i * self.config.adversary.io_window_moving_interval
-            df = pd.DataFrame([(time, node.id, msg_cnt, len(senders)) for node, (msg_cnt, senders) in msgs_in_node.items()],
-                              columns=["time", "node_id", "msg_cnt", "sender_cnt"])
+            df = pd.DataFrame(
+                [(time, node.id, msg_cnt, len(senders)) for node, (msg_cnt, senders) in msgs_in_node.items()],
+                columns=["time", "node_id", "msg_cnt", "sender_cnt"])
             if not df.empty:
                 dataframes.append(df)
         df = pd.concat(dataframes, ignore_index=True)
@@ -244,7 +244,11 @@ class Analysis:
         _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[starting_window][starting_node]
         nodes_per_hop = [Counter(senders)]
 
-        MAX_HOPS = 4 * 8
+        if self.config.p2p.type == self.config.p2p.TYPE_ONE_TO_ALL:
+            MAX_HOPS = 1 + self.config.mixnet.num_mix_layers
+        else:
+            MAX_HOPS = (1 + self.config.mixnet.num_mix_layers) * 8
+
         for window in range(starting_window - 1, 0, -1):
             if len(nodes_per_hop) >= MAX_HOPS:
                 break

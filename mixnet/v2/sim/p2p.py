@@ -35,16 +35,14 @@ class P2P(ABC):
     # This should accept only bytes in practice,
     # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
     @abstractmethod
-    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops: int = 0):
+    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops_traveled: int = 0):
         # Yield 0 to ensure that the broadcast is done in the same time step.
         # Without any yield, SimPy complains that the broadcast func is not a generator.
         yield self.env.timeout(0)
 
-    def send(self, msg: SphinxPacket | bytes, hops: int, sender: "Node", receiver: "Node", is_first_of_msg: bool):
-        if hops == 0:
-            self.measurement.count_original_sender(sender)
-
-        if is_first_of_msg:
+    def send(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node",
+             is_first_of_broadcasting: bool):
+        if is_first_of_broadcasting:
             self.adversary.inspect_message_size(msg)
             self.adversary.observe_sending_node(sender, receiver)
         self.measurement.measure_egress(sender, msg)
@@ -54,10 +52,10 @@ class P2P(ABC):
 
         self.measurement.measure_ingress(receiver, msg)
         self.adversary.observe_receiving_node(sender, receiver)
-        self.receive(msg, hops, sender, receiver)
+        self.receive(msg, hops_traveled + 1, sender, receiver)
 
     @abstractmethod
-    def receive(self, msg: SphinxPacket | bytes, hops: int, sender: "Node", receiver: "Node"):
+    def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node"):
         pass
 
     def log(self, msg):
@@ -71,14 +69,14 @@ class NaiveBroadcastP2P(P2P):
 
     # This should accept only bytes in practice,
     # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
-    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops: int = 0):
+    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops_traveled: int = 0):
         yield from super().broadcast(sender, msg)
 
         self.log(f"Node:{sender.id}: Broadcasting a msg: {len(msg)} bytes")
         for i, receiver in enumerate(self.nodes):
-            self.env.process(self.send(msg, hops, sender, receiver, i == 0))
+            self.env.process(self.send(msg, 0, sender, receiver, i == 0))
 
-    def receive(self, msg: SphinxPacket | bytes, hops: int, sender: "Node", receiver: "Node"):
+    def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node"):
         self.env.process(receiver.receive_message(msg))
 
 
@@ -109,7 +107,7 @@ class GossipP2P(P2P):
             conns.add(neighbor)
             self.topology[node] = conns
 
-    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops: int = 0):
+    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops_traveled: int = 0):
         yield from super().broadcast(sender, msg)
         self.log(f"Node:{sender.id}: Gossiping a msg: {len(msg)} bytes")
 
@@ -123,17 +121,17 @@ class GossipP2P(P2P):
             # Don't gossip the message if it was received from the node who is going to be the receiver,
             # which means that the node already knows the message.
             if receiver != self.message_cache[sender][msg_hash]:
-                self.env.process(self.send(msg, hops, sender, receiver, cnt == 0))
+                self.env.process(self.send(msg, hops_traveled, sender, receiver, cnt == 0))
                 cnt += 1
 
-    def receive(self, msg: SphinxPacket | bytes, hops: int, sender: "Node", receiver: "Node"):
+    def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node"):
         # Receive/gossip the msg only if it hasn't been received before. If not, just ignore the msg.
         # i.e. each message is received/gossiped at most once by each node.
         msg_hash = hashlib.sha256(bytes(msg)).digest()
         if msg_hash not in self.message_cache[receiver]:
             self.message_cache[receiver][msg_hash] = sender
+            self.measurement.update_message_hops(msg_hash, hops_traveled)
+
             # Receive and gossip
             self.env.process(receiver.receive_message(msg))
-            hops += 1
-            self.measurement.update_message_hops(msg_hash, hops)
-            self.env.process(self.broadcast(receiver, msg, hops))
+            self.env.process(self.broadcast(receiver, msg, hops_traveled))
