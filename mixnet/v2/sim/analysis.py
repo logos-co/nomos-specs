@@ -174,28 +174,36 @@ class Analysis:
         - there is no message to track back within a reasonable time window
         - enough hops have been traversed
         """
-        MAX_HOPS = 4 * 9
-        nodes_per_hop = []  # [Counter[Node]]
-        for receivers in reversed(self.sim.p2p.adversary.msgs_in_node_per_window):
-            if len(nodes_per_hop) == 0:
-                receivers = {node: (msg_cnt, senders) for node, (msg_cnt, senders) in receivers.items() if len(senders) > 0}
-                if len(receivers) == 0:
-                    continue
-                _, (_, senders) = random.choice(list(receivers.items()))
-                nodes_per_hop.append(Counter(senders))
+        for t in range(len(self.sim.p2p.adversary.msgs_in_node_per_window)-1, 0, -1):
+            items = self.sim.p2p.adversary.msgs_in_node_per_window[t].items()
+            actual_receivers = [node for node, (msg_cnt, senders) in items if len(senders) > 0]
+            if len(actual_receivers) == 0:
                 continue
-            elif len(nodes_per_hop) >= MAX_HOPS:
+            receiver = random.choice(actual_receivers)
+            nodes_per_hop = self.timing_attack_with(receiver, t)
+            self.print_nodes_per_hop(nodes_per_hop)
+            break
+
+    def timing_attack_with(self, starting_node: "Node", starting_time: int):
+        _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[starting_time][starting_node]
+        nodes_per_hop = [Counter(senders)]
+
+        MAX_HOPS = 4 * 8
+        for t in range(starting_time-1, 0, -1):
+            if len(nodes_per_hop) >= MAX_HOPS:
                 break
 
             next_nodes = Counter()
             for node in nodes_per_hop[-1]:
-                if node not in receivers:
-                    continue
-                _, senders = receivers[node]
+                _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[t][node]
                 next_nodes.update(senders)
             if len(next_nodes) == 0:
                 break
             nodes_per_hop.append(next_nodes)
 
+        return nodes_per_hop
+
+    @staticmethod
+    def print_nodes_per_hop(nodes_per_hop):
         for i, nodes in enumerate(nodes_per_hop):
-            print(f"{i}: len:{len(nodes)}: {sorted([node.id for node in nodes])}")
+            print(f"hop-{i}: {len(nodes)} nodes: {sorted([node.id for node in nodes])}")
