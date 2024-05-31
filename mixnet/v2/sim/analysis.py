@@ -168,34 +168,36 @@ class Analysis:
 
     def timing_attack(self):
         """
-        pick a random message. i.e. pick a random node
+        pick a random node received a message.
         then, track back the message to the sender
         until
         - there is no message to track back within a reasonable time window
         - enough hops have been traversed
         """
-        for t in range(len(self.sim.p2p.adversary.msgs_in_node_per_window)-1, 0, -1):
-            items = self.sim.p2p.adversary.msgs_in_node_per_window[t].items()
+        window = len(self.sim.p2p.adversary.msgs_in_node_per_window) - 1
+        while window >= 0:
+            items = self.sim.p2p.adversary.msgs_in_node_per_window[window].items()
             actual_receivers = [node for node, (msg_cnt, senders) in items if len(senders) > 0]
             if len(actual_receivers) == 0:
+                window -= 1
                 continue
             receiver = random.choice(actual_receivers)
-            nodes_per_hop = self.timing_attack_with(receiver, t)
-            self.print_nodes_per_hop(nodes_per_hop)
-            break
+            nodes_per_hop = self.timing_attack_with(receiver, window)
+            self.print_nodes_per_hop(nodes_per_hop, window)
+            window -= len(nodes_per_hop)
 
-    def timing_attack_with(self, starting_node: "Node", starting_time: int):
-        _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[starting_time][starting_node]
+    def timing_attack_with(self, starting_node: "Node", starting_window: int):
+        _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[starting_window][starting_node]
         nodes_per_hop = [Counter(senders)]
 
         MAX_HOPS = 4 * 8
-        for t in range(starting_time-1, 0, -1):
+        for window in range(starting_window - 1, 0, -1):
             if len(nodes_per_hop) >= MAX_HOPS:
                 break
 
             next_nodes = Counter()
             for node in nodes_per_hop[-1]:
-                _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[t][node]
+                _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[window][node]
                 next_nodes.update(senders)
             if len(next_nodes) == 0:
                 break
@@ -204,6 +206,6 @@ class Analysis:
         return nodes_per_hop
 
     @staticmethod
-    def print_nodes_per_hop(nodes_per_hop):
-        for i, nodes in enumerate(nodes_per_hop):
-            print(f"hop-{i}: {len(nodes)} nodes: {sorted([node.id for node in nodes])}")
+    def print_nodes_per_hop(nodes_per_hop, starting_window: int):
+        for hop, nodes in enumerate(nodes_per_hop):
+            print(f"hop-{hop} from w-{starting_window}: {len(nodes)} nodes: {sorted([node.id for node in nodes])}")
