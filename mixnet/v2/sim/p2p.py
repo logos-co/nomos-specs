@@ -27,6 +27,7 @@ class P2P(ABC):
 
     def set_nodes(self, nodes: list["Node"]):
         self.nodes = nodes
+        self.measurement.set_nodes(nodes)
 
     def get_nodes(self, n: int) -> list["Node"]:
         return random.sample(self.nodes, n)
@@ -40,6 +41,9 @@ class P2P(ABC):
         yield self.env.timeout(0)
 
     def send(self, msg: SphinxPacket | bytes, hops: int, sender: "Node", receiver: "Node", is_first_of_msg: bool):
+        if hops == 0:
+            self.measurement.count_original_sender(sender)
+
         if is_first_of_msg:
             self.adversary.inspect_message_size(msg)
             self.adversary.observe_sending_node(sender, receiver)
@@ -128,9 +132,8 @@ class GossipP2P(P2P):
         msg_hash = hashlib.sha256(bytes(msg)).digest()
         if msg_hash not in self.message_cache[receiver]:
             self.message_cache[receiver][msg_hash] = sender
-            hops += 1
-            self.measurement.update_message_hops(msg_hash, hops)
-
             # Receive and gossip
             self.env.process(receiver.receive_message(msg))
+            hops += 1
+            self.measurement.update_message_hops(msg_hash, hops)
             self.env.process(self.broadcast(receiver, msg, hops))

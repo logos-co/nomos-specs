@@ -2,9 +2,11 @@ import random
 from collections import defaultdict, Counter
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 import seaborn
 from matplotlib import pyplot as plt
+import scipy.stats as stats
 
 from adversary import NodeState
 from config import Config
@@ -174,6 +176,7 @@ class Analysis:
         - there is no message to track back within a reasonable time window
         - enough hops have been traversed
         """
+        all_results = []
         window = len(self.sim.p2p.adversary.msgs_in_node_per_window) - 1
         while window >= 0:
             items = self.sim.p2p.adversary.msgs_in_node_per_window[window].items()
@@ -181,10 +184,61 @@ class Analysis:
             if len(actual_receivers) == 0:
                 window -= 1
                 continue
-            receiver = random.choice(actual_receivers)
-            nodes_per_hop = self.timing_attack_with(receiver, window)
-            self.print_nodes_per_hop(nodes_per_hop, window)
-            window -= len(nodes_per_hop)
+
+            results = []
+            max_hops = 0
+            for receiver in actual_receivers:
+                nodes_per_hop = self.timing_attack_with(receiver, window)
+                self.print_nodes_per_hop(nodes_per_hop, window)
+                results.append(nodes_per_hop)
+                max_hops = max(max_hops, len(nodes_per_hop))
+            window -= max_hops
+            all_results.extend(results)
+
+        suspected_senders = Counter()
+        for result in all_results:
+            print(Counter({node.id: count for node, count in result[-1].items()}))
+            suspected_senders.update(result[-1])
+        suspected_senders = ({node.id: count for node, count in suspected_senders.items()})
+        print(f"suspected nodes count: {len(suspected_senders)}")
+
+        # Extract keys and values from the Counter
+        keys = list(suspected_senders.keys())
+        values = list(suspected_senders.values())
+        # Create the bar plot
+        plt.figure(figsize=(12, 8))
+        plt.bar(keys, values)
+        plt.xlabel('Node ID')
+        plt.ylabel('Counts')
+        plt.title('Suspected Sender Counts')
+        plt.show()
+
+        # Create the bar plot for original sender counts
+        original_senders = ({node.id: count for node, count in self.sim.p2p.measurement.original_senders.items()})
+        plt.figure(figsize=(12, 8))
+        plt.bar(list(original_senders.keys()), list(original_senders.values()))
+        plt.xlabel('Node ID')
+        plt.ylabel('Counts')
+        plt.title('Original Sender Counts')
+        plt.show()
+
+        # Calculate the mean and standard deviation of the counts
+        mean = np.mean(values)
+        std_dev = np.std(values)
+        # Plot the histogram of the values
+        plt.figure(figsize=(12, 8))
+        plt.hist(values, bins=30, density=True, alpha=0.6, color='g', label='Counts Histogram')
+        # Plot the normal distribution curve
+        xmin, xmax = plt.xlim()
+        x = np.linspace(xmin, xmax, 100)
+        p = stats.norm.pdf(x, mean, std_dev)
+        plt.plot(x, p, 'k', linewidth=2, label='Normal Distribution')
+        title = "Fit results: mean = %.2f,  std_dev = %.2f" % (mean, std_dev)
+        plt.title(title)
+        plt.xlabel('Counts')
+        plt.ylabel('Density')
+        plt.legend()
+        plt.show()
 
     def timing_attack_with(self, starting_node: "Node", starting_window: int):
         _, senders = self.sim.p2p.adversary.msgs_in_node_per_window[starting_window][starting_node]

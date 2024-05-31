@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -15,11 +15,19 @@ class Measurement:
     def __init__(self, env: simpy.Environment, config: Config):
         self.env = env
         self.config = config
+        self.original_senders = Counter()
         self.egress_bandwidth_per_time = []
         self.ingress_bandwidth_per_time = []
         self.message_hops = defaultdict(int)  # dict[msg_hash, hops]
 
         self.env.process(self._update_bandwidth_window())
+
+    def set_nodes(self, nodes: list["Node"]):
+        for node in nodes:
+            self.original_senders[node] = 0
+
+    def count_original_sender(self, sender: "Node"):
+        self.original_senders[sender] += 1
 
     def measure_egress(self, node: "Node", msg: SphinxPacket | bytes):
         self.egress_bandwidth_per_time[-1][node] += len(msg)
