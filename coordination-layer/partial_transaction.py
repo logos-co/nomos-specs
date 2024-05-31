@@ -27,16 +27,6 @@ class OutputNote:
         return self.note.note.verify_birth(self.birth_proof)
 
 
-# TODO: is this used?
-@dataclass
-class Output:
-    note: PublicNote
-
-    # pre-computed balance and zero commitment "SecretNote" here.
-    balance: Field
-    zero: Field
-
-
 @dataclass(unsafe_hash=True)
 class PartialTransaction:
     inputs: list[InputNote]

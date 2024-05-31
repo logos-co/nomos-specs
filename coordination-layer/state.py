@@ -15,9 +15,9 @@ import constraint
 
 @dataclass
 class State:
-    commitments: set[note.Commitment]
-    nullifiers: set[note.Nullifier]
-    constraints: dict[bytes, constraint.Constraint]
+    # commitments: set[note.Commitment]
+    # nullifiers: set[note.Nullifier]
+    # constraints: dict[bytes, constraint.Constraint]
 
     def add_constraint(self, c: constraint.Constraint):
         self.constraints[c.hash()] = c

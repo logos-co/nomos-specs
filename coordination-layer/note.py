@@ -13,20 +13,6 @@ from crypto import (
 from constraints import Constraint, Proof
 
 
-# TODO: is this used?
-@dataclass
-class NoteCommitment:
-    cm: Field
-    blinding: Field
-    zero: Field
-
-
-# TODO: is this used?
-@dataclass
-class Nullifier:
-    nf: bytes
-
-
 def nf_pk(nf_sk) -> Field:
     return prf("CL_NOTE_NF", nf_sk)
 
