@@ -1,3 +1,7 @@
+import random
+from collections import defaultdict, Counter
+from typing import TYPE_CHECKING
+
 import pandas as pd
 import seaborn
 from matplotlib import pyplot as plt
@@ -5,6 +9,9 @@ from matplotlib import pyplot as plt
 from adversary import NodeState
 from config import Config
 from simulation import Simulation
+
+if TYPE_CHECKING:
+    from node import Node
 
 
 class Analysis:
@@ -19,6 +26,7 @@ class Analysis:
         self.messages_in_node_over_time()
         # self.node_states()
         self.message_hops()
+        self.timing_attack()
 
     def bandwidth(self, message_size_df: pd.DataFrame):
         dataframes = []
@@ -92,7 +100,7 @@ class Analysis:
         dataframes = []
         for i, msgs_in_node in enumerate(self.sim.p2p.adversary.msgs_in_node_per_window):
             time = i * self.config.adversary.io_window_moving_interval
-            df = pd.DataFrame([(time, node.id, msg_cnt, sender_cnt) for node, (msg_cnt, sender_cnt) in msgs_in_node.items()],
+            df = pd.DataFrame([(time, node.id, msg_cnt, len(senders)) for node, (msg_cnt, senders) in msgs_in_node.items()],
                               columns=["time", "node_id", "msg_cnt", "sender_cnt"])
             if not df.empty:
                 dataframes.append(df)
@@ -157,3 +165,37 @@ class Analysis:
         seaborn.boxplot(data=df, y="hops", medianprops={"color": "red", "linewidth": 2.5})
         plt.title("Message hops distribution")
         plt.show()
+
+    def timing_attack(self):
+        """
+        pick a random message. i.e. pick a random node
+        then, track back the message to the sender
+        until
+        - there is no message to track back within a reasonable time window
+        - enough hops have been traversed
+        """
+        MAX_HOPS = 4 * 9
+        nodes_per_hop = []  # [Counter[Node]]
+        for receivers in reversed(self.sim.p2p.adversary.msgs_in_node_per_window):
+            if len(nodes_per_hop) == 0:
+                receivers = {node: (msg_cnt, senders) for node, (msg_cnt, senders) in receivers.items() if len(senders) > 0}
+                if len(receivers) == 0:
+                    continue
+                _, (_, senders) = random.choice(list(receivers.items()))
+                nodes_per_hop.append(Counter(senders))
+                continue
+            elif len(nodes_per_hop) >= MAX_HOPS:
+                break
+
+            next_nodes = Counter()
+            for node in nodes_per_hop[-1]:
+                if node not in receivers:
+                    continue
+                _, senders = receivers[node]
+                next_nodes.update(senders)
+            if len(next_nodes) == 0:
+                break
+            nodes_per_hop.append(next_nodes)
+
+        for i, nodes in enumerate(nodes_per_hop):
+            print(f"{i}: len:{len(nodes)}: {sorted([node.id for node in nodes])}")

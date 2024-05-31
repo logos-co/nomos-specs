@@ -21,7 +21,7 @@ class Adversary:
         self.config = config
         self.message_sizes = []
         self.senders_around_interval = defaultdict(int)
-        self.msgs_in_node_per_window = []  # [<node, (int, int)>]: The 1st int is msg count, the 2nd int is sender count
+        self.msgs_in_node_per_window = []  # [<receiver, (int, set[sender]))>]
         self.cur_window_per_node = defaultdict(lambda: deque())  # <node, [(time, int)]>: int is + or -.
         # self.node_states = defaultdict(dict)
 
@@ -49,7 +49,7 @@ class Adversary:
         while True:
             yield self.env.timeout(self.config.adversary.io_window_moving_interval)
 
-            self.msgs_in_node_per_window.append(defaultdict(lambda: (0, 0)))  # <node, (int, int)>
+            self.msgs_in_node_per_window.append(defaultdict(lambda: (0, set())))  # <node, (int, int)>
             for node, queue in self.cur_window_per_node.items():
                 msg_cnt = 0.0
                 senders = set()
@@ -62,7 +62,7 @@ class Adversary:
                 for _, delta, sender in queue:
                     msg_cnt += delta
                     senders.add(sender)
-                self.msgs_in_node_per_window[-1][node] = (msg_cnt, len(senders))
+                self.msgs_in_node_per_window[-1][node] = (msg_cnt, senders)
 
 
 class NodeState(Enum):
