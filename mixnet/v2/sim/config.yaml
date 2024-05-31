@@ -42,4 +42,4 @@ adversary:
   io_window_size: 0.20
   # A moving interval of the time window for the adversary to observe inputs and outputs of each node
   # This must be smaller or equal to io_window_size.
-  io_window_moving_interval: 0.10
+  io_window_moving_interval: 0.20
