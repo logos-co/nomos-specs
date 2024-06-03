@@ -60,7 +60,9 @@ class Adversary:
                     if delta > 0:
                         senders.add(sender)
                 # Iterate remaining events that will remain in the new window, and accumulate msg_cnt
-                for _, delta, sender in queue:
+                for t, delta, sender in queue:
+                    if t >= self.env.now - self.config.adversary.io_window_moving_interval:
+                        break
                     msg_cnt += delta
                     if delta > 0:
                         senders.add(sender)

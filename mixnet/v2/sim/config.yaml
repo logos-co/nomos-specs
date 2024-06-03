@@ -23,7 +23,8 @@ mixnet:
   # A maximum preparation time (computation time) for a message sender before sending the message
   max_message_prep_time: 0
   # A maximum delay of messages mixed in a mix node
-  max_mix_delay: 0
+  min_mix_delay: 0.0
+  max_mix_delay: 0.0
 
 p2p:
   # Broadcasting type: 1-to-all | gossip
@@ -31,6 +32,7 @@ p2p:
   # A connection density, only if the type is gossip
   connection_density: 6
   # A maximum network latency between nodes directly connected with each other
+  min_network_latency: 0.10
   max_network_latency: 0.20
 
 measurement:
@@ -39,7 +41,9 @@ measurement:
 
 adversary:
   # A time window for the adversary to observe inputs and outputs of each node
-  io_window_size: 0.20
+  # Recommendation: Same as `mixnet.max_mix_delay + (p2p.max_network_latency - p2p.min_network_latency)`
+  io_window_size: 0.10
   # A moving interval of the time window for the adversary to observe inputs and outputs of each node
   # This must be smaller or equal to io_window_size.
+  # Recommendation: Same as `p2p.min_network_latency`
   io_window_moving_interval: 0.10

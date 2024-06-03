@@ -165,6 +165,7 @@ class Analysis:
         print(df.describe())
         plt.figure(figsize=(6, 6))
         seaborn.boxplot(data=df, y="hops", medianprops={"color": "red", "linewidth": 2.5})
+        plt.ylim(bottom=0)
         plt.title("Message hops distribution")
         plt.show()
 
@@ -202,7 +203,17 @@ class Analysis:
         suspected_senders = ({node.id: count for node, count in suspected_senders.items()})
         print(f"suspected nodes count: {len(suspected_senders)}")
 
-        # Extract keys and values from the Counter
+        # Create the bar plot for original sender counts
+        original_senders = ({node.id: count for node, count in self.sim.p2p.measurement.original_senders.items()})
+        plt.figure(figsize=(12, 8))
+        plt.bar(list(original_senders.keys()), list(original_senders.values()))
+        plt.xlabel('Node ID')
+        plt.ylabel('Counts')
+        plt.title('Original Sender Counts')
+        plt.xlim(-1, self.config.mixnet.num_nodes)
+        plt.show()
+
+        # Create the bar plot for suspected sender counts
         keys = list(suspected_senders.keys())
         values = list(suspected_senders.values())
         # Create the bar plot
@@ -211,24 +222,17 @@ class Analysis:
         plt.xlabel('Node ID')
         plt.ylabel('Counts')
         plt.title('Suspected Sender Counts')
+        plt.xlim(-1, self.config.mixnet.num_nodes)
         plt.show()
 
-        # Create the bar plot for original sender counts
-        original_senders = ({node.id: count for node, count in self.sim.p2p.measurement.original_senders.items()})
-        plt.figure(figsize=(12, 8))
-        plt.bar(list(original_senders.keys()), list(original_senders.values()))
-        plt.xlabel('Node ID')
-        plt.ylabel('Counts')
-        plt.title('Original Sender Counts')
-        plt.show()
-
-        # Create the bar plot for original sender counts
+        # Create the bar plot for broadcasters
         broadcasters = ({node.id: count for node, count in self.sim.p2p.broadcasters.items()})
         plt.figure(figsize=(12, 8))
         plt.bar(list(broadcasters.keys()), list(broadcasters.values()))
         plt.xlabel('Node ID')
         plt.ylabel('Counts')
         plt.title('Broadcasters')
+        plt.xlim(-1, self.config.mixnet.num_nodes)
         plt.show()
 
         # Calculate the mean and standard deviation of the counts

@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import random
 from dataclasses import dataclass
 from typing import Self
 
@@ -26,7 +28,7 @@ class Config:
         config.p2p.validate()
         config.measurement.validate()
         config.adversary.validate()
-        
+
         return config
 
     def description(self):
@@ -64,6 +66,7 @@ class MixnetConfig:
     # A maximum preparation time (computation time) for a message sender before sending the message
     max_message_prep_time: float
     # A maximum delay of messages mixed in a mix node
+    min_mix_delay: float
     max_mix_delay: float
 
     def validate(self):
@@ -77,13 +80,14 @@ class MixnetConfig:
             assert weight >= 1
         assert self.cover_message_prob >= 0
         assert self.max_message_prep_time >= 0
-        assert self.max_mix_delay >= 0
+        assert 0 <= self.min_mix_delay <= self.max_mix_delay
 
     def description(self):
         return (
             f"payload: {self.payload_size} bytes\n"
             f"num_nodes: {self.num_nodes}\n"
             f"num_mix_layers: {self.num_mix_layers}\n"
+            f"min_mix_delay: {self.min_mix_delay}\n"
             f"max_mix_delay: {self.max_mix_delay}\n"
             f"msg_interval: {self.message_interval}\n"
             f"real_msg_prob: {self.real_message_prob:.2f}\n"
@@ -93,6 +97,9 @@ class MixnetConfig:
     def is_mixing_on(self) -> bool:
         return self.num_mix_layers > 0
 
+    def random_mix_delay(self) -> float:
+        return random.uniform(self.min_mix_delay, self.max_mix_delay)
+
 
 @dataclass
 class P2PConfig:
@@ -101,6 +108,7 @@ class P2PConfig:
     # A connection density, only if the type is gossip
     connection_density: int
     # A maximum network latency between nodes directly connected with each other
+    min_network_latency: float
     max_network_latency: float
 
     TYPE_ONE_TO_ALL = "1-to-all"
@@ -110,14 +118,18 @@ class P2PConfig:
         assert self.type in [self.TYPE_ONE_TO_ALL, self.TYPE_GOSSIP]
         if self.type == self.TYPE_GOSSIP:
             assert self.connection_density > 0
-        assert self.max_network_latency >= 0
+        assert 0 < self.min_network_latency <= self.max_network_latency
 
     def description(self):
         return (
             f"p2p_type: {self.type}\n"
             f"conn_density: {self.connection_density}\n"
+            f"min_net_latency: {self.min_network_latency:.2f}\n"
             f"max_net_latency: {self.max_network_latency:.2f}"
         )
+
+    def random_network_latency(self) -> float:
+        return random.uniform(self.min_network_latency, self.max_network_latency)
 
 
 @dataclass

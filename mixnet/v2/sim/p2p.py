@@ -50,7 +50,7 @@ class P2P(ABC):
         self.measurement.measure_egress(sender, msg)
 
         # simulate network latency
-        yield self.env.timeout(random.uniform(0, self.config.p2p.max_network_latency))
+        yield self.env.timeout(self.config.p2p.random_network_latency())
 
         self.measurement.measure_ingress(receiver, msg)
         self.adversary.observe_receiving_node(sender, receiver)
