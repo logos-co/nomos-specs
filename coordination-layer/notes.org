@@ -1,5 +1,57 @@
 * Open Issues
 
+** Do we need both Public, Secret and Inner Note?
+
+Can't we simply have a Note (currently InnerNote) and the partial transaction will introduce
+a wrapper over the Note struct that will have the extra fields necessary for using notes within
+a transaction system:
+
+#+begin_src python
+
+
+  # ----- note.py -----
+
+  @dataclass(unsafe_hash=True)
+  class Note:
+      value: Field
+      unit: str
+      birth_constraint: Constraint
+      death_constraints: list[Constraint]
+      state: Field
+      nonce: Field
+      rand: Field
+
+      def verify_death(self, death_cm: Field, death_proof: Proof) -> bool:
+          pass
+
+      def verify_birth(self, birth_proof: Proof) -> bool:
+          pass
+
+      def verify_value(self) -> bool:
+          pass
+
+      def fungibility_domain(self) -> Field:
+          pass
+
+  # ----- partial_transaction.py -----
+
+  @dataclass
+  class InputNote:
+      note: Note
+      nullifier: Note
+      death_cm: Field
+      death_proof: Proof
+      balance_cm: Point
+
+  @dataclass
+  class OutputNote:
+      note: PublicNote
+      birth_proof: Proof
+      balance_cm: Point
+
+#+end_src
+
+
 ** provided commitment to zero may removing the blinding of the pederson commitment
 
 Since you can subtract the randomness from the commitment to get just the binding part.

@@ -1,3 +1,4 @@
+from py_ecc import bn128
 from keum import grumpkin
 import poseidon
 
@@ -5,8 +6,11 @@ import poseidon
 # !Important! The crypto primitives here must be in agreement with the proving system
 # E.g. if you are using noir with the Barretenberg, we must use the Grumpkin curve.
 
-Point = grumpkin.AffineWeierstrass
-Field = grumpkin.Fq
+# Point = grumpkin.AffineWeierstrass
+# Field = grumpkin.Fq
+
+Point = bn128.FQ
+Field = bn128.Point2D[FQ]
 
 
 def fake_algebraic_hash(data) -> Field:

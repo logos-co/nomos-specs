@@ -76,7 +76,7 @@ class InnerNote:
         return prf("CL_NOTE_COMM_RAND", self.rand, index)
 
     @property
-    def fungibility_domain(self) -> Field:
+    def fungibility_domain(self) -> Point:
         """The fungibility domain of this note"""
         return hash_to_curve(
             "CL_NOTE_NULL", self.birth_constraint.hash(), *_str_to_vec(self.unit)
