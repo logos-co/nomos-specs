@@ -19,7 +19,7 @@ mixnet:
   # The length of the list should be <= p2p.num_nodes. i.e. some nodes won't have a weight.
   real_message_prob_weights: []
   # A probability of sending a cover message within a cycle if not sending a real message
-  cover_message_prob: 0
+  cover_message_prob: 0.05
   # A maximum preparation time (computation time) for a message sender before sending the message
   max_message_prep_time: 0
   # A maximum delay of messages mixed in a mix node
@@ -41,9 +41,5 @@ measurement:
 
 adversary:
   # A time window for the adversary to observe inputs and outputs of each node
-  # Recommendation: Same as `mixnet.max_mix_delay + (p2p.max_network_latency - p2p.min_network_latency)`
-  io_window_size: 0.10
-  # A moving interval of the time window for the adversary to observe inputs and outputs of each node
-  # This must be smaller or equal to io_window_size.
   # Recommendation: Same as `p2p.min_network_latency`
-  io_window_moving_interval: 0.10
+  io_window_size: 0.10

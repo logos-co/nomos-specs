@@ -46,7 +46,7 @@ class P2P(ABC):
              is_first_of_broadcasting: bool):
         if is_first_of_broadcasting:
             self.adversary.inspect_message_size(msg)
-            self.adversary.observe_sending_node(sender, receiver)
+            self.adversary.observe_sending_node(sender)
         self.measurement.measure_egress(sender, msg)
 
         # simulate network latency
@@ -79,6 +79,8 @@ class NaiveBroadcastP2P(P2P):
             self.env.process(self.send(msg, 0, sender, receiver, i == 0))
 
     def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node"):
+        msg_hash = hashlib.sha256(bytes(msg)).digest()
+        self.measurement.update_message_hops(msg_hash, hops_traveled)
         self.env.process(receiver.receive_message(msg))
 
 
