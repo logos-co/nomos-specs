@@ -1,4 +1,4 @@
-blspy==2.0.2
+blspy==2.0.3
 cffi==1.16.0
 cryptography==41.0.7
 numpy==1.26.3
