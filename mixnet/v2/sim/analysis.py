@@ -210,7 +210,7 @@ class Analysis:
                 for sender, origin_id in senders_and_origins:
                     print(f"START: receiver:{receiver.id}, window:{window}, sender:{sender.id}, origin:{origin_id}")
                     suspected_origins = Counter()
-                    self.timing_attack_with(receiver, window, hops_to_observe, suspected_origins, sender)
+                    self.timing_attack_with(receiver, window, hops_to_observe, 0, suspected_origins, sender)
                     suspected_origin_ids = {node.id for node in suspected_origins}
                     if origin_id in suspected_origin_ids:
                         success_rate = 1 / len(suspected_origin_ids) * 100.0
@@ -237,7 +237,8 @@ class Analysis:
         plt.grid(True)
         plt.show()
 
-    def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, suspected_origins: Counter,
+    def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, observed_hops: int,
+                           suspected_origins: Counter,
                            sender: "Node" = None):
         assert remaining_hops >= 1
         # If all nodes are already suspected, no need to inspect further.
@@ -250,6 +251,12 @@ class Analysis:
             senders = {sender}
         else:
             senders = self.sim.p2p.adversary.msgs_received_per_window[window][receiver]
+
+        # Suspect the receiver as the origin, if the receiver has not received any messages at the given window,
+        # and if the minimum number of hops has been observed.
+        if len(senders) == 0 and observed_hops > self.sim.config.mixnet.num_mix_layers:
+            suspected_origins.update({receiver})
+            return
 
         # If the remaining_hops is 1, return the senders as suspected senders
         if remaining_hops == 1:
@@ -264,7 +271,7 @@ class Analysis:
             for prev_window in range(window - 1, window - 1 - window_range, -1):
                 if prev_window < 0:
                     break
-                self.timing_attack_with(sender, prev_window, remaining_hops - 1, suspected_origins)
+                self.timing_attack_with(sender, prev_window, remaining_hops - 1, observed_hops + 1, suspected_origins)
 
     @staticmethod
     def print_nodes_per_hop(nodes_per_hop, starting_window: int):
