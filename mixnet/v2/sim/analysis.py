@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 import seaborn
 from matplotlib import pyplot as plt
-import scipy.stats as stats
 
 from adversary import NodeState
 from config import Config
@@ -37,8 +37,8 @@ class Analysis:
         self.messages_emitted_around_interval()
         self.messages_in_node_over_time()
         # self.node_states()
-        self.message_hops()
-        # self.timing_attack(median_hops)
+        median_hops = self.message_hops()
+        self.timing_attack(median_hops)
 
     def bandwidth(self, message_size_df: pd.DataFrame):
         dataframes = []
@@ -96,8 +96,9 @@ class Analysis:
 
     def messages_emitted_around_interval(self):
         # A ground truth that shows how many times each node sent a real message
-        truth_df = pd.DataFrame([(node.id, count) for node, count in self.sim.p2p.measurement.original_senders.items()],
-                                columns=[COL_NODE_ID, COL_MSG_CNT])
+        truth_df = pd.DataFrame(
+            [(node.id, count) for node, count in self.sim.p2p.measurement.original_senders.items()],
+            columns=[COL_NODE_ID, COL_MSG_CNT])
         # A result of observing nodes who have sent messages around the promised message interval
         suspected_df = pd.DataFrame(
             [(node.id, self.sim.p2p.adversary.senders_around_interval[node]) for node in
@@ -194,22 +195,12 @@ class Analysis:
 
     def timing_attack(self, hops_between_layers: int):
         hops_to_observe = hops_between_layers * (self.config.mixnet.num_mix_layers + 1)
-        all_results = Counter()
-        window = len(self.sim.p2p.adversary.io_windows) - 1
-        while window >= 0:
-            items = self.sim.p2p.adversary.io_windows[window].items()
-            actual_receivers = [receiver for receiver, (_, senders) in items if len(senders) > 0]
-            if len(actual_receivers) == 0:
-                window -= 1
-                continue
+        suspected_senders = Counter()
+        for receiver, windows_and_senders in self.sim.p2p.adversary.final_msgs_received.items():
+            for window, sender in windows_and_senders.items():
+                suspected_senders.update(self.timing_attack_with(receiver, window, hops_to_observe, sender))
 
-            for receiver in actual_receivers:
-                suspected_senders = self.timing_attack_with(receiver, window, hops_to_observe)
-                # self.print_nodes_per_hop(suspected_senders, window)
-                all_results.update(suspected_senders)
-            window -= 1
-
-        suspected_senders = ({node.id: count for node, count in all_results.items()})
+        suspected_senders = ({node.id: count for node, count in suspected_senders.items()})
         print(f"suspected nodes count: {len(suspected_senders)}")
 
         # Create the bar plot for original sender counts
@@ -262,40 +253,33 @@ class Analysis:
         plt.legend()
         plt.show()
 
-    def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int) -> Counter:
+    def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, sender: "Node" = None) -> Counter:
         assert remaining_hops >= 1
 
         # Start inspecting senders who sent messages that were arrived in the receiver at the given window
-        _, senders = self.sim.p2p.adversary.io_windows[window][receiver]
+        if sender is not None:
+            senders = {sender}
+        else:
+            _, senders = self.sim.p2p.adversary.io_windows[window][receiver]
 
         # If the remaining_hops is 1, return the senders as suspected senders
         if remaining_hops == 1:
             return Counter(senders)
 
         # A result to be returned after inspecting all senders who sent messages to the receiver
-        all_suspected_senders = Counter()
+        suspected_senders = Counter()
 
         # Inspect each sender who sent messages to the receiver
         for sender in senders:
-            # A sub-result to be filled when tracking back further from the sender
-            suspected_senders = Counter()
-
             # Track back to each window where that sender might have received any messages.
-            time_range = self.config.mixnet.max_mix_delay + self.config.p2p.max_network_latency - self.config.adversary.io_window_size
+            time_range = self.config.mixnet.max_mix_delay + self.config.p2p.max_network_latency
             window_range = int(time_range / self.config.adversary.io_window_size)
             for prev_window in range(window - 1, window - 1 - window_range, -1):
                 if prev_window < 0:
                     break
                 suspected_senders.update(self.timing_attack_with(sender, prev_window, remaining_hops - 1))
 
-            # If there is no suspected sender gathered, we can assume that the sender is the original sender
-            # because it means that nobody has sent messages to the sender within the reasonable time window
-            if len(suspected_senders) == 0:
-                all_suspected_senders.update({sender})
-            else:
-                all_suspected_senders.update(suspected_senders)
-
-        return all_suspected_senders
+        return suspected_senders
 
     @staticmethod
     def print_nodes_per_hop(nodes_per_hop, starting_window: int):

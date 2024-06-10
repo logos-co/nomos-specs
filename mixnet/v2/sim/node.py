@@ -10,15 +10,16 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X
 
 from config import Config
 from measurement import Measurement
-from sphinx import SphinxPacket, Attachment
 from p2p import P2P
+from sphinx import SphinxPacket, Attachment
 
 
 class Node:
     INCENTIVE_TX_SIZE = 512
     PADDING_SEPARATOR = b'\x01'
 
-    def __init__(self, id: int, env: simpy.Environment, p2p: P2P, config: Config, measurement: Measurement):
+    def __init__(self, id: int, env: simpy.Environment, p2p: P2P, config: Config, measurement: Measurement,
+                 operated_by_adversary: bool = False):
         self.id = id
         self.env = env
         self.p2p = p2p
@@ -27,6 +28,7 @@ class Node:
         self.config = config
         self.payload_id = 0
         self.measurement = measurement
+        self.operated_by_adversary = operated_by_adversary
         self.action = self.env.process(self.send_message())
 
     def send_message(self):

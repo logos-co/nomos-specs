@@ -27,7 +27,7 @@ class Measurement:
             self.original_senders[node] = 0
 
     def count_original_sender(self, sender: "Node"):
-        self.original_senders[sender] += 1
+        self.original_senders.update({sender})
 
     def measure_egress(self, node: "Node", msg: SphinxPacket | bytes):
         self.egress_bandwidth_per_time[-1][node] += len(msg)

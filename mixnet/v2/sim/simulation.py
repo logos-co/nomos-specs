@@ -13,7 +13,8 @@ class Simulation:
         self.config = config
         self.env = simpy.Environment()
         self.p2p = Simulation.init_p2p(self.env, config)
-        nodes = [Node(i, self.env, self.p2p, config, self.p2p.measurement) for i in range(config.mixnet.num_nodes)]
+        nodes = [Node(i, self.env, self.p2p, config, self.p2p.measurement, i == 0) for i in
+                 range(config.mixnet.num_nodes)]
         self.p2p.set_nodes(nodes)
 
     def run(self):
