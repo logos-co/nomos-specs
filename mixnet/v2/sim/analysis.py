@@ -208,14 +208,16 @@ class Analysis:
         for receiver, windows_and_msgs in self.sim.p2p.adversary.final_msgs_received.items():
             for window, senders_and_origins in windows_and_msgs.items():
                 for sender, origin_id in senders_and_origins:
-                    suspected_origins = self.timing_attack_with(receiver, window, hops_to_observe, sender)
-                    suspected_origin_ids = {node.id for node in suspected_origins.keys()}
+                    print(f"START: receiver:{receiver.id}, window:{window}, sender:{sender.id}, origin:{origin_id}")
+                    suspected_origins = Counter()
+                    self.timing_attack_with(receiver, window, hops_to_observe, suspected_origins, sender)
+                    suspected_origin_ids = {node.id for node in suspected_origins}
                     if origin_id in suspected_origin_ids:
                         success_rate = 1 / len(suspected_origin_ids) * 100.0
                     else:
                         success_rate = 0.0
                     print(
-                        f"origin:{origin_id}, suspected_origins:{suspected_origin_ids}, success_rate:{success_rate:.2f}%"
+                        f"END: origin:{origin_id}, suspected_origins:{suspected_origin_ids}, success_rate:{success_rate:.2f}%"
                     )
                     success_rates.append(success_rate)
 
@@ -235,8 +237,12 @@ class Analysis:
         plt.grid(True)
         plt.show()
 
-    def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, sender: "Node" = None) -> Counter:
+    def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, suspected_origins: Counter,
+                           sender: "Node" = None):
         assert remaining_hops >= 1
+        # If all nodes are already suspected, no need to inspect further.
+        if len(suspected_origins) == len(self.sim.p2p.nodes):
+            return
 
         # Start inspecting senders who sent messages that were arrived in the receiver at the given window.
         # If the specific sender is given, inspect only that sender to maximize the success rate.
@@ -247,10 +253,8 @@ class Analysis:
 
         # If the remaining_hops is 1, return the senders as suspected senders
         if remaining_hops == 1:
-            return Counter(senders)
-
-        # A result to be returned after inspecting all senders who sent messages to the receiver
-        suspected_origins = Counter()
+            suspected_origins.update(senders)
+            return
 
         # Inspect each sender who sent messages to the receiver
         for sender in senders:
@@ -260,9 +264,7 @@ class Analysis:
             for prev_window in range(window - 1, window - 1 - window_range, -1):
                 if prev_window < 0:
                     break
-                suspected_origins.update(self.timing_attack_with(sender, prev_window, remaining_hops - 1))
-
-        return suspected_origins
+                self.timing_attack_with(sender, prev_window, remaining_hops - 1, suspected_origins)
 
     @staticmethod
     def print_nodes_per_hop(nodes_per_hop, starting_window: int):
