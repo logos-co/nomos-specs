@@ -144,7 +144,7 @@ class MeasurementConfig:
 @dataclass
 class AdversaryConfig:
     # A time window for the adversary to observe inputs and outputs of each node
-    io_window_size: float
+    window_size: float
 
     def validate(self):
-        assert self.io_window_size > 0
+        assert self.window_size > 0

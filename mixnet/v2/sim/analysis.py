@@ -121,12 +121,13 @@ class Analysis:
 
     def messages_in_node_over_time(self):
         dataframes = []
-        for i, io_window in enumerate(self.sim.p2p.adversary.io_windows):
-            time = i * self.config.adversary.io_window_size
-            df = pd.DataFrame(
-                [(time, receiver.id, len(msg_queue), len(senders)) for receiver, (msg_queue, senders) in
-                 io_window.items()],
-                columns=[COL_TIME, COL_NODE_ID, COL_MSG_CNT, COL_SENDER_CNT])
+        for window, msg_pools in enumerate(self.sim.p2p.adversary.msg_pools_per_window):
+            time = window * self.config.adversary.window_size
+            data = []
+            for receiver, msg_pool in msg_pools.items():
+                senders = self.sim.p2p.adversary.msgs_received_per_window[window][receiver]
+                data.append((time, receiver.id, len(msg_pool), len(senders)))
+            df = pd.DataFrame(data, columns=[COL_TIME, COL_NODE_ID, COL_MSG_CNT, COL_SENDER_CNT])
             if not df.empty:
                 dataframes.append(df)
         df = pd.concat(dataframes, ignore_index=True)
@@ -260,7 +261,7 @@ class Analysis:
         if sender is not None:
             senders = {sender}
         else:
-            _, senders = self.sim.p2p.adversary.io_windows[window][receiver]
+            senders = self.sim.p2p.adversary.msgs_received_per_window[window][receiver]
 
         # If the remaining_hops is 1, return the senders as suspected senders
         if remaining_hops == 1:
@@ -273,7 +274,7 @@ class Analysis:
         for sender in senders:
             # Track back to each window where that sender might have received any messages.
             time_range = self.config.mixnet.max_mix_delay + self.config.p2p.max_network_latency
-            window_range = int(time_range / self.config.adversary.io_window_size)
+            window_range = int(time_range / self.config.adversary.window_size)
             for prev_window in range(window - 1, window - 1 - window_range, -1):
                 if prev_window < 0:
                     break
