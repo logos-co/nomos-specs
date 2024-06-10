@@ -1,9 +1,7 @@
 from collections import Counter
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pandas as pd
-import scipy.stats as stats
 import seaborn
 from matplotlib import pyplot as plt
 
@@ -224,34 +222,6 @@ class Analysis:
         plt.ylabel("Counts")
         plt.title("Suspected Sender Counts")
         plt.xlim(-1, self.config.mixnet.num_nodes)
-        plt.show()
-
-        # Create the bar plot for broadcasters
-        broadcasters = ({node.id: count for node, count in self.sim.p2p.broadcasters.items()})
-        plt.figure(figsize=(12, 8))
-        plt.bar(list(broadcasters.keys()), list(broadcasters.values()))
-        plt.xlabel("Node ID")
-        plt.ylabel("Counts")
-        plt.title("Broadcasters")
-        plt.xlim(-1, self.config.mixnet.num_nodes)
-        plt.show()
-
-        # Calculate the mean and standard deviation of the counts
-        mean = np.mean(values)
-        std_dev = np.std(values)
-        # Plot the histogram of the values
-        plt.figure(figsize=(12, 8))
-        plt.hist(values, bins=30, density=True, alpha=0.6, color="g", label="Counts Histogram")
-        # Plot the normal distribution curve
-        xmin, xmax = plt.xlim()
-        x = np.linspace(xmin, xmax, 100)
-        p = stats.norm.pdf(x, mean, std_dev)
-        plt.plot(x, p, "k", linewidth=2, label="Normal Distribution")
-        title = "Fit results: mean = %.2f,  std_dev = %.2f" % (mean, std_dev)
-        plt.title(title)
-        plt.xlabel("Counts")
-        plt.ylabel("Density")
-        plt.legend()
         plt.show()
 
     def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, sender: "Node" = None) -> Counter:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import random
 from abc import ABC, abstractmethod
-from collections import defaultdict, Counter
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import simpy
@@ -24,7 +24,6 @@ class P2P(ABC):
         self.nodes = []
         self.measurement = Measurement(env, config)
         self.adversary = Adversary(env, config)
-        self.broadcasters = Counter()
 
     def set_nodes(self, nodes: list["Node"]):
         self.nodes = nodes
@@ -40,7 +39,6 @@ class P2P(ABC):
         # Yield 0 to ensure that the broadcast is done in the same time step.
         # Without any yield, SimPy complains that the broadcast func is not a generator.
         yield self.env.timeout(0)
-        self.broadcasters[sender] += 1
 
     def send(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node",
              is_first_of_broadcasting: bool):
