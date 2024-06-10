@@ -24,7 +24,8 @@ class Adversary:
         self.msg_pools_per_window.append(defaultdict(lambda: deque()))
         self.msgs_received_per_window = []  # list[dict[receiver, set[sender])]]
         self.msgs_received_per_window.append(defaultdict(set))
-        self.final_msgs_received = defaultdict(dict)  # dict[receiver, dict[window, sender]]
+        # dict[receiver, dict[window, list[(sender, origin_id)]]]
+        self.final_msgs_received = defaultdict(lambda: defaultdict(list))
         # self.node_states = defaultdict(dict)
 
         self.env.process(self.update_observation_window())
@@ -33,10 +34,13 @@ class Adversary:
         self.message_sizes.append(len(msg))
 
     def observe_receiving_node(self, sender: "Node", receiver: "Node", msg: SphinxPacket | bytes):
-        self.msg_pools_per_window[-1][receiver].append(self.env.now)
-        self.msgs_received_per_window[-1][receiver].add(sender)
-        if receiver.operated_by_adversary and not isinstance(msg, SphinxPacket):
-            self.final_msgs_received[receiver][len(self.msg_pools_per_window) - 1] = sender
+        cur_window = len(self.msg_pools_per_window) - 1
+        self.msg_pools_per_window[cur_window][receiver].append(self.env.now)
+        self.msgs_received_per_window[cur_window][receiver].add(sender)
+
+        origin_id = receiver.inspect_message(msg)
+        if origin_id is not None:
+            self.final_msgs_received[receiver][cur_window].append((sender, origin_id))
         # if node not in self.node_states[self.env.now]:
         #     self.node_states[self.env.now][node] = NodeState.RECEIVING
 

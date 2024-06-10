@@ -22,6 +22,7 @@ COL_EXPECTED = "Expected"
 COL_MSG_SIZE = "Message Size"
 COL_EGRESS = "Egress"
 COL_INGRESS = "Ingress"
+COL_SUCCESS_RATE = "Success Rate (%)"
 
 
 class Analysis:
@@ -67,7 +68,7 @@ class Analysis:
         plt.xlabel(COL_TIME)
         plt.ylabel("Bandwidth (KiB/s)")
         plt.ylim(bottom=0)
-        # Customize the legend to show only 'egress' and 'ingress' regardless of node_id
+        # Customize the legend to show only "egress" and "ingress" regardless of node_id
         handles, labels = plt.gca().get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         plt.legend(by_label.values(), by_label.keys())
@@ -194,40 +195,38 @@ class Analysis:
 
     def timing_attack(self, hops_between_layers: int):
         hops_to_observe = hops_between_layers * (self.config.mixnet.num_mix_layers + 1)
-        suspected_senders = Counter()
-        for receiver, windows_and_senders in self.sim.p2p.adversary.final_msgs_received.items():
-            for window, sender in windows_and_senders.items():
-                suspected_senders.update(self.timing_attack_with(receiver, window, hops_to_observe, sender))
+        success_rates = []
+        for receiver, windows_and_msgs in self.sim.p2p.adversary.final_msgs_received.items():
+            for window, senders_and_origins in windows_and_msgs.items():
+                for sender, origin_id in senders_and_origins:
+                    suspected_origins = self.timing_attack_with(receiver, window, hops_to_observe, sender)
+                    suspected_origin_ids = {node.id for node in suspected_origins.keys()}
+                    if origin_id in suspected_origin_ids:
+                        success_rate = 1 / len(suspected_origin_ids) * 100.0
+                    else:
+                        success_rate = 0.0
+                    success_rates.append(success_rate)
 
-        suspected_senders = ({node.id: count for node, count in suspected_senders.items()})
-        print(f"suspected nodes count: {len(suspected_senders)}")
-
-        # Create the bar plot for original sender counts
-        original_senders = ({node.id: count for node, count in self.sim.p2p.measurement.original_senders.items()})
-        plt.figure(figsize=(12, 8))
-        plt.bar(list(original_senders.keys()), list(original_senders.values()))
-        plt.xlabel("Node ID")
-        plt.ylabel("Counts")
-        plt.title("Original Sender Counts")
-        plt.xlim(-1, self.config.mixnet.num_nodes)
-        plt.show()
-
-        # Create the bar plot for suspected sender counts
-        keys = list(suspected_senders.keys())
-        values = list(suspected_senders.values())
-        # Create the bar plot
-        plt.figure(figsize=(12, 8))
-        plt.bar(keys, values)
-        plt.xlabel("Node ID")
-        plt.ylabel("Counts")
-        plt.title("Suspected Sender Counts")
-        plt.xlim(-1, self.config.mixnet.num_nodes)
+        df = pd.DataFrame(success_rates, columns=[COL_SUCCESS_RATE])
+        print(df.describe())
+        plt.figure(figsize=(6, 6))
+        plt.boxplot(df[COL_SUCCESS_RATE], vert=True, patch_artist=True, boxprops=dict(facecolor="lightblue"),
+                    medianprops=dict(color="orange"))
+        mean = df[COL_SUCCESS_RATE].mean()
+        median = df[COL_SUCCESS_RATE].median()
+        plt.axhline(mean, color="red", linestyle="--", linewidth=1, label=f"Mean: {mean:.2f}%")
+        plt.axhline(median, color="orange", linestyle="-", linewidth=1, label=f"Median: {median:.2f}%")
+        plt.ylim(-5, 105)
+        plt.title("Timing attack success rate distribution")
+        plt.legend()
+        plt.grid(True)
         plt.show()
 
     def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, sender: "Node" = None) -> Counter:
         assert remaining_hops >= 1
 
-        # Start inspecting senders who sent messages that were arrived in the receiver at the given window
+        # Start inspecting senders who sent messages that were arrived in the receiver at the given window.
+        # If the specific sender is given, inspect only that sender to maximize the success rate.
         if sender is not None:
             senders = {sender}
         else:
@@ -238,7 +237,7 @@ class Analysis:
             return Counter(senders)
 
         # A result to be returned after inspecting all senders who sent messages to the receiver
-        suspected_senders = Counter()
+        suspected_origins = Counter()
 
         # Inspect each sender who sent messages to the receiver
         for sender in senders:
@@ -248,9 +247,9 @@ class Analysis:
             for prev_window in range(window - 1, window - 1 - window_range, -1):
                 if prev_window < 0:
                     break
-                suspected_senders.update(self.timing_attack_with(sender, prev_window, remaining_hops - 1))
+                suspected_origins.update(self.timing_attack_with(sender, prev_window, remaining_hops - 1))
 
-        return suspected_senders
+        return suspected_origins
 
     @staticmethod
     def print_nodes_per_hop(nodes_per_hop, starting_window: int):

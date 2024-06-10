@@ -106,10 +106,27 @@ class Node:
             final_msg = msg[:msg.rfind(self.PADDING_SEPARATOR)]
             self.log("Received final message: %s" % final_msg)
 
+    def inspect_message(self, msg: SphinxPacket | bytes) -> int | None:
+        """
+        Inspects the message if the node is operated by adversary.
+        @param msg: SphinxPacket or final unwrapped message
+        @return: Origin Node ID, or None if the node is not operated by adversary
+        """
+        if self.operated_by_adversary and isinstance(msg, bytes):
+            origin_id, _ = Node.parse_payload(msg)
+            return origin_id
+        return None
+
     def build_payload(self) -> bytes:
-        payload = bytes(f"{self.id}-{self.payload_id}", "utf-8")
+        payload = bytes(f"{self.id}-{self.payload_id}-", "utf-8")
         self.payload_id += 1
         return payload + bytes(self.config.mixnet.payload_size - len(payload))
+
+    @staticmethod
+    def parse_payload(payload: bytes) -> (int, int):
+        parts = payload.split(b"-")
+        node_id, payload_id = int(parts[0]), int(parts[1])
+        return node_id, payload_id
 
     def pad_payload(self, payload: bytes, target_size: int) -> bytes:
         """
