@@ -205,6 +205,9 @@ class Analysis:
                         success_rate = 1 / len(suspected_origin_ids) * 100.0
                     else:
                         success_rate = 0.0
+                    print(
+                        f"origin:{origin_id}, suspected_origins:{suspected_origin_ids}, success_rate:{success_rate:.2f}%"
+                    )
                     success_rates.append(success_rate)
 
         df = pd.DataFrame(success_rates, columns=[COL_SUCCESS_RATE])
