@@ -3,7 +3,7 @@ from typing import List, Sequence
 from eth2spec.deneb.mainnet import KZGProof as Proof
 
 from da.kzg_rs.common import G1, BLS_MODULUS
-from da.kzg_rs.fft import fft
+from da.kzg_rs.fft import fft, ifft
 from da.kzg_rs.poly import Polynomial
 from da.kzg_rs.utils import is_power_of_two
 
@@ -25,6 +25,17 @@ def toeplitz1(global_parameters: List[G1], roots_of_unity: Sequence[int], polyno
     vector_x_extended = global_parameters + [G1(0) for _ in range(len(global_parameters))]
     vector_x_extended_fft = fft(vector_x_extended, BLS_MODULUS, roots_of_unity)
     return vector_x_extended_fft
+
+
+def toeplitz2(coefficients: List[G1], roots_of_unity: Sequence[int], extended_vector: Sequence[G1]) -> List[G1]:
+    assert is_power_of_two(len(coefficients))
+    toeplitz_coefficients_fft = fft(coefficients, BLS_MODULUS, roots_of_unity)
+    return [v*c for v, c in zip(extended_vector, toeplitz_coefficients_fft)]
+
+
+def toeplitz3(h_extended_fft: Sequence[G1], roots_of_unity: Sequence[int]) -> List[G1]:
+    return ifft(h_extended_fft, BLS_MODULUS, roots_of_unity)
+
 
 def fk20_generate_proofs(polynomial: Polynomial) -> List[Proof]:
     # 1 - Build toeplitz matrix for h values
