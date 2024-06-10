@@ -219,6 +219,7 @@ class Analysis:
         median = df[COL_SUCCESS_RATE].median()
         plt.axhline(mean, color="red", linestyle="--", linewidth=1, label=f"Mean: {mean:.2f}%")
         plt.axhline(median, color="orange", linestyle="-", linewidth=1, label=f"Median: {median:.2f}%")
+        plt.ylabel(COL_SUCCESS_RATE)
         plt.ylim(-5, 105)
         plt.title("Timing attack success rate distribution")
         plt.legend()
