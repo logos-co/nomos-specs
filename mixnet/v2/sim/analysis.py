@@ -118,6 +118,15 @@ class Analysis:
         plt.tight_layout()
         plt.show()
 
+        # Calculate precision, recall, and F1 score
+        truth = set(truth_df[truth_df[COL_MSG_CNT] > 0][COL_NODE_ID])
+        suspected = set(suspected_df[suspected_df[COL_MSG_CNT] > 0][COL_NODE_ID])
+        true_positives = truth.intersection(suspected)
+        precision = len(true_positives) / len(suspected) * 100.0 if len(suspected) > 0 else 0.0
+        recall = len(true_positives) / len(truth) * 100.0 if len(truth) > 0 else 0.0
+        f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+        print(f"Precision: {precision:.2f}%, Recall: {recall:.2f}%, F1 Score: {f1_score:.2f}%")
+
     def messages_in_node_over_time(self):
         dataframes = []
         for window, msg_pools in enumerate(self.sim.p2p.adversary.msg_pools_per_window):
