@@ -52,7 +52,7 @@ class P2P(ABC):
             yield self.env.timeout(self.config.p2p.random_network_latency())
 
             self.measurement.measure_ingress(receiver, msg)
-            self.adversary.observe_receiving_node(sender, receiver, msg)
+            self.adversary.observe_receiving_node(sender, receiver)
         self.receive(msg, hops_traveled + 1, sender, receiver)
 
     @abstractmethod
@@ -80,6 +80,7 @@ class NaiveBroadcastP2P(P2P):
     def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node"):
         msg_hash = hashlib.sha256(bytes(msg)).digest()
         self.measurement.update_message_hops(msg_hash, hops_traveled)
+        self.adversary.observe_if_final_msg(sender, receiver, msg)
         self.env.process(receiver.receive_message(msg))
 
 
@@ -134,6 +135,7 @@ class GossipP2P(P2P):
         if msg_hash not in self.message_cache[receiver]:
             self.message_cache[receiver][msg_hash] = sender
             self.measurement.update_message_hops(msg_hash, hops_traveled)
+            self.adversary.observe_if_final_msg(sender, receiver, msg)
 
             # Receive and gossip
             self.env.process(receiver.receive_message(msg))

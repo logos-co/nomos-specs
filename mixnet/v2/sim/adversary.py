@@ -33,14 +33,9 @@ class Adversary:
     def inspect_message_size(self, msg: SphinxPacket | bytes):
         self.message_sizes.append(len(msg))
 
-    def observe_receiving_node(self, sender: "Node", receiver: "Node", msg: SphinxPacket | bytes):
-        cur_window = len(self.msg_pools_per_window) - 1
-        self.msg_pools_per_window[cur_window][receiver].append(self.env.now)
-        self.msgs_received_per_window[cur_window][receiver].add(sender)
-
-        origin_id = receiver.inspect_message(msg)
-        if origin_id is not None:
-            self.final_msgs_received[receiver][cur_window].append((sender, origin_id))
+    def observe_receiving_node(self, sender: "Node", receiver: "Node"):
+        self.msg_pools_per_window[-1][receiver].append(self.env.now)
+        self.msgs_received_per_window[-1][receiver].add(sender)
         # if node not in self.node_states[self.env.now]:
         #     self.node_states[self.env.now][node] = NodeState.RECEIVING
 
@@ -52,6 +47,12 @@ class Adversary:
         if self.is_around_message_interval(self.env.now):
             self.senders_around_interval.update({sender})
         # self.node_states[self.env.now][node] = NodeState.SENDING
+
+    def observe_if_final_msg(self, sender: "Node", receiver: "Node", msg: SphinxPacket | bytes):
+        origin_id = receiver.inspect_message(msg)
+        if origin_id is not None:
+            cur_window = len(self.msgs_received_per_window) - 1
+            self.final_msgs_received[receiver][cur_window].append((sender, origin_id))
 
     def is_around_message_interval(self, time: SimTime):
         return time % self.config.mixnet.message_interval <= self.config.mixnet.max_message_prep_time
