@@ -24,5 +24,6 @@ class TestFK20(TestCase):
             polynomial = bytes_to_polynomial(rand_bytes)
             proofs = [generate_element_proof(i, polynomial, GLOBAL_PARAMETERS, roots_of_unity) for i in range(size)]
             fk20_proofs = fk20_generate_proofs(polynomial, GLOBAL_PARAMETERS, roots_of_unity)
+            self.assertEqual(len(proofs), len(fk20_proofs))
             self.assertEqual(proofs, fk20_proofs)
 
