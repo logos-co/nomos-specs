@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 import eth2spec.eip7594.mainnet
 from py_ecc.bls.typing import G1Uncompressed, G2Uncompressed
@@ -15,5 +15,7 @@ BLS_MODULUS = eth2spec.eip7594.mainnet.BLS_MODULUS
 GLOBAL_PARAMETERS: List[G1]
 GLOBAL_PARAMETERS_G2: List[G2]
 # secret is fixed but this should come from a different synchronization protocol
-GLOBAL_PARAMETERS, GLOBAL_PARAMETERS_G2 = map(list, generate_setup(1024, 8, 1987))
-ROOTS_OF_UNITY: List[int] = compute_roots_of_unity(2, BLS_MODULUS, 4096)
+GLOBAL_PARAMETERS, GLOBAL_PARAMETERS_G2 = map(list, generate_setup(4096, 8, 1987))
+ROOTS_OF_UNITY: Tuple[int] = compute_roots_of_unity(
+    7, 4096, BLS_MODULUS
+)
