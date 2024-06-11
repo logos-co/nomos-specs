@@ -3,6 +3,7 @@ import random
 import simpy
 
 from config import Config, P2PConfig
+from environment import Environment
 from node import Node
 from p2p import NaiveBroadcastP2P, GossipP2P
 
@@ -11,7 +12,7 @@ class Simulation:
     def __init__(self, config: Config):
         random.seed()
         self.config = config
-        self.env = simpy.Environment()
+        self.env = Environment()
         self.p2p = Simulation.init_p2p(self.env, config)
         nodes = [Node(i, self.env, self.p2p, config, self.p2p.measurement, i == 0) for i in
                  range(config.mixnet.num_nodes)]

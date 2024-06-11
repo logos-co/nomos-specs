@@ -4,11 +4,11 @@ import os
 import random
 from enum import Enum
 
-import simpy
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
 
 from config import Config
+from environment import Environment
 from measurement import Measurement
 from p2p import P2P
 from sphinx import SphinxPacket, Attachment
@@ -18,7 +18,7 @@ class Node:
     INCENTIVE_TX_SIZE = 512
     PADDING_SEPARATOR = b'\x01'
 
-    def __init__(self, id: int, env: simpy.Environment, p2p: P2P, config: Config, measurement: Measurement,
+    def __init__(self, id: int, env: Environment, p2p: P2P, config: Config, measurement: Measurement,
                  operated_by_adversary: bool = False):
         self.id = id
         self.env = env
@@ -45,7 +45,7 @@ class Node:
                 self.measurement.count_original_sender(self)
 
             msg = self.create_message(message_type)
-            prep_time = random.uniform(0, self.config.mixnet.max_message_prep_time)
+            prep_time = random.randint(0, self.config.mixnet.max_message_prep_time)
             yield self.env.timeout(prep_time)
 
             self.log("Sending a message to the mixnet")
@@ -73,7 +73,7 @@ class Node:
         if not self.config.mixnet.is_mixing_on():
             return self.build_payload()
 
-        mixes = self.p2p.get_nodes(self.config.mixnet.num_mix_layers)
+        mixes = self.p2p.get_nodes(self.config.mixnet.num_mix_layers, self.id)
         public_keys = [mix.public_key for mix in mixes]
         # TODO: replace with realistic tx
         incentive_txs = [Node.create_incentive_tx(mix.public_key) for mix in mixes]
@@ -98,7 +98,7 @@ class Node:
                     self.env.process(self.p2p.broadcast(self, final_padded_msg))
                 else:
                     # TODO: use Poisson delay or something else, if necessary
-                    yield self.env.timeout(random.uniform(0, self.config.mixnet.max_mix_delay))
+                    yield self.env.timeout(random.randint(0, self.config.mixnet.max_mix_delay))
                     self.env.process(self.p2p.broadcast(self, msg))
             # else:
             #     self.log("Receiving SphinxPacket, but not mine")
@@ -149,7 +149,7 @@ class Node:
         return tx == Node.create_incentive_tx(self.public_key)
 
     def log(self, msg):
-        print(f"t={self.env.now:.3f}: Node:{self.id}: {msg}")
+        print(f"t={self.env.now():.3f}: Node:{self.id}: {msg}")
 
 
 class MessageType(Enum):

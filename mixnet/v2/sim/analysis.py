@@ -1,3 +1,4 @@
+import sys
 from collections import Counter
 from typing import TYPE_CHECKING
 
@@ -7,6 +8,7 @@ from matplotlib import pyplot as plt
 
 from adversary import NodeState
 from config import Config
+from environment import Time
 from simulation import Simulation
 
 if TYPE_CHECKING:
@@ -43,8 +45,8 @@ class Analysis:
         dataframes = []
         nonzero_egresses = []
         nonzero_ingresses = []
-        for egress_bandwidths, ingress_bandwidths in zip(self.sim.p2p.measurement.egress_bandwidth_per_time,
-                                                         self.sim.p2p.measurement.ingress_bandwidth_per_time):
+        for egress_bandwidths, ingress_bandwidths in zip(self.sim.p2p.measurement.egress_bandwidth_per_sec,
+                                                         self.sim.p2p.measurement.ingress_bandwidth_per_sec):
             rows = []
             for node in self.sim.p2p.nodes:
                 egress = egress_bandwidths[node] / 1024.0
@@ -129,11 +131,10 @@ class Analysis:
 
     def messages_in_node_over_time(self):
         dataframes = []
-        for window, msg_pools in enumerate(self.sim.p2p.adversary.msg_pools_per_window):
-            time = window * self.config.adversary.window_size
+        for time, msg_pools in enumerate(self.sim.p2p.adversary.msg_pools_per_time):
             data = []
             for receiver, msg_pool in msg_pools.items():
-                senders = self.sim.p2p.adversary.msgs_received_per_window[window][receiver]
+                senders = self.sim.p2p.adversary.msgs_received_per_time[time][receiver].keys()
                 data.append((time, receiver.id, len(msg_pool), len(senders)))
             df = pd.DataFrame(data, columns=[COL_TIME, COL_NODE_ID, COL_MSG_CNT, COL_SENDER_CNT])
             if not df.empty:
@@ -205,20 +206,18 @@ class Analysis:
     def timing_attack(self, hops_between_layers: int):
         hops_to_observe = hops_between_layers * (self.config.mixnet.num_mix_layers + 1)
         success_rates = []
-        for receiver, windows_and_msgs in self.sim.p2p.adversary.final_msgs_received.items():
-            for window, senders_and_origins in windows_and_msgs.items():
-                for sender, origin_id in senders_and_origins:
-                    print(f"START: receiver:{receiver.id}, window:{window}, sender:{sender.id}, origin:{origin_id}")
+        for receiver, times_and_msgs in self.sim.p2p.adversary.final_msgs_received.items():
+            for time_received, msgs in times_and_msgs.items():
+                for sender, time_sent, origin_id in msgs:
                     suspected_origins = Counter()
-                    self.timing_attack_with(receiver, window, hops_to_observe, 0, suspected_origins, sender)
+                    self.timing_attack_with(
+                        receiver, time_received, hops_to_observe, 0, suspected_origins, {sender: [time_sent]}
+                    )
                     suspected_origin_ids = {node.id for node in suspected_origins}
                     if origin_id in suspected_origin_ids:
                         success_rate = 1 / len(suspected_origin_ids) * 100.0
                     else:
                         success_rate = 0.0
-                    print(
-                        f"END: origin:{origin_id}, suspected_origins:{suspected_origin_ids}, success_rate:{success_rate:.2f}%"
-                    )
                     success_rates.append(success_rate)
 
         df = pd.DataFrame(success_rates, columns=[COL_SUCCESS_RATE])
@@ -237,43 +236,39 @@ class Analysis:
         plt.grid(True)
         plt.show()
 
-    def timing_attack_with(self, receiver: "Node", window: int, remaining_hops: int, observed_hops: int,
-                           suspected_origins: Counter,
-                           sender: "Node" = None):
-        assert remaining_hops >= 1
+    def timing_attack_with(self, receiver: "Node", time_received: Time,
+                           remaining_hops: int, observed_hops: int, suspected_origins: Counter,
+                           senders: dict["Node", list[Time]] = None):
+        if remaining_hops <= 0:
+            return
+
         # If all nodes are already suspected, no need to inspect further.
         if len(suspected_origins) == len(self.sim.p2p.nodes):
             return
 
-        # Start inspecting senders who sent messages that were arrived in the receiver at the given window.
+        # Start inspecting senders who sent messages that were arrived in the receiver at the given time.
         # If the specific sender is given, inspect only that sender to maximize the success rate.
-        if sender is not None:
-            senders = {sender}
-        else:
-            senders = self.sim.p2p.adversary.msgs_received_per_window[window][receiver]
-
-        # Suspect the receiver as the origin, if the receiver has not received any messages at the given window,
-        # and if the minimum number of hops has been observed.
-        if len(senders) == 0 and observed_hops > self.sim.config.mixnet.num_mix_layers:
-            suspected_origins.update({receiver})
-            return
-
-        # If the remaining_hops is 1, return the senders as suspected senders
-        if remaining_hops == 1:
-            suspected_origins.update(senders)
-            return
+        if senders is None:
+            senders = self.sim.p2p.adversary.msgs_received_per_time[time_received][receiver]
 
         # Inspect each sender who sent messages to the receiver
-        for sender in senders:
-            # Track back to each window where that sender might have received any messages.
-            time_range = self.config.mixnet.max_mix_delay + self.config.p2p.max_network_latency
-            window_range = int(time_range / self.config.adversary.window_size)
-            for prev_window in range(window - 1, window - 1 - window_range, -1):
-                if prev_window < 0:
-                    break
-                self.timing_attack_with(sender, prev_window, remaining_hops - 1, observed_hops + 1, suspected_origins)
+        for sender, times_sent in senders.items():
+            # Calculate the time range where the sender might have received any messages
+            # related to the message being traced.
+            min_time, max_time = sys.maxsize, 0
+            for time_sent in times_sent:
+                min_time = min(min_time, time_sent - self.config.mixnet.max_mix_delay)
+                max_time = max(max_time, time_sent - self.config.mixnet.min_mix_delay)
+                # If the sender is sent the message around the message interval, suspect the sender as the origin.
+                if (self.sim.p2p.adversary.is_around_message_interval(time_sent)
+                        and observed_hops >= self.sim.config.mixnet.num_mix_layers):
+                    suspected_origins.update({sender})
 
-    @staticmethod
-    def print_nodes_per_hop(nodes_per_hop, starting_window: int):
-        for hop, nodes in enumerate(nodes_per_hop):
-            print(f"hop-{hop} from w-{starting_window}: {len(nodes)} nodes: {sorted([node.id for node in nodes])}")
+            # Track back to each time when that sender might have received any messages.
+            for time_sender_received in range(max_time, min_time - 1, -1):
+                if time_sender_received < 0:
+                    break
+                self.timing_attack_with(
+                    sender, time_sender_received,
+                    remaining_hops - 1, observed_hops + 1, suspected_origins
+                )

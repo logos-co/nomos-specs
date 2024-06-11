@@ -7,6 +7,8 @@ from typing import Self
 import dacite
 import yaml
 
+from environment import Time
+
 
 @dataclass
 class Config:
@@ -14,7 +16,6 @@ class Config:
     mixnet: MixnetConfig
     p2p: P2PConfig
     measurement: MeasurementConfig
-    adversary: AdversaryConfig
 
     @classmethod
     def load(cls, yaml_path: str) -> Self:
@@ -27,7 +28,6 @@ class Config:
         config.mixnet.validate()
         config.p2p.validate()
         config.measurement.validate()
-        config.adversary.validate()
 
         return config
 
@@ -40,7 +40,7 @@ class Config:
 
 @dataclass
 class SimulationConfig:
-    running_time: int
+    running_time: Time
 
     def validate(self):
         assert self.running_time > 0
@@ -54,7 +54,7 @@ class MixnetConfig:
     payload_size: int
     # An interval of sending a new real/cover message
     # A probability of actually sending a message depends on the following parameters.
-    message_interval: int
+    message_interval: Time
     # A probability of sending a real message within one cycle
     real_message_prob: float
     # A weight of real message emission probability of some nodes
@@ -64,10 +64,10 @@ class MixnetConfig:
     # A probability of sending a cover message within one cycle if not sending a real message
     cover_message_prob: float
     # A maximum preparation time (computation time) for a message sender before sending the message
-    max_message_prep_time: float
+    max_message_prep_time: Time
     # A maximum delay of messages mixed in a mix node
-    min_mix_delay: float
-    max_mix_delay: float
+    min_mix_delay: Time
+    max_mix_delay: Time
 
     def validate(self):
         assert self.num_nodes > 0
@@ -97,8 +97,8 @@ class MixnetConfig:
     def is_mixing_on(self) -> bool:
         return self.num_mix_layers > 0
 
-    def random_mix_delay(self) -> float:
-        return random.uniform(self.min_mix_delay, self.max_mix_delay)
+    def random_mix_delay(self) -> Time:
+        return random.randint(self.min_mix_delay, self.max_mix_delay)
 
 
 @dataclass
@@ -108,8 +108,8 @@ class P2PConfig:
     # A connection density, only if the type is gossip
     connection_density: int
     # A maximum network latency between nodes directly connected with each other
-    min_network_latency: float
-    max_network_latency: float
+    min_network_latency: Time
+    max_network_latency: Time
 
     TYPE_ONE_TO_ALL = "1-to-all"
     TYPE_GOSSIP = "gossip"
@@ -128,23 +128,14 @@ class P2PConfig:
             f"max_net_latency: {self.max_network_latency:.2f}"
         )
 
-    def random_network_latency(self) -> float:
-        return random.uniform(self.min_network_latency, self.max_network_latency)
+    def random_network_latency(self) -> Time:
+        return random.randint(self.min_network_latency, self.max_network_latency)
 
 
 @dataclass
 class MeasurementConfig:
     # How many times in simulation represent 1 second in real time
-    sim_time_per_second: float
+    sim_time_per_second: Time
 
     def validate(self):
         assert self.sim_time_per_second > 0
-
-
-@dataclass
-class AdversaryConfig:
-    # A time window for the adversary to observe inputs and outputs of each node
-    window_size: float
-
-    def validate(self):
-        assert self.window_size > 0
