@@ -199,7 +199,7 @@ class Analysis:
         plt.figure(figsize=(6, 6))
         seaborn.boxplot(data=df, y=COL_HOPS, medianprops={"color": "red", "linewidth": 2.5})
         plt.ylim(bottom=0)
-        plt.title("Message hops distribution")
+        plt.title("The distribution of max hops of single broadcasting")
         plt.show()
         return int(df.median().iloc[0])
 
@@ -261,7 +261,7 @@ class Analysis:
                 max_time = max(max_time, time_sent - self.config.mixnet.min_mix_delay)
                 # If the sender is sent the message around the message interval, suspect the sender as the origin.
                 if (self.sim.p2p.adversary.is_around_message_interval(time_sent)
-                        and observed_hops >= self.sim.config.mixnet.num_mix_layers):
+                        and observed_hops + 1 >= self.min_hops_to_observe_for_timing_attack()):
                     suspected_origins.update({sender})
 
             # Track back to each time when that sender might have received any messages.
@@ -272,3 +272,6 @@ class Analysis:
                     sender, time_sender_received,
                     remaining_hops - 1, observed_hops + 1, suspected_origins
                 )
+
+    def min_hops_to_observe_for_timing_attack(self) -> int:
+        return self.config.mixnet.num_mix_layers + 1
