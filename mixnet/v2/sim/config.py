@@ -16,6 +16,7 @@ class Config:
     mixnet: MixnetConfig
     p2p: P2PConfig
     measurement: MeasurementConfig
+    adversary: AdversaryConfig
 
     @classmethod
     def load(cls, yaml_path: str) -> Self:
@@ -28,6 +29,7 @@ class Config:
         config.mixnet.validate()
         config.p2p.validate()
         config.measurement.validate()
+        config.adversary.validate()
 
         return config
 
@@ -139,3 +141,13 @@ class MeasurementConfig:
 
     def validate(self):
         assert self.sim_time_per_second > 0
+
+
+@dataclass
+class AdversaryConfig:
+    timing_attack_max_targets: int
+    timing_attack_max_pool_size: int
+
+    def validate(self):
+        assert self.timing_attack_max_targets > 0
+        assert self.timing_attack_max_pool_size > 0

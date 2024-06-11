@@ -1,3 +1,4 @@
+import itertools
 import sys
 from collections import Counter
 from typing import TYPE_CHECKING
@@ -28,9 +29,10 @@ COL_SUCCESS_RATE = "Success Rate (%)"
 
 
 class Analysis:
-    def __init__(self, sim: Simulation, config: Config):
+    def __init__(self, sim: Simulation, config: Config, show_plots: bool = True):
         self.sim = sim
         self.config = config
+        self.show_plots = show_plots
 
     def run(self):
         message_size_df = self.message_size_distribution()
@@ -42,6 +44,9 @@ class Analysis:
         self.timing_attack(median_hops)
 
     def bandwidth(self, message_size_df: pd.DataFrame):
+        if not self.show_plots:
+            return
+
         dataframes = []
         nonzero_egresses = []
         nonzero_ingresses = []
@@ -95,7 +100,7 @@ class Analysis:
         print(df.describe())
         return df
 
-    def messages_emitted_around_interval(self):
+    def messages_emitted_around_interval(self) -> (float, float, float):
         # A ground truth that shows how many times each node sent a real message
         truth_df = pd.DataFrame(
             [(node.id, count) for node, count in self.sim.p2p.measurement.original_senders.items()],
@@ -107,18 +112,19 @@ class Analysis:
             columns=[COL_NODE_ID, COL_MSG_CNT]
         )
 
-        width = 0.4
-        fig, ax = plt.subplots(figsize=(12, 8))
-        ax.bar(truth_df[COL_NODE_ID] - width / 2, truth_df[COL_MSG_CNT], width, label="Ground Truth", color="b")
-        ax.bar(truth_df[COL_NODE_ID] + width / 2, suspected_df[COL_MSG_CNT], width, label="Adversary's Inference",
-               color="r")
-        ax.set_title("Nodes who generated real messages")
-        ax.set_xlabel(COL_NODE_ID)
-        ax.set_ylabel(COL_MSG_CNT)
-        ax.set_xlim(-1, len(truth_df[COL_NODE_ID]))
-        ax.legend()
-        plt.tight_layout()
-        plt.show()
+        if self.show_plots:
+            width = 0.4
+            fig, ax = plt.subplots(figsize=(12, 8))
+            ax.bar(truth_df[COL_NODE_ID] - width / 2, truth_df[COL_MSG_CNT], width, label="Ground Truth", color="b")
+            ax.bar(truth_df[COL_NODE_ID] + width / 2, suspected_df[COL_MSG_CNT], width, label="Adversary's Inference",
+                   color="r")
+            ax.set_title("Nodes who generated real messages")
+            ax.set_xlabel(COL_NODE_ID)
+            ax.set_ylabel(COL_MSG_CNT)
+            ax.set_xlim(-1, len(truth_df[COL_NODE_ID]))
+            ax.legend()
+            plt.tight_layout()
+            plt.show()
 
         # Calculate precision, recall, and F1 score
         truth = set(truth_df[truth_df[COL_MSG_CNT] > 0][COL_NODE_ID])
@@ -128,8 +134,12 @@ class Analysis:
         recall = len(true_positives) / len(truth) * 100.0 if len(truth) > 0 else 0.0
         f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
         print(f"Precision: {precision:.2f}%, Recall: {recall:.2f}%, F1 Score: {f1_score:.2f}%")
+        return precision, recall, f1_score
 
     def messages_in_node_over_time(self):
+        if not self.show_plots:
+            return
+
         dataframes = []
         for time, msg_pools in enumerate(self.sim.p2p.adversary.msg_pools_per_time):
             data = []
@@ -178,6 +188,9 @@ class Analysis:
         plt.show()
 
     def node_states(self):
+        if not self.show_plots:
+            return
+
         rows = []
         for time, node_states in self.sim.p2p.adversary.node_states.items():
             for node, state in node_states.items():
@@ -196,14 +209,37 @@ class Analysis:
     def message_hops(self) -> int:
         df = pd.DataFrame(self.sim.p2p.measurement.message_hops.values(), columns=[COL_HOPS])
         print(df.describe())
-        plt.figure(figsize=(6, 6))
-        seaborn.boxplot(data=df, y=COL_HOPS, medianprops={"color": "red", "linewidth": 2.5})
-        plt.ylim(bottom=0)
-        plt.title("The distribution of max hops of single broadcasting")
-        plt.show()
+        if self.show_plots:
+            plt.figure(figsize=(6, 6))
+            seaborn.boxplot(data=df, y=COL_HOPS, medianprops={"color": "red", "linewidth": 2.5})
+            plt.ylim(bottom=0)
+            plt.title("The distribution of max hops of single broadcasting")
+            plt.show()
         return int(df.median().iloc[0])
 
-    def timing_attack(self, hops_between_layers: int):
+    def timing_attack(self, hops_between_layers: int) -> pd.DataFrame:
+        success_rates = self.timing_attack_inner(hops_between_layers)
+        df = pd.DataFrame(success_rates, columns=[COL_SUCCESS_RATE])
+        print(df.describe())
+
+        if self.show_plots:
+            plt.figure(figsize=(6, 6))
+            plt.boxplot(df[COL_SUCCESS_RATE], vert=True, patch_artist=True, boxprops=dict(facecolor="lightblue"),
+                        medianprops=dict(color="orange"))
+            mean = df[COL_SUCCESS_RATE].mean()
+            median = df[COL_SUCCESS_RATE].median()
+            plt.axhline(mean, color="red", linestyle="--", linewidth=1, label=f"Mean: {mean:.2f}%")
+            plt.axhline(median, color="orange", linestyle="-", linewidth=1, label=f"Median: {median:.2f}%")
+            plt.ylabel(COL_SUCCESS_RATE)
+            plt.ylim(-5, 105)
+            plt.title("Timing attack success rate distribution")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        return df
+
+    def timing_attack_inner(self, hops_between_layers: int) -> list[float]:
         hops_to_observe = hops_between_layers * (self.config.mixnet.num_mix_layers + 1)
         success_rates = []
         for receiver, times_and_msgs in self.sim.p2p.adversary.final_msgs_received.items():
@@ -219,22 +255,10 @@ class Analysis:
                     else:
                         success_rate = 0.0
                     success_rates.append(success_rate)
+                    if len(success_rates) >= self.config.adversary.timing_attack_max_targets:
+                        return success_rates
 
-        df = pd.DataFrame(success_rates, columns=[COL_SUCCESS_RATE])
-        print(df.describe())
-        plt.figure(figsize=(6, 6))
-        plt.boxplot(df[COL_SUCCESS_RATE], vert=True, patch_artist=True, boxprops=dict(facecolor="lightblue"),
-                    medianprops=dict(color="orange"))
-        mean = df[COL_SUCCESS_RATE].mean()
-        median = df[COL_SUCCESS_RATE].median()
-        plt.axhline(mean, color="red", linestyle="--", linewidth=1, label=f"Mean: {mean:.2f}%")
-        plt.axhline(median, color="orange", linestyle="-", linewidth=1, label=f"Median: {median:.2f}%")
-        plt.ylabel(COL_SUCCESS_RATE)
-        plt.ylim(-5, 105)
-        plt.title("Timing attack success rate distribution")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+        return success_rates
 
     def timing_attack_with(self, receiver: "Node", time_received: Time,
                            remaining_hops: int, observed_hops: int, suspected_origins: Counter,
@@ -250,6 +274,8 @@ class Analysis:
         # If the specific sender is given, inspect only that sender to maximize the success rate.
         if senders is None:
             senders = self.sim.p2p.adversary.msgs_received_per_time[time_received][receiver]
+            
+        senders = dict(itertools.islice(senders.items(), self.config.adversary.timing_attack_max_pool_size))
 
         # Inspect each sender who sent messages to the receiver
         for sender, times_sent in senders.items():

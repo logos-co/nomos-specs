@@ -38,3 +38,7 @@ p2p:
 measurement:
   # How many times in simulation represent 1 second in real time
   sim_time_per_second: 10
+
+adversary:
+  timing_attack_max_targets: 5
+  timing_attack_max_pool_size: 3
