@@ -1,8 +1,8 @@
 from unittest import TestCase
 
-from da.kzg_rs.roots import compute_roots_of_unity
-from da.kzg_rs.common import BLS_MODULUS
-from fft import fft, ifft
+from .roots import compute_roots_of_unity
+from .common import BLS_MODULUS
+from .fft import fft, ifft
 
 
 class TestFFT(TestCase):

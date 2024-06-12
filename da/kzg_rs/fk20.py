@@ -4,7 +4,7 @@ from eth2spec.deneb.mainnet import KZGProof as Proof, BLSFieldElement
 from eth2spec.utils import bls
 
 from da.kzg_rs.common import G1, BLS_MODULUS, PRIMITIVE_ROOT
-from da.kzg_rs.fft import fft, ifft, fft_g1, ifft_g1
+from da.kzg_rs.fft import fft, fft_g1, ifft_g1
 from da.kzg_rs.poly import Polynomial
 from da.kzg_rs.roots import compute_roots_of_unity
 from da.kzg_rs.utils import is_power_of_two
