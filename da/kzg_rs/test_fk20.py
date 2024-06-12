@@ -18,12 +18,11 @@ class TestFK20(TestCase):
         )
 
     def test_fk20(self):
-        for size in [16, 32, 64, 128]:
-            roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, size*2, BLS_MODULUS)
+        for size in [16, 32, 64, 128, 256]:
+            roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, size, BLS_MODULUS)
             rand_bytes = self.rand_bytes(size)
             polynomial = bytes_to_polynomial(rand_bytes)
             proofs = [generate_element_proof(i, polynomial, GLOBAL_PARAMETERS, roots_of_unity) for i in range(size)]
             fk20_proofs = fk20_generate_proofs(polynomial, GLOBAL_PARAMETERS)
             self.assertEqual(len(proofs), len(fk20_proofs))
             self.assertEqual(proofs, fk20_proofs)
-
