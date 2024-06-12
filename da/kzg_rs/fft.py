@@ -30,6 +30,7 @@ def ifft_g1(vals: Sequence[G1], roots_of_unity: Sequence[BLSFieldElement], modul
         )
     ]
 
+
 def _fft(
         vals: Sequence[BLSFieldElement],
         roots_of_unity: Sequence[BLSFieldElement],
@@ -45,6 +46,7 @@ def _fft(
         o[i] = BLSFieldElement((int(x) + y_times_root) % modulus)
         o[i + len(L)] = BLSFieldElement((int(x) - int(y_times_root) + modulus) % modulus)
     return o
+
 
 def fft(vals, root_of_unity, modulus):
     assert len(vals) == len(root_of_unity)
