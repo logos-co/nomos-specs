@@ -145,9 +145,11 @@ class MeasurementConfig:
 
 @dataclass
 class AdversaryConfig:
+    timing_attack_timeout: int
     timing_attack_max_targets: int
     timing_attack_max_pool_size: int
 
     def validate(self):
+        assert self.timing_attack_timeout > 0
         assert self.timing_attack_max_targets > 0
         assert self.timing_attack_max_pool_size > 0

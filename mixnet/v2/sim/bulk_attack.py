@@ -31,7 +31,7 @@ def bulk_attack():
     args = parser.parse_args()
     config = Config.load(args.config)
 
-    config.simulation.running_time = 300
+    config.simulation.running_time = 200
     config.mixnet.num_nodes = 100
     config.mixnet.payload_size = 320
     config.mixnet.message_interval = 10

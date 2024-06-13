@@ -40,5 +40,6 @@ measurement:
   sim_time_per_second: 10
 
 adversary:
-  timing_attack_max_targets: 5
-  timing_attack_max_pool_size: 3
+  timing_attack_timeout: 300
+  timing_attack_max_targets: 10000000000
+  timing_attack_max_pool_size: 100
