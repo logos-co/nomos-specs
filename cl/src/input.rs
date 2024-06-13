@@ -114,9 +114,8 @@ mod test {
         for wrong_witness in wrong_witnesses {
             assert!(input.prove(&wrong_witness).is_err());
 
-            let wrong_note = Input::from_witness(wrong_witness.clone());
-            let wrong_proof = wrong_note.prove(&wrong_witness).unwrap();
-
+            let wrong_input = Input::from_witness(wrong_witness.clone());
+            let wrong_proof = wrong_input.prove(&wrong_witness).unwrap();
             assert!(!input.verify(&wrong_proof));
         }
     }

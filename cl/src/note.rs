@@ -13,7 +13,7 @@ lazy_static! {
         crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING");
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoteCommitment([u8; 32]);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
