@@ -16,6 +16,12 @@ lazy_static! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoteCommitment([u8; 32]);
 
+impl NoteCommitment {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note {
     pub value: u64,

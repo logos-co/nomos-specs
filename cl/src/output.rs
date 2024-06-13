@@ -1,4 +1,6 @@
+use group::{ff::Field, GroupEncoding};
 use jubjub::{ExtendedPoint, Scalar};
+use rand_core::RngCore;
 
 use crate::{
     error::Error,
@@ -14,10 +16,21 @@ pub struct Output {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutputWitness {
-    note: Note,
-    nf_pk: NullifierCommitment,
-    nonce: NullifierNonce,
-    balance_blinding: Scalar,
+    pub note: Note,
+    pub nf_pk: NullifierCommitment,
+    pub nonce: NullifierNonce,
+    pub balance_blinding: Scalar,
+}
+
+impl OutputWitness {
+    pub fn random(note: Note, owner: NullifierCommitment, mut rng: impl RngCore) -> Self {
+        Self {
+            note,
+            nf_pk: owner,
+            nonce: NullifierNonce::random(&mut rng),
+            balance_blinding: Scalar::random(&mut rng),
+        }
+    }
 }
 
 // as we don't have SNARKS hooked up yet, the witness will be our proof
@@ -48,6 +61,13 @@ impl Output {
 
         self.note_comm == witness.note.commit(witness.nf_pk, witness.nonce)
             && self.balance == witness.note.balance(witness.balance_blinding)
+    }
+
+    pub(crate) fn to_bytes(&self) -> [u8; 64] {
+        let mut bytes = [0u8; 64];
+        bytes[..32].copy_from_slice(self.note_comm.as_bytes());
+        bytes[32..64].copy_from_slice(&self.balance.to_bytes());
+        bytes
     }
 }
 

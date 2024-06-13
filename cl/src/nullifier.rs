@@ -78,6 +78,10 @@ impl Nullifier {
         let nf_bytes: [u8; 32] = hasher.finalize().into();
         Self(nf_bytes)
     }
+
+    pub(crate) fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 #[cfg(test)]
