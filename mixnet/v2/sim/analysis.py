@@ -1,4 +1,5 @@
 import itertools
+import multiprocessing
 import sys
 from collections import Counter
 from typing import TYPE_CHECKING
@@ -218,7 +219,7 @@ class Analysis:
         return int(df.median().iloc[0])
 
     def timing_attack(self, hops_between_layers: int) -> pd.DataFrame:
-        success_rates = self.timing_attack_inner(hops_between_layers)
+        success_rates = self.spawn_timing_attacks(hops_between_layers)
         df = pd.DataFrame(success_rates, columns=[COL_SUCCESS_RATE])
         print(df.describe())
 
@@ -239,42 +240,72 @@ class Analysis:
 
         return df
 
-    def timing_attack_inner(self, hops_between_layers: int) -> list[float]:
+    def spawn_timing_attacks(self, hops_between_layers: int) -> list[float]:
+        tasks = self.prepare_timing_attack_tasks(hops_between_layers)
+        print(f"{len(tasks)} TASKS")
+
+        processes = []
+        results = multiprocessing.Manager().list()
+        for task in tasks:
+            process = multiprocessing.Process(target=self.spawn_timing_attack, args=(task, results))
+            process.start()
+            processes.append(process)
+
+        for process in processes:
+            process.join()
+
+        return list(results)
+
+    def spawn_timing_attack(self, task, results):
+        origin_id, receiver, time_received, remaining_hops, observed_hops, suspected_origins, senders = task
+        result = self.run_and_evaluate_timing_attack(
+            origin_id, receiver, time_received, remaining_hops, observed_hops, suspected_origins, senders
+        )
+        results.append(result)
+        print(f"{len(results)} PROCESSES DONE")
+
+    def prepare_timing_attack_tasks(self, hops_between_layers: int) -> list:
         hops_to_observe = hops_between_layers * (self.config.mixnet.num_mix_layers + 1)
-        success_rates = []
+        tasks = []
+
         for receiver, times_and_msgs in self.sim.p2p.adversary.final_msgs_received.items():
             for time_received, msgs in times_and_msgs.items():
                 for sender, time_sent, origin_id in msgs:
-                    suspected_origins = Counter()
-                    self.timing_attack_with(
-                        receiver, time_received, hops_to_observe, 0, suspected_origins, {sender: [time_sent]}
-                    )
-                    suspected_origin_ids = {node.id for node in suspected_origins}
-                    if origin_id in suspected_origin_ids:
-                        success_rate = 1 / len(suspected_origin_ids) * 100.0
-                    else:
-                        success_rate = 0.0
-                    success_rates.append(success_rate)
-                    if len(success_rates) >= self.config.adversary.timing_attack_max_targets:
-                        return success_rates
+                    tasks.append((
+                        origin_id, receiver, time_received, hops_to_observe, 0, Counter(), {sender: [time_sent]}
+                    ))
+                    if len(tasks) >= self.config.adversary.timing_attack_max_targets:
+                        return tasks
 
-        return success_rates
+        return tasks
 
-    def timing_attack_with(self, receiver: "Node", time_received: Time,
-                           remaining_hops: int, observed_hops: int, suspected_origins: Counter,
-                           senders: dict["Node", list[Time]] = None):
+    def run_and_evaluate_timing_attack(self, origin_id: int, receiver: "Node", time_received: Time,
+                                       remaining_hops: int, observed_hops: int, suspected_origins: Counter,
+                                       senders: dict["Node", list[Time]] = None) -> float:
+        suspected_origins = self.timing_attack_from_receiver(
+            receiver, time_received, remaining_hops, observed_hops, suspected_origins, senders
+        )
+        suspected_origin_ids = {node.id for node in suspected_origins}
+        if origin_id in suspected_origin_ids:
+            return 1 / len(suspected_origin_ids) * 100.0
+        else:
+            return 0.0
+
+    def timing_attack_from_receiver(self, receiver: "Node", time_received: Time,
+                                    remaining_hops: int, observed_hops: int, suspected_origins: Counter,
+                                    senders: dict["Node", list[Time]] = None) -> Counter:
         if remaining_hops <= 0:
-            return
+            return suspected_origins
 
         # If all nodes are already suspected, no need to inspect further.
-        if len(suspected_origins) == len(self.sim.p2p.nodes):
-            return
+        if len(suspected_origins) == self.config.mixnet.num_nodes:
+            return suspected_origins
 
         # Start inspecting senders who sent messages that were arrived in the receiver at the given time.
         # If the specific sender is given, inspect only that sender to maximize the success rate.
         if senders is None:
             senders = self.sim.p2p.adversary.msgs_received_per_time[time_received][receiver]
-            
+
         senders = dict(itertools.islice(senders.items(), self.config.adversary.timing_attack_max_pool_size))
 
         # Inspect each sender who sent messages to the receiver
@@ -294,10 +325,11 @@ class Analysis:
             for time_sender_received in range(max_time, min_time - 1, -1):
                 if time_sender_received < 0:
                     break
-                self.timing_attack_with(
-                    sender, time_sender_received,
-                    remaining_hops - 1, observed_hops + 1, suspected_origins
+                self.timing_attack_from_receiver(
+                    sender, time_sender_received, remaining_hops - 1, observed_hops + 1, suspected_origins
                 )
+
+        return suspected_origins
 
     def min_hops_to_observe_for_timing_attack(self) -> int:
         return self.config.mixnet.num_mix_layers + 1
