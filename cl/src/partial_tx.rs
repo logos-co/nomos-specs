@@ -108,7 +108,7 @@ impl PartialTx {
         let in_sum: ExtendedPoint = self.inputs.iter().map(|i| i.balance).sum();
         let out_sum: ExtendedPoint = self.outputs.iter().map(|o| o.balance).sum();
 
-        in_sum - out_sum
+        out_sum - in_sum
     }
 }
 
@@ -164,9 +164,9 @@ mod test {
 
         assert_eq!(
             ptx.balance(),
-            crate::balance::balance(10, "NMO", nmo_10.balance_blinding)
-                + crate::balance::balance(23, "ETH", eth_23.balance_blinding)
-                - crate::balance::balance(4840, "CRV", crv_4840.balance_blinding)
+            crate::balance::balance(4840, "CRV", crv_4840.balance_blinding)
+                - (crate::balance::balance(10, "NMO", nmo_10.balance_blinding)
+                    + crate::balance::balance(23, "ETH", eth_23.balance_blinding))
         );
     }
 }
