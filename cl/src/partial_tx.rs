@@ -142,4 +142,31 @@ mod test {
 
         assert!(ptx.verify(&ptx_proof));
     }
+
+    #[test]
+    fn test_partial_tx_balance() {
+        let mut rng = seed_rng(0);
+
+        let nmo_10 = InputWitness::random(Note::new(10, "NMO"), &mut rng);
+        let eth_23 = InputWitness::random(Note::new(23, "ETH"), &mut rng);
+        let crv_4840 = OutputWitness::random(
+            Note::new(4840, "CRV"),
+            NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
+            &mut rng,
+        );
+
+        let ptx_witness = PartialTxWitness {
+            inputs: vec![nmo_10.clone(), eth_23.clone()],
+            outputs: vec![crv_4840.clone()],
+        };
+
+        let ptx = PartialTx::from_witness(ptx_witness.clone());
+
+        assert_eq!(
+            ptx.balance(),
+            crate::balance::balance(10, "NMO", nmo_10.balance_blinding)
+                + crate::balance::balance(23, "ETH", eth_23.balance_blinding)
+                - crate::balance::balance(4840, "CRV", crv_4840.balance_blinding)
+        );
+    }
 }

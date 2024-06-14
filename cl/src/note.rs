@@ -1,17 +1,8 @@
 use blake2::{Blake2s256, Digest};
 use group::GroupEncoding;
 use jubjub::{ExtendedPoint, Scalar};
-use lazy_static::lazy_static;
 
-use crate::{
-    crypto,
-    nullifier::{NullifierCommitment, NullifierNonce},
-};
-
-lazy_static! {
-    static ref PEDERSON_COMMITMENT_BLINDING_POINT: ExtendedPoint =
-        crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING");
-}
+use crate::nullifier::{NullifierCommitment, NullifierNonce};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NoteCommitment([u8; 32]);
@@ -37,12 +28,11 @@ impl Note {
     }
 
     pub fn unit_point(&self) -> ExtendedPoint {
-        crypto::hash_to_curve(self.unit.as_bytes())
+        crate::balance::unit_point(&self.unit)
     }
 
     pub fn balance(&self, blinding: Scalar) -> ExtendedPoint {
-        let value_scalar = Scalar::from(self.value);
-        self.unit_point() * value_scalar + *PEDERSON_COMMITMENT_BLINDING_POINT * blinding
+        crate::balance::balance(self.value, &self.unit, blinding)
     }
 
     pub fn commit(&self, nf_pk: NullifierCommitment, nonce: NullifierNonce) -> NoteCommitment {

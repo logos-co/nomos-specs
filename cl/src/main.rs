@@ -1,3 +1,4 @@
+pub mod balance;
 pub mod crypto;
 pub mod error;
 pub mod input;
