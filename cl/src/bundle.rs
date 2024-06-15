@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use jubjub::{ExtendedPoint, Scalar};
+use jubjub::{Scalar, SubgroupPoint};
 
 use crate::{
     error::Error,
@@ -34,7 +34,7 @@ impl Bundle {
         }
     }
 
-    pub fn balance(&self) -> ExtendedPoint {
+    pub fn balance(&self) -> SubgroupPoint {
         self.partials.iter().map(|ptx| ptx.balance()).sum()
     }
 
@@ -102,10 +102,10 @@ mod test {
     fn test_bundle_balance() {
         let mut rng = seed_rng(0);
 
-        let nmo_10_in = InputWitness::random(Note::new(10, "NMO"), &mut rng);
-        let eth_23_in = InputWitness::random(Note::new(23, "ETH"), &mut rng);
+        let nmo_10_in = InputWitness::random(Note::random(10, "NMO", &mut rng), &mut rng);
+        let eth_23_in = InputWitness::random(Note::random(23, "ETH", &mut rng), &mut rng);
         let crv_4840_out = OutputWitness::random(
-            Note::new(4840, "CRV"),
+            Note::random(4840, "CRV", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -120,24 +120,24 @@ mod test {
         let bundle = Bundle::from_witness(bundle_witness.clone());
 
         assert!(!bundle.is_balanced(
-            -nmo_10_in.balance_blinding - eth_23_in.balance_blinding
-                + crv_4840_out.balance_blinding
+            -nmo_10_in.note.balance.blinding - eth_23_in.note.balance.blinding
+                + crv_4840_out.note.balance.blinding
         ));
         assert_eq!(
             bundle.balance(),
-            crate::balance::balance(4840, "CRV", crv_4840_out.balance_blinding)
-                - (crate::balance::balance(10, "NMO", nmo_10_in.balance_blinding)
-                    + crate::balance::balance(23, "ETH", eth_23_in.balance_blinding))
+            crate::balance::balance(4840, "CRV", crv_4840_out.note.balance.blinding)
+                - (crate::balance::balance(10, "NMO", nmo_10_in.note.balance.blinding)
+                    + crate::balance::balance(23, "ETH", eth_23_in.note.balance.blinding))
         );
 
-        let crv_4840_in = InputWitness::random(Note::new(4840, "CRV"), &mut rng);
+        let crv_4840_in = InputWitness::random(Note::random(4840, "CRV", &mut rng), &mut rng);
         let nmo_10_out = OutputWitness::random(
-            Note::new(10, "NMO"),
+            Note::random(10, "NMO", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
         let eth_23_out = OutputWitness::random(
-            Note::new(23, "ETH"),
+            Note::random(23, "ETH", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -149,11 +149,11 @@ mod test {
 
         let bundle = Bundle::from_witness(bundle_witness);
 
-        let blinding = -nmo_10_in.balance_blinding - eth_23_in.balance_blinding
-            + crv_4840_out.balance_blinding
-            - crv_4840_in.balance_blinding
-            + nmo_10_out.balance_blinding
-            + eth_23_out.balance_blinding;
+        let blinding = -nmo_10_in.note.balance.blinding - eth_23_in.note.balance.blinding
+            + crv_4840_out.note.balance.blinding
+            - crv_4840_in.note.balance.blinding
+            + nmo_10_out.note.balance.blinding
+            + eth_23_out.note.balance.blinding;
 
         assert_eq!(bundle.balance(), crate::balance::balance(0, "", blinding));
 

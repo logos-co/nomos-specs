@@ -1,8 +1,7 @@
-use group::{ff::Field, GroupEncoding};
-use jubjub::{ExtendedPoint, Scalar};
 use rand_core::RngCore;
 
 use crate::{
+    balance::Balance,
     error::Error,
     note::{Note, NoteCommitment},
     nullifier::{NullifierCommitment, NullifierNonce},
@@ -11,7 +10,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Output {
     pub note_comm: NoteCommitment,
-    pub balance: ExtendedPoint,
+    pub balance: Balance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +18,6 @@ pub struct OutputWitness {
     pub note: Note,
     pub nf_pk: NullifierCommitment,
     pub nonce: NullifierNonce,
-    pub balance_blinding: Scalar,
 }
 
 impl OutputWitness {
@@ -28,7 +26,6 @@ impl OutputWitness {
             note,
             nf_pk: owner,
             nonce: NullifierNonce::random(&mut rng),
-            balance_blinding: Scalar::random(&mut rng),
         }
     }
 }
@@ -41,7 +38,7 @@ impl Output {
     pub fn from_witness(w: OutputWitness) -> Self {
         Self {
             note_comm: w.note.commit(w.nf_pk, w.nonce),
-            balance: w.note.balance(w.balance_blinding),
+            balance: w.note.balance(),
         }
     }
 
@@ -60,7 +57,7 @@ impl Output {
         let witness = &proof.0;
 
         self.note_comm == witness.note.commit(witness.nf_pk, witness.nonce)
-            && self.balance == witness.note.balance(witness.balance_blinding)
+            && self.balance == witness.note.balance()
     }
 
     pub(crate) fn to_bytes(&self) -> [u8; 64] {
@@ -73,8 +70,6 @@ impl Output {
 
 #[cfg(test)]
 mod test {
-    use group::ff::Field;
-
     use super::*;
     use crate::{nullifier::NullifierSecret, test_util::seed_rng};
 
@@ -82,17 +77,11 @@ mod test {
     fn test_output_proof() {
         let mut rng = seed_rng(0);
 
-        let note = Note::new(10, "NMO");
+        let note = Note::random(10, "NMO", &mut rng);
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);
-        let balance_blinding = Scalar::random(&mut rng);
 
-        let witness = OutputWitness {
-            note,
-            nf_pk,
-            nonce,
-            balance_blinding,
-        };
+        let witness = OutputWitness { note, nf_pk, nonce };
 
         let output = Output::from_witness(witness.clone());
         let proof = output.prove(&witness).unwrap();
@@ -101,11 +90,11 @@ mod test {
 
         let wrong_witnesses = [
             OutputWitness {
-                note: Note::new(11, "NMO"),
+                note: Note::random(11, "NMO", &mut rng),
                 ..witness.clone()
             },
             OutputWitness {
-                note: Note::new(10, "ETH"),
+                note: Note::random(10, "ETH", &mut rng),
                 ..witness.clone()
             },
             OutputWitness {
@@ -114,10 +103,6 @@ mod test {
             },
             OutputWitness {
                 nonce: NullifierNonce::random(&mut rng),
-                ..witness.clone()
-            },
-            OutputWitness {
-                balance_blinding: Scalar::random(&mut rng),
                 ..witness.clone()
             },
         ];

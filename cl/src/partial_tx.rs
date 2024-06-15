@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use blake2::{Blake2s256, Digest};
-use jubjub::ExtendedPoint;
+use jubjub::SubgroupPoint;
 use rand_core::RngCore;
 
 use crate::error::Error;
@@ -114,9 +114,9 @@ impl PartialTx {
                 .all(|(o, p)| o.verify(p))
     }
 
-    pub fn balance(&self) -> ExtendedPoint {
-        let in_sum: ExtendedPoint = self.inputs.iter().map(|i| i.balance).sum();
-        let out_sum: ExtendedPoint = self.outputs.iter().map(|o| o.balance).sum();
+    pub fn balance(&self) -> SubgroupPoint {
+        let in_sum: SubgroupPoint = self.inputs.iter().map(|i| i.balance.0).sum();
+        let out_sum: SubgroupPoint = self.outputs.iter().map(|o| o.balance.0).sum();
 
         out_sum - in_sum
     }
@@ -133,10 +133,10 @@ mod test {
     fn test_partial_tx_proof() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(Note::new(10, "NMO"), &mut rng);
-        let eth_23 = InputWitness::random(Note::new(23, "ETH"), &mut rng);
+        let nmo_10 = InputWitness::random(Note::random(10, "NMO", &mut rng), &mut rng);
+        let eth_23 = InputWitness::random(Note::random(23, "ETH", &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            Note::new(4840, "CRV"),
+            Note::random(4840, "CRV", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -157,10 +157,10 @@ mod test {
     fn test_partial_tx_balance() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(Note::new(10, "NMO"), &mut rng);
-        let eth_23 = InputWitness::random(Note::new(23, "ETH"), &mut rng);
+        let nmo_10 = InputWitness::random(Note::random(10, "NMO", &mut rng), &mut rng);
+        let eth_23 = InputWitness::random(Note::random(23, "ETH", &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            Note::new(4840, "CRV"),
+            Note::random(4840, "CRV", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -174,9 +174,9 @@ mod test {
 
         assert_eq!(
             ptx.balance(),
-            crate::balance::balance(4840, "CRV", crv_4840.balance_blinding)
-                - (crate::balance::balance(10, "NMO", nmo_10.balance_blinding)
-                    + crate::balance::balance(23, "ETH", eth_23.balance_blinding))
+            crate::balance::balance(4840, "CRV", crv_4840.note.balance.blinding)
+                - (crate::balance::balance(10, "NMO", nmo_10.note.balance.blinding)
+                    + crate::balance::balance(23, "ETH", eth_23.note.balance.blinding))
         );
     }
 }

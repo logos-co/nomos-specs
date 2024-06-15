@@ -3,20 +3,19 @@
 /// Partial transactions, as the name suggests, are transactions
 /// which on their own may not balance (i.e. \sum inputs != \sum outputs)
 use crate::{
+    balance::Balance,
     error::Error,
     note::{Note, NoteCommitment},
     nullifier::{Nullifier, NullifierNonce, NullifierSecret},
     partial_tx::PtxCommitment,
 };
-use group::{ff::Field, GroupEncoding};
-use jubjub::{ExtendedPoint, Scalar};
 use rand_core::RngCore;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Input {
     pub note_comm: NoteCommitment,
     pub nullifier: Nullifier,
-    pub balance: ExtendedPoint,
+    pub balance: Balance,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,7 +23,6 @@ pub struct InputWitness {
     pub note: Note,
     pub nf_sk: NullifierSecret,
     pub nonce: NullifierNonce,
-    pub balance_blinding: Scalar,
 }
 
 impl InputWitness {
@@ -33,7 +31,6 @@ impl InputWitness {
             note,
             nf_sk: NullifierSecret::random(&mut rng),
             nonce: NullifierNonce::random(&mut rng),
-            balance_blinding: Scalar::random(&mut rng),
         }
     }
 }
@@ -47,7 +44,7 @@ impl Input {
         Self {
             note_comm: w.note.commit(w.nf_sk.commit(), w.nonce),
             nullifier: Nullifier::new(w.nf_sk, w.nonce),
-            balance: w.note.balance(w.balance_blinding),
+            balance: w.note.balance(),
         }
     }
 
@@ -72,7 +69,7 @@ impl Input {
         let nf_pk = witness.nf_sk.commit();
         self.note_comm == witness.note.commit(nf_pk, witness.nonce)
             && self.nullifier == Nullifier::new(witness.nf_sk, witness.nonce)
-            && self.balance == witness.note.balance(witness.balance_blinding)
+            && self.balance == witness.note.balance()
             && ptx_comm == proof.1
     }
 
@@ -87,8 +84,6 @@ impl Input {
 
 #[cfg(test)]
 mod test {
-    use group::ff::Field;
-
     use super::*;
     use crate::{nullifier::NullifierNonce, test_util::seed_rng};
 
@@ -98,17 +93,11 @@ mod test {
 
         let ptx_comm = PtxCommitment::default();
 
-        let note = Note::new(10, "NMO");
+        let note = Note::random(10, "NMO", &mut rng);
         let nf_sk = NullifierSecret::random(&mut rng);
         let nonce = NullifierNonce::random(&mut rng);
-        let balance_blinding = Scalar::random(&mut rng);
 
-        let witness = InputWitness {
-            note,
-            nf_sk,
-            nonce,
-            balance_blinding,
-        };
+        let witness = InputWitness { note, nf_sk, nonce };
 
         let input = Input::from_witness(witness.clone());
         let proof = input.prove(&witness, ptx_comm).unwrap();
@@ -117,11 +106,11 @@ mod test {
 
         let wrong_witnesses = [
             InputWitness {
-                note: Note::new(11, "NMO"),
+                note: Note::random(11, "NMO", &mut rng),
                 ..witness.clone()
             },
             InputWitness {
-                note: Note::new(10, "ETH"),
+                note: Note::random(10, "ETH", &mut rng),
                 ..witness.clone()
             },
             InputWitness {
@@ -130,10 +119,6 @@ mod test {
             },
             InputWitness {
                 nonce: NullifierNonce::random(&mut rng),
-                ..witness.clone()
-            },
-            InputWitness {
-                balance_blinding: Scalar::random(&mut rng),
                 ..witness.clone()
             },
         ];
@@ -151,17 +136,11 @@ mod test {
     fn test_input_ptx_coupling() {
         let mut rng = seed_rng(0);
 
-        let note = Note::new(10, "NMO");
+        let note = Note::random(10, "NMO", &mut rng);
         let nf_sk = NullifierSecret::random(&mut rng);
         let nonce = NullifierNonce::random(&mut rng);
-        let balance_blinding = Scalar::random(&mut rng);
 
-        let witness = InputWitness {
-            note,
-            nf_sk,
-            nonce,
-            balance_blinding,
-        };
+        let witness = InputWitness { note, nf_sk, nonce };
 
         let input = Input::from_witness(witness.clone());
 
