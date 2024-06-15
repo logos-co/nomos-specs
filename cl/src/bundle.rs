@@ -119,6 +119,10 @@ mod test {
 
         let bundle = Bundle::from_witness(bundle_witness.clone());
 
+        assert!(!bundle.is_balanced(
+            -nmo_10_in.balance_blinding - eth_23_in.balance_blinding
+                + crv_4840_out.balance_blinding
+        ));
         assert_eq!(
             bundle.balance(),
             crate::balance::balance(4840, "CRV", crv_4840_out.balance_blinding)
