@@ -4,7 +4,7 @@ use jubjub::{ExtendedPoint, Scalar};
 
 use crate::nullifier::{NullifierCommitment, NullifierNonce};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NoteCommitment([u8; 32]);
 
 impl NoteCommitment {

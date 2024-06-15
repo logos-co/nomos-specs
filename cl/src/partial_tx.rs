@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use blake2::{Blake2s256, Digest};
 use jubjub::ExtendedPoint;
 use rand_core::RngCore;
@@ -21,20 +23,20 @@ impl PtxCommitment {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartialTx {
-    inputs: Vec<Input>,
-    outputs: Vec<Output>,
+    pub inputs: Vec<Input>,
+    pub outputs: Vec<Output>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartialTxWitness {
-    inputs: Vec<InputWitness>,
-    outputs: Vec<OutputWitness>,
+    pub inputs: Vec<InputWitness>,
+    pub outputs: Vec<OutputWitness>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartialTxProof {
-    inputs: Vec<InputProof>,
-    outputs: Vec<OutputProof>,
+    pub inputs: Vec<InputProof>,
+    pub outputs: Vec<OutputProof>,
 }
 
 impl PartialTx {
@@ -63,6 +65,14 @@ impl PartialTx {
 
     pub fn prove(&self, w: PartialTxWitness) -> Result<PartialTxProof, Error> {
         if &Self::from_witness(w.clone()) != self {
+            return Err(Error::ProofFailed);
+        }
+        let input_note_comms = BTreeSet::from_iter(self.inputs.iter().map(|i| i.note_comm));
+        let output_note_comms = BTreeSet::from_iter(self.outputs.iter().map(|o| o.note_comm));
+
+        if input_note_comms.len() != self.inputs.len()
+            || output_note_comms.len() != self.outputs.len()
+        {
             return Err(Error::ProofFailed);
         }
 

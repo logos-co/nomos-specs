@@ -26,7 +26,7 @@ pub struct NullifierNonce([u8; 16]);
 
 // The nullifier attached to input notes to prove an input has not
 // already been spent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Nullifier([u8; 32]);
 
 impl NullifierSecret {
