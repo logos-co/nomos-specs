@@ -3,6 +3,8 @@ use std::collections::BTreeSet;
 use blake2::{Blake2s256, Digest};
 use jubjub::SubgroupPoint;
 use rand_core::RngCore;
+use risc0_groth16::ProofJson;
+use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::input::{Input, InputProof, InputWitness};
@@ -19,21 +21,25 @@ impl PtxCommitment {
         rng.fill_bytes(&mut sk);
         Self(sk)
     }
+
+    pub fn hex(&self) -> String {
+        hex::encode(self.0)
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PartialTx {
     pub inputs: Vec<Input>,
     pub outputs: Vec<Output>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PartialTxWitness {
     pub inputs: Vec<InputWitness>,
     pub outputs: Vec<OutputWitness>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct PartialTxProof {
     pub inputs: Vec<InputProof>,
     pub outputs: Vec<OutputProof>,
@@ -63,8 +69,14 @@ impl PartialTx {
         PtxCommitment(commit_bytes)
     }
 
-    pub fn prove(&self, w: PartialTxWitness) -> Result<PartialTxProof, Error> {
-        if &Self::from_witness(w.clone()) != self {
+    pub fn prove(
+        &self,
+        w: PartialTxWitness,
+        death_proofs: Vec<ProofJson>,
+    ) -> Result<PartialTxProof, Error> {
+        if bincode::serialize(&Self::from_witness(w.clone())).unwrap()
+            != bincode::serialize(&self).unwrap()
+        {
             return Err(Error::ProofFailed);
         }
         let input_note_comms = BTreeSet::from_iter(self.inputs.iter().map(|i| i.note_comm));
@@ -82,7 +94,8 @@ impl PartialTx {
             self.inputs
                 .iter()
                 .zip(&w.inputs)
-                .map(|(i, i_w)| i.prove(i_w, ptx_comm)),
+                .zip(death_proofs.into_iter())
+                .map(|((i, i_w), death_p)| i.prove(i_w, ptx_comm, death_p)),
         )?;
 
         let output_proofs: Vec<OutputProof> = Result::from_iter(

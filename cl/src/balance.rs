@@ -2,14 +2,15 @@ use group::{ff::Field, GroupEncoding};
 use jubjub::{Scalar, SubgroupPoint};
 use lazy_static::lazy_static;
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 
 lazy_static! {
     static ref PEDERSON_COMMITMENT_BLINDING_POINT: SubgroupPoint =
         crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING");
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Balance(pub SubgroupPoint);
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct Balance(#[serde(with = "serde_point")] pub SubgroupPoint);
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BalanceWitness {
@@ -55,6 +56,51 @@ pub fn balance(value: u64, unit: &str, blinding: Scalar) -> SubgroupPoint {
     unit_point(unit) * value_scalar + *PEDERSON_COMMITMENT_BLINDING_POINT * blinding
 }
 
+mod serde_point {
+    use super::SubgroupPoint;
+    use group::GroupEncoding;
+    use serde::de::{self, Visitor};
+    use serde::{Deserializer, Serializer};
+    use std::fmt;
+
+    // Serialize a SubgroupPoint by converting it to bytes.
+    pub fn serialize<S>(point: &SubgroupPoint, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let bytes = point.to_bytes();
+        serializer.serialize_bytes(&bytes)
+    }
+
+    // Deserialize a SubgroupPoint by converting it from bytes.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<SubgroupPoint, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BytesVisitor;
+
+        impl<'de> Visitor<'de> for BytesVisitor {
+            type Value = SubgroupPoint;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid SubgroupPoint in byte representation")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let mut bytes = <jubjub::SubgroupPoint as group::GroupEncoding>::Repr::default();
+                assert_eq!(bytes.len(), v.len());
+                bytes.copy_from_slice(v);
+
+                Ok(SubgroupPoint::from_bytes(&bytes).unwrap())
+            }
+        }
+
+        deserializer.deserialize_bytes(BytesVisitor)
+    }
+}
 #[cfg(test)]
 mod test {
 

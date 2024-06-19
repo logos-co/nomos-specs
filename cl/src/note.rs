@@ -1,13 +1,15 @@
 use blake2::{Blake2s256, Digest};
 use group::GroupEncoding;
 use rand_core::RngCore;
+use risc0_groth16::VerifyingKeyJson;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     balance::{Balance, BalanceWitness},
     nullifier::{NullifierCommitment, NullifierNonce},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NoteCommitment([u8; 32]);
 
 impl NoteCommitment {
@@ -18,24 +20,38 @@ impl NoteCommitment {
 
 // TODO: Rename Note to NoteWitness and NoteCommitment to Note
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Note {
     pub balance: BalanceWitness,
+    pub death_constraint: Vec<u8>, // serialized death_constraint
 }
 
 impl Note {
-    pub fn random(value: u64, unit: impl Into<String>, rng: impl RngCore) -> Self {
+    pub fn random(
+        value: u64,
+        unit: impl Into<String>,
+        death_constraint: &VerifyingKeyJson,
+        rng: impl RngCore,
+    ) -> Self {
         Self {
             balance: BalanceWitness::random(value, unit, rng),
+            death_constraint: bincode::serialize(death_constraint).unwrap(),
         }
     }
 
     pub fn commit(&self, nf_pk: NullifierCommitment, nonce: NullifierNonce) -> NoteCommitment {
         let mut hasher = Blake2s256::new();
         hasher.update(b"NOMOS_CL_NOTE_COMMIT");
+
+        // COMMIT TO BALANCE
         hasher.update(self.balance.value.to_le_bytes());
         hasher.update(self.balance.unit_point().to_bytes());
         // Important! we don't commit to the balance blinding factor as that may make the notes linkable.
+
+        // COMMIT TO DEATH CONSTRAINT
+        hasher.update(&self.death_constraint);
+
+        // COMMIT TO NULLIFIER
         hasher.update(nf_pk.as_bytes());
         hasher.update(nonce.as_bytes());
 

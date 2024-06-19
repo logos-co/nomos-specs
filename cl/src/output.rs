@@ -1,4 +1,5 @@
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     balance::Balance,
@@ -7,13 +8,13 @@ use crate::{
     nullifier::{NullifierCommitment, NullifierNonce},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Output {
     pub note_comm: NoteCommitment,
     pub balance: Balance,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct OutputWitness {
     pub note: Note,
     pub nf_pk: NullifierCommitment,
@@ -31,7 +32,7 @@ impl OutputWitness {
 }
 
 // as we don't have SNARKS hooked up yet, the witness will be our proof
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct OutputProof(OutputWitness);
 
 impl Output {

@@ -7,6 +7,7 @@
 // secret is used for multiple notes.
 use blake2::{Blake2s256, Digest};
 use rand_core::RngCore;
+use serde::{Deserialize, Serialize};
 
 // Maintained privately by note holder
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +27,7 @@ pub struct NullifierNonce([u8; 16]);
 
 // The nullifier attached to input notes to prove an input has not
 // already been spent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Nullifier([u8; 32]);
 
 impl NullifierSecret {

@@ -10,15 +10,17 @@ use crate::{
     partial_tx::PtxCommitment,
 };
 use rand_core::RngCore;
+use risc0_groth16::{ProofJson, PublicInputsJson, Verifier};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Input {
     pub note_comm: NoteCommitment,
     pub nullifier: Nullifier,
     pub balance: Balance,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct InputWitness {
     pub note: Note,
     pub nf_sk: NullifierSecret,
@@ -36,8 +38,19 @@ impl InputWitness {
 }
 
 // as we don't have SNARKS hooked up yet, the witness will be our proof
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InputProof(InputWitness, PtxCommitment);
+#[derive(Debug)]
+pub struct InputProof {
+    input: InputWitness,
+    ptx_comm: PtxCommitment,
+    death_proof: ProofJson,
+}
+
+impl InputProof {
+    fn clone_death_proof(&self) -> ProofJson {
+        let bytes = bincode::serialize(&self.death_proof).unwrap();
+        bincode::deserialize(&bytes).unwrap()
+    }
+}
 
 impl Input {
     pub fn from_witness(w: InputWitness) -> Self {
@@ -48,11 +61,22 @@ impl Input {
         }
     }
 
-    pub fn prove(&self, w: &InputWitness, ptx_comm: PtxCommitment) -> Result<InputProof, Error> {
-        if &Input::from_witness(w.clone()) != self {
+    pub fn prove(
+        &self,
+        w: &InputWitness,
+        ptx_comm: PtxCommitment,
+        death_proof: ProofJson,
+    ) -> Result<InputProof, Error> {
+        if bincode::serialize(&Input::from_witness(w.clone())).unwrap()
+            != bincode::serialize(&self).unwrap()
+        {
             Err(Error::ProofFailed)
         } else {
-            Ok(InputProof(w.clone(), ptx_comm))
+            Ok(InputProof {
+                input: w.clone(),
+                ptx_comm,
+                death_proof,
+            })
         }
     }
 
@@ -64,13 +88,29 @@ impl Input {
         // - balance == v * hash_to_curve(Unit) + blinding * H
         // - ptx_comm is the same one that was used in proving.
 
-        let witness = &proof.0;
+        let witness = &proof.input;
 
         let nf_pk = witness.nf_sk.commit();
+
+        // let death_constraint_was_committed_to =
+        //     witness.note.death_constraint == bincode::serialize(&death_constraint).unwrap();
+
+        let death_constraint_is_satisfied: bool = Verifier::from_json(
+            proof.clone_death_proof(),
+            PublicInputsJson {
+                values: vec![ptx_comm.hex()],
+            },
+            bincode::deserialize(&witness.note.death_constraint).unwrap(),
+        )
+        .unwrap()
+        .verify()
+        .is_ok();
         self.note_comm == witness.note.commit(nf_pk, witness.nonce)
             && self.nullifier == Nullifier::new(witness.nf_sk, witness.nonce)
             && self.balance == witness.note.balance()
-            && ptx_comm == proof.1
+            && ptx_comm == proof.ptx_comm
+            // && death_constraint_was_committed_to
+            && death_constraint_is_satisfied
     }
 
     pub(crate) fn to_bytes(&self) -> [u8; 96] {

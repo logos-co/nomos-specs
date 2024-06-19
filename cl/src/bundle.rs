@@ -1,39 +1,35 @@
 use std::collections::BTreeSet;
 
 use jubjub::{Scalar, SubgroupPoint};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     error::Error,
     note::NoteCommitment,
-    partial_tx::{PartialTx, PartialTxProof, PartialTxWitness},
+    partial_tx::{PartialTx, PartialTxProof},
 };
 
 /// The transaction bundle is a collection of partial transactions.
 /// The goal in bundling transactions is to produce a set of partial transactions
 /// that balance each other.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bundle {
     pub partials: Vec<PartialTx>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct BundleWitness {
-    pub partials: Vec<PartialTxWitness>,
+    pub balance_blinding: Scalar,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct BundleProof {
     pub partials: Vec<PartialTxProof>,
+    pub balance_blinding: Scalar,
 }
 
 impl Bundle {
-    pub fn from_witness(w: BundleWitness) -> Self {
-        Self {
-            partials: Vec::from_iter(w.partials.into_iter().map(PartialTx::from_witness)),
-        }
-    }
-
     pub fn balance(&self) -> SubgroupPoint {
         self.partials.iter().map(|ptx| ptx.balance()).sum()
     }
@@ -42,11 +38,12 @@ impl Bundle {
         self.balance() == crate::balance::balance(0, "", balance_blinding_witness)
     }
 
-    pub fn prove(&self, w: BundleWitness) -> Result<BundleProof, Error> {
-        if &Self::from_witness(w.clone()) != self {
-            return Err(Error::ProofFailed);
-        }
-        if w.partials.len() == self.partials.len() {
+    pub fn prove(
+        &self,
+        w: BundleWitness,
+        ptx_proofs: Vec<PartialTxProof>,
+    ) -> Result<BundleProof, Error> {
+        if ptx_proofs.len() == self.partials.len() {
             return Err(Error::ProofFailed);
         }
         let input_notes: Vec<NoteCommitment> = self
@@ -67,15 +64,13 @@ impl Bundle {
             return Err(Error::ProofFailed);
         }
 
-        let ptx_proofs = self
-            .partials
-            .iter()
-            .zip(w.partials)
-            .map(|(ptx, p_w)| ptx.prove(p_w))
-            .collect::<Result<Vec<PartialTxProof>, _>>()?;
+        if self.balance() != crate::balance::balance(0, "", w.balance_blinding) {
+            return Err(Error::ProofFailed);
+        }
 
         Ok(BundleProof {
             partials: ptx_proofs,
+            balance_blinding: w.balance_blinding,
         })
     }
 
