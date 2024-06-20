@@ -19,17 +19,16 @@ def __toeplitz1(global_parameters: List[G1], polynomial_degree: int) -> List[G1]
     :return:
     """
     assert len(global_parameters) >= polynomial_degree
-    roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, polynomial_degree*2, BLS_MODULUS)
     global_parameters = global_parameters[:polynomial_degree]
     # algorithm only works on powers of 2 for dft computations
     assert is_power_of_two(len(global_parameters))
-    roots_of_unity = roots_of_unity[:2*polynomial_degree]
-    vector_x_extended = global_parameters + [bls.multiply(bls.Z1(), 0) for _ in range(len(global_parameters))]
+    roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, polynomial_degree*2, BLS_MODULUS)
+    vector_x_extended = global_parameters + [bls.multiply(bls.Z1(), 0) for _ in range(polynomial_degree)]
     vector_x_extended_fft = fft_g1(vector_x_extended, roots_of_unity, BLS_MODULUS)
     return vector_x_extended_fft
 
 
-def __toeplitz2(coefficients: List[G1], extended_vector: Sequence[G1]) -> List[G1]:
+def __toeplitz2(coefficients: List[BLSFieldElement], extended_vector: Sequence[G1]) -> List[G1]:
     assert is_power_of_two(len(coefficients))
     roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, len(coefficients), BLS_MODULUS)
     toeplitz_coefficients_fft = fft(coefficients, roots_of_unity, BLS_MODULUS)
@@ -61,13 +60,12 @@ def fk20_generate_proofs(
     # 1.2 z = dft([*[0 for _ in len(polynomial)], f1, f2, ..., fd])
     # 1.3 u = y * v * roots_of_unity(len(polynomial)*2)
     roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, polynomial_degree, BLS_MODULUS)
-    global_parameters = [*global_parameters[polynomial_degree-2::-1], bls.multiply(bls.Z1(), 0)]
+    global_parameters = list(reversed(global_parameters))
     extended_vector = __toeplitz1(global_parameters, polynomial_degree)
     # 2 - Build circulant matrix with the polynomial coefficients (reversed N..n, and padded)
     toeplitz_coefficients = [
-        polynomial.coefficients[-1],
-        *(BLSFieldElement(0) for _ in range(polynomial_degree+1)),
-        *polynomial.coefficients[1:-1]
+        *(BLSFieldElement(0) for _ in range(polynomial_degree)),
+        *polynomial.coefficients
     ]
     h_extended_vector = __toeplitz2(toeplitz_coefficients, extended_vector)
     # 3 - Perform fft and nub the tail half as it is padding
