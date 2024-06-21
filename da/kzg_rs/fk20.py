@@ -18,12 +18,11 @@ def __toeplitz1(global_parameters: List[G1], polynomial_degree: int) -> List[G1]
     :param polynomial_degree:
     :return:
     """
-    assert len(global_parameters) >= polynomial_degree
-    global_parameters = global_parameters[:polynomial_degree]
+    assert len(global_parameters) == polynomial_degree
     # algorithm only works on powers of 2 for dft computations
     assert is_power_of_two(len(global_parameters))
     roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, polynomial_degree*2, BLS_MODULUS)
-    vector_x_extended = global_parameters + [bls.multiply(bls.Z1(), 0) for _ in range(polynomial_degree)]
+    vector_x_extended = global_parameters + [bls.Z1() for _ in range(polynomial_degree)]
     vector_x_extended_fft = fft_g1(vector_x_extended, roots_of_unity, BLS_MODULUS)
     return vector_x_extended_fft
 
@@ -60,7 +59,7 @@ def fk20_generate_proofs(
     # 1.2 z = dft([*[0 for _ in len(polynomial)], f1, f2, ..., fd])
     # 1.3 u = y * v * roots_of_unity(len(polynomial)*2)
     roots_of_unity = compute_roots_of_unity(PRIMITIVE_ROOT, polynomial_degree, BLS_MODULUS)
-    global_parameters = list(reversed(global_parameters))
+    global_parameters = list(reversed(global_parameters[:polynomial_degree]))
     extended_vector = __toeplitz1(global_parameters, polynomial_degree)
     # 2 - Build circulant matrix with the polynomial coefficients (reversed N..n, and padded)
     toeplitz_coefficients = [
