@@ -98,6 +98,9 @@ class MixGossipChannel:
     async def __process_inbound_conn(self, conn: Connection):
         while True:
             elem = await conn.get()
+            # In practice, data transmitted through connections is going to be always 'bytes'.
+            # But here, we use the SphinxPacket type explicitly for simplicity
+            # without implementing serde for SphinxPacket.
             if isinstance(elem, bytes):
                 assert elem == build_noise_packet()
                 # Drop packet
