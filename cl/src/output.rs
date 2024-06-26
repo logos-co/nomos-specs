@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     balance::Balance,
     error::Error,
-    note::{Note, NoteCommitment},
+    note::{NoteCommitment, NoteWitness},
     nullifier::{NullifierCommitment, NullifierNonce},
 };
 
@@ -16,13 +16,13 @@ pub struct Output {
 
 #[derive(Debug, Clone)]
 pub struct OutputWitness {
-    pub note: Note,
+    pub note: NoteWitness,
     pub nf_pk: NullifierCommitment,
     pub nonce: NullifierNonce,
 }
 
 impl OutputWitness {
-    pub fn random(note: Note, owner: NullifierCommitment, mut rng: impl RngCore) -> Self {
+    pub fn random(note: NoteWitness, owner: NullifierCommitment, mut rng: impl RngCore) -> Self {
         Self {
             note,
             nf_pk: owner,
@@ -78,7 +78,7 @@ mod test {
     fn test_output_proof() {
         let mut rng = seed_rng(0);
 
-        let note = Note::random(10, "NMO", &mut rng);
+        let note = NoteWitness::random(10, "NMO", &mut rng);
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);
 
@@ -91,11 +91,11 @@ mod test {
 
         let wrong_witnesses = [
             OutputWitness {
-                note: Note::random(11, "NMO", &mut rng),
+                note: NoteWitness::random(11, "NMO", &mut rng),
                 ..witness.clone()
             },
             OutputWitness {
-                note: Note::random(10, "ETH", &mut rng),
+                note: NoteWitness::random(10, "ETH", &mut rng),
                 ..witness.clone()
             },
             OutputWitness {

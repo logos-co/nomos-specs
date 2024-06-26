@@ -138,7 +138,7 @@ impl PartialTx {
 #[cfg(test)]
 mod test {
 
-    use crate::{note::Note, nullifier::NullifierSecret, test_util::seed_rng};
+    use crate::{note::NoteWitness, nullifier::NullifierSecret, test_util::seed_rng};
 
     use super::*;
 
@@ -146,10 +146,10 @@ mod test {
     fn test_partial_tx_proof() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(Note::random(10, "NMO", &mut rng), &mut rng);
-        let eth_23 = InputWitness::random(Note::random(23, "ETH", &mut rng), &mut rng);
+        let nmo_10 = InputWitness::random(NoteWitness::random(10, "NMO", &mut rng), &mut rng);
+        let eth_23 = InputWitness::random(NoteWitness::random(23, "ETH", &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            Note::random(4840, "CRV", &mut rng),
+            NoteWitness::random(4840, "CRV", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -170,10 +170,10 @@ mod test {
     fn test_partial_tx_balance() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(Note::random(10, "NMO", &mut rng), &mut rng);
-        let eth_23 = InputWitness::random(Note::random(23, "ETH", &mut rng), &mut rng);
+        let nmo_10 = InputWitness::random(NoteWitness::random(10, "NMO", &mut rng), &mut rng);
+        let eth_23 = InputWitness::random(NoteWitness::random(23, "ETH", &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            Note::random(4840, "CRV", &mut rng),
+            NoteWitness::random(4840, "CRV", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );

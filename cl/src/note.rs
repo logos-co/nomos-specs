@@ -21,12 +21,12 @@ impl NoteCommitment {
 // TODO: Rename Note to NoteWitness and NoteCommitment to Note
 
 #[derive(Debug, Clone)]
-pub struct Note {
+pub struct NoteWitness {
     pub balance: BalanceWitness,
     pub death_constraint: Vec<u8>, // serialized death_constraint
 }
 
-impl Note {
+impl NoteWitness {
     pub fn random(
         value: u64,
         unit: impl Into<String>,
@@ -73,8 +73,8 @@ mod test {
     #[test]
     fn test_note_commitments_dont_commit_to_balance_blinding() {
         let mut rng = seed_rng(0);
-        let n1 = Note::random(12, "NMO", &mut rng);
-        let n2 = Note::random(12, "NMO", &mut rng);
+        let n1 = NoteWitness::random(12, "NMO", &mut rng);
+        let n2 = NoteWitness::random(12, "NMO", &mut rng);
 
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);

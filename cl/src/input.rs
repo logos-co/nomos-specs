@@ -5,7 +5,7 @@
 use crate::{
     balance::Balance,
     error::Error,
-    note::{Note, NoteCommitment},
+    note::{NoteCommitment, NoteWitness},
     nullifier::{Nullifier, NullifierNonce, NullifierSecret},
     partial_tx::PtxCommitment,
 };
@@ -22,13 +22,13 @@ pub struct Input {
 
 #[derive(Debug, Clone)]
 pub struct InputWitness {
-    pub note: Note,
+    pub note: NoteWitness,
     pub nf_sk: NullifierSecret,
     pub nonce: NullifierNonce,
 }
 
 impl InputWitness {
-    pub fn random(note: Note, mut rng: impl RngCore) -> Self {
+    pub fn random(note: NoteWitness, mut rng: impl RngCore) -> Self {
         Self {
             note,
             nf_sk: NullifierSecret::random(&mut rng),
@@ -133,7 +133,7 @@ mod test {
 
         let ptx_comm = PtxCommitment::default();
 
-        let note = Note::random(10, "NMO", &mut rng);
+        let note = NoteWitness::random(10, "NMO", &mut rng);
         let nf_sk = NullifierSecret::random(&mut rng);
         let nonce = NullifierNonce::random(&mut rng);
 
@@ -146,11 +146,11 @@ mod test {
 
         let wrong_witnesses = [
             InputWitness {
-                note: Note::random(11, "NMO", &mut rng),
+                note: NoteWitness::random(11, "NMO", &mut rng),
                 ..witness.clone()
             },
             InputWitness {
-                note: Note::random(10, "ETH", &mut rng),
+                note: NoteWitness::random(10, "ETH", &mut rng),
                 ..witness.clone()
             },
             InputWitness {
@@ -176,7 +176,7 @@ mod test {
     fn test_input_ptx_coupling() {
         let mut rng = seed_rng(0);
 
-        let note = Note::random(10, "NMO", &mut rng);
+        let note = NoteWitness::random(10, "NMO", &mut rng);
         let nf_sk = NullifierSecret::random(&mut rng);
         let nonce = NullifierNonce::random(&mut rng);
 

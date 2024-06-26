@@ -87,7 +87,7 @@ impl Bundle {
 #[cfg(test)]
 mod test {
     use crate::{
-        input::InputWitness, note::Note, nullifier::NullifierSecret, output::OutputWitness,
+        input::InputWitness, note::NoteWitness, nullifier::NullifierSecret, output::OutputWitness,
         test_util::seed_rng,
     };
 
@@ -97,10 +97,10 @@ mod test {
     fn test_bundle_balance() {
         let mut rng = seed_rng(0);
 
-        let nmo_10_in = InputWitness::random(Note::random(10, "NMO", &mut rng), &mut rng);
-        let eth_23_in = InputWitness::random(Note::random(23, "ETH", &mut rng), &mut rng);
+        let nmo_10_in = InputWitness::random(NoteWitness::random(10, "NMO", &mut rng), &mut rng);
+        let eth_23_in = InputWitness::random(NoteWitness::random(23, "ETH", &mut rng), &mut rng);
         let crv_4840_out = OutputWitness::random(
-            Note::random(4840, "CRV", &mut rng),
+            NoteWitness::random(4840, "CRV", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -125,14 +125,15 @@ mod test {
                     + crate::balance::balance(23, "ETH", eth_23_in.note.balance.blinding))
         );
 
-        let crv_4840_in = InputWitness::random(Note::random(4840, "CRV", &mut rng), &mut rng);
+        let crv_4840_in =
+            InputWitness::random(NoteWitness::random(4840, "CRV", &mut rng), &mut rng);
         let nmo_10_out = OutputWitness::random(
-            Note::random(10, "NMO", &mut rng),
+            NoteWitness::random(10, "NMO", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
         let eth_23_out = OutputWitness::random(
-            Note::random(23, "ETH", &mut rng),
+            NoteWitness::random(23, "ETH", &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
