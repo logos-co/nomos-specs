@@ -3,25 +3,8 @@
 use blake2::{Blake2s256, Digest};
 use methods::{METHOD_ELF, METHOD_ID};
 use risc0_zkvm::{default_prover, ExecutorEnv};
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use common::*;
 
-// state of the zone
-type State = BTreeMap<u32, u32>;
-// list of all inputs that were executed up to this point
-type Journal = Vec<Input>;
-
-#[derive(Clone, Serialize, Deserialize)]
-struct Note {
-    state_cm: [u8; 32],
-    journal_cm: [u8; 32],
-    zone_input: Input,
-}
-
-#[derive(Clone, Copy, Serialize, Deserialize)]
-enum Input {
-    Transfer { from: u32, to: u32, amount: u32 },
-}
 
 fn main() {
     // Initialize tracing. In order to view logs, run `RUST_LOG=info cargo run`
@@ -29,28 +12,43 @@ fn main() {
         .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
         .init();
 
-    let state: BTreeMap<u32, u32> = [(0, 1000)].into_iter().collect();
+    let state: State = [(0, 1000)].into_iter().collect();
     let journal = vec![];
+    let zone_input = Input::Transfer {
+        from: 0,
+        to: 1,
+        amount: 10,
+    };
 
-    let note = Note {
+    let in_note = Note {
         state_cm: calculate_state_hash(&state),
         journal_cm: calculate_journal_hash(&journal),
-        zone_input: Input::Transfer {
-            from: 0,
-            to: 1,
-            amount: 10,
-        },
+        zone_input,
+    };
+
+    let mut out_journal = journal.clone();
+    out_journal.push(zone_input);
+
+    let out_note = Note {
+        state_cm: calculate_state_hash(&stf(state.clone(), zone_input)),
+        journal_cm: calculate_journal_hash(&out_journal),
+        zone_input: Input::None,
     };
 
     let ptx_root = [0u8; 32];
     let in_ptx_path: Vec<[u8; 32]> = vec![[0; 32]];
+    let out_ptx_path: Vec<[u8; 32]> = vec![[0; 32]];
 
     let env = ExecutorEnv::builder()
         .write(&ptx_root)
         .unwrap()
         .write(&in_ptx_path)
         .unwrap()
-        .write(&note)
+        .write(&out_ptx_path)
+        .unwrap()
+        .write(&in_note)
+        .unwrap()
+        .write(&out_note)
         .unwrap()
         .write(&state)
         .unwrap()
@@ -64,7 +62,7 @@ fn main() {
 
     // Proof information by proving the specified ELF binary.
     // This struct contains the receipt along with statistics about execution of the guest
-    let opts = risc0_zkvm::ProverOpts::default();
+    let opts = risc0_zkvm::ProverOpts::succinct();
     let prove_info = prover.prove_with_opts(env, METHOD_ELF, &opts).unwrap();
 
     // extract the receipt.
@@ -72,10 +70,7 @@ fn main() {
 
     // TODO: Implement code for retrieving receipt journal here.
 
-    // For example:
-    let (state_cm, journal_cm): ([u8; 32], [u8; 32]) = receipt.journal.decode().unwrap();
-    // println!("After: {:?}", output);
-
+    std::fs::write("proof.stark", bincode::serialize(&receipt).unwrap()).unwrap();
     // The receipt was verified at the end of proving, but the below code is an
     // example of how someone else could verify this receipt.
     receipt.verify(METHOD_ID).unwrap();

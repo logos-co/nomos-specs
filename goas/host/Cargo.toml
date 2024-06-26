@@ -10,3 +10,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = "1.0"
 blake2 = "0.10"
 bincode = "1"
+common = { path = "../common" }

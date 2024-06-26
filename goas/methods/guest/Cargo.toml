@@ -10,3 +10,4 @@ risc0-zkvm = { version = "1.0.1", default-features = false, features = ['std'] }
 blake2 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1"
+common = { path = "../../common" }
