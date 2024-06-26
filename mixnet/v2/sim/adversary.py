@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict, deque, Counter
+from collections import Counter, defaultdict, deque
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -46,14 +46,25 @@ class Adversary:
             self.senders_around_interval.update({sender})
         # self.node_states[self.env.now][node] = NodeState.SENDING
 
-    def observe_if_final_msg(self, sender: "Node", receiver: "Node", time_sent: Time, msg: SphinxPacket | bytes):
+    def observe_if_final_msg(
+        self,
+        sender: "Node",
+        receiver: "Node",
+        time_sent: Time,
+        msg: SphinxPacket | bytes,
+    ):
         origin_id = receiver.inspect_message(msg)
         if origin_id is not None:
             cur_time = len(self.msgs_received_per_time) - 1
-            self.final_msgs_received[receiver][cur_time].append((sender, time_sent, origin_id))
+            self.final_msgs_received[receiver][cur_time].append(
+                (sender, time_sent, origin_id)
+            )
 
     def is_around_message_interval(self, time: Time) -> bool:
-        return time % self.config.mixnet.message_interval <= self.config.mixnet.max_message_prep_time
+        return (
+            time % self.config.mixnet.message_interval
+            <= self.config.mixnet.max_message_prep_time
+        )
 
     def update_observation_time(self):
         while True:
@@ -66,7 +77,10 @@ class Adversary:
                 for time_received in msg_queue:
                     # If the message is likely to be still pending and be emitted soon,
                     # pass it on to the next time slot.
-                    if self.env.now() - time_received < self.config.mixnet.max_mix_delay:
+                    if (
+                        self.env.now() - time_received
+                        < self.config.mixnet.max_mix_delay
+                    ):
                         new_msg_pool[receiver][0].append(time_received)
             self.msg_pools_per_time.append(new_msg_pool)
 

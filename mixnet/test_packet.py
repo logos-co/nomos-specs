@@ -3,7 +3,7 @@ from unittest import TestCase
 
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
-from mixnet.config import MixNodeInfo
+from mixnet.config import NodePublicInfo
 from mixnet.packet import (
     Fragment,
     MessageFlag,
@@ -16,9 +16,9 @@ from mixnet.utils import random_bytes
 
 class TestPacket(TestCase):
     def test_real_packet(self):
-        topology = init_mixnet_config().mixclient_config.topology
+        membership = init_mixnet_config(10).membership
         msg = random_bytes(3500)
-        packets_and_routes = PacketBuilder.build_real_packets(msg, topology)
+        packets_and_routes = PacketBuilder.build_real_packets(msg, membership)
         self.assertEqual(4, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
@@ -47,9 +47,9 @@ class TestPacket(TestCase):
         )
 
     def test_cover_packet(self):
-        topology = init_mixnet_config().mixclient_config.topology
+        membership = init_mixnet_config(10).membership
         msg = b"cover"
-        packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, topology)
+        packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, membership)
         self.assertEqual(1, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
@@ -63,14 +63,14 @@ class TestPacket(TestCase):
         )
 
     @staticmethod
-    def process_packet(packet: SphinxPacket, route: List[MixNodeInfo]) -> Fragment:
-        processed = packet.process(route[0].encryption_private_key)
+    def process_packet(packet: SphinxPacket, route: List[NodePublicInfo]) -> Fragment:
+        processed = packet.process(route[0].private_key)
         if isinstance(processed, ProcessedFinalHopPacket):
             return Fragment.from_bytes(processed.payload.recover_plain_playload())
         else:
             processed = processed
             for node in route[1:]:
-                p = processed.next_packet.process(node.encryption_private_key)
+                p = processed.next_packet.process(node.private_key)
                 if isinstance(p, ProcessedFinalHopPacket):
                     return Fragment.from_bytes(p.payload.recover_plain_playload())
                 else:
