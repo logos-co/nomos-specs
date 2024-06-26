@@ -1,9 +1,10 @@
+from random import randint
 from typing import List
 from unittest import TestCase
 
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
-from mixnet.config import MixNodeInfo
+from mixnet.config import NodeInfo
 from mixnet.packet import (
     Fragment,
     MessageFlag,
@@ -11,14 +12,13 @@ from mixnet.packet import (
     PacketBuilder,
 )
 from mixnet.test_utils import init_mixnet_config
-from mixnet.utils import random_bytes
 
 
 class TestPacket(TestCase):
     def test_real_packet(self):
-        topology = init_mixnet_config().mixclient_config.topology
-        msg = random_bytes(3500)
-        packets_and_routes = PacketBuilder.build_real_packets(msg, topology)
+        membership = init_mixnet_config(10).membership
+        msg = self.random_bytes(3500)
+        packets_and_routes = PacketBuilder.build_real_packets(msg, membership)
         self.assertEqual(4, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
@@ -47,9 +47,9 @@ class TestPacket(TestCase):
         )
 
     def test_cover_packet(self):
-        topology = init_mixnet_config().mixclient_config.topology
+        membership = init_mixnet_config(10).membership
         msg = b"cover"
-        packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, topology)
+        packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, membership)
         self.assertEqual(1, len(packets_and_routes))
 
         reconstructor = MessageReconstructor()
@@ -63,16 +63,21 @@ class TestPacket(TestCase):
         )
 
     @staticmethod
-    def process_packet(packet: SphinxPacket, route: List[MixNodeInfo]) -> Fragment:
-        processed = packet.process(route[0].encryption_private_key)
+    def process_packet(packet: SphinxPacket, route: List[NodeInfo]) -> Fragment:
+        processed = packet.process(route[0].private_key)
         if isinstance(processed, ProcessedFinalHopPacket):
             return Fragment.from_bytes(processed.payload.recover_plain_playload())
         else:
             processed = processed
             for node in route[1:]:
-                p = processed.next_packet.process(node.encryption_private_key)
+                p = processed.next_packet.process(node.private_key)
                 if isinstance(p, ProcessedFinalHopPacket):
                     return Fragment.from_bytes(p.payload.recover_plain_playload())
                 else:
                     processed = p
             assert False
+
+    @staticmethod
+    def random_bytes(size: int) -> bytes:
+        assert size >= 0
+        return bytes([randint(0, 255) for _ in range(size)])
