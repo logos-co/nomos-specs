@@ -11,7 +11,3 @@ pub mod partial_tx;
 
 #[cfg(test)]
 mod test_util;
-
-fn main() {
-    println!("Hello, world!");
-}
