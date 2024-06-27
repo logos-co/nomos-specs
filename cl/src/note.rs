@@ -1,6 +1,6 @@
 use blake2::{Blake2s256, Digest};
 use group::GroupEncoding;
-use risc0_groth16::VerifyingKeyJson;
+use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -27,9 +27,14 @@ pub struct NoteWitness {
 }
 
 impl NoteWitness {
-    pub fn new(balance: BalanceWitness, death_constraint: Vec<u8>) -> Self {
+    pub fn new(
+        value: u64,
+        unit: impl Into<String>,
+        death_constraint: Vec<u8>,
+        rng: impl RngCore,
+    ) -> Self {
         Self {
-            balance,
+            balance: BalanceWitness::random(value, unit, rng),
             death_constraint,
             state: [0u8; 32],
         }
@@ -72,8 +77,8 @@ mod test {
     #[test]
     fn test_note_commitments_dont_commit_to_balance_blinding() {
         let mut rng = seed_rng(0);
-        let n1 = NoteWitness::new(BalanceWitness::random(12, "NMO", &mut rng), vec![]);
-        let n2 = NoteWitness::new(BalanceWitness::random(12, "NMO", &mut rng), vec![]);
+        let n1 = NoteWitness::new(12, "NMO", vec![], &mut rng);
+        let n2 = NoteWitness::new(12, "NMO", vec![], &mut rng);
 
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);

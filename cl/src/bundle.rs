@@ -76,6 +76,7 @@ impl Bundle {
 
     pub fn verify(&self, proof: BundleProof) -> bool {
         proof.partials.len() == self.partials.len()
+            && self.is_balanced(proof.balance_blinding)
             && self
                 .partials
                 .iter()
@@ -88,7 +89,7 @@ impl Bundle {
 mod test {
     use crate::{
         input::InputWitness, note::NoteWitness, nullifier::NullifierSecret, output::OutputWitness,
-        test_util::seed_rng,
+        partial_tx::PartialTxWitness, test_util::seed_rng,
     };
 
     use super::*;
@@ -97,27 +98,32 @@ mod test {
     fn test_bundle_balance() {
         let mut rng = seed_rng(0);
 
-        let nmo_10_in = InputWitness::random(NoteWitness::random(10, "NMO", &mut rng), &mut rng);
-        let eth_23_in = InputWitness::random(NoteWitness::random(23, "ETH", &mut rng), &mut rng);
+        let nmo_10_in =
+            InputWitness::random(NoteWitness::new(10, "NMO", vec![], &mut rng), &mut rng);
+        let eth_23_in =
+            InputWitness::random(NoteWitness::new(23, "ETH", vec![], &mut rng), &mut rng);
         let crv_4840_out = OutputWitness::random(
-            NoteWitness::random(4840, "CRV", &mut rng),
+            NoteWitness::new(4840, "CRV", vec![], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
 
-        let mut bundle_witness = BundleWitness {
-            partials: vec![PartialTxWitness {
-                inputs: vec![nmo_10_in.clone(), eth_23_in.clone()],
-                outputs: vec![crv_4840_out.clone()],
-            }],
+        let ptx_unbalanced = PartialTxWitness {
+            inputs: vec![nmo_10_in.clone(), eth_23_in.clone()],
+            outputs: vec![crv_4840_out.clone()],
         };
 
-        let bundle = Bundle::from_witness(bundle_witness.clone());
+        let bundle_witness = BundleWitness {
+            balance_blinding: crv_4840_out.note.balance.blinding
+                - nmo_10_in.note.balance.blinding
+                - eth_23_in.note.balance.blinding,
+        };
 
-        assert!(!bundle.is_balanced(
-            -nmo_10_in.note.balance.blinding - eth_23_in.note.balance.blinding
-                + crv_4840_out.note.balance.blinding
-        ));
+        let mut bundle = Bundle {
+            partials: vec![PartialTx::from_witness(ptx_unbalanced)],
+        };
+
+        assert!(!bundle.is_balanced(bundle_witness.balance_blinding));
         assert_eq!(
             bundle.balance(),
             crate::balance::balance(4840, "CRV", crv_4840_out.note.balance.blinding)
@@ -126,33 +132,38 @@ mod test {
         );
 
         let crv_4840_in =
-            InputWitness::random(NoteWitness::random(4840, "CRV", &mut rng), &mut rng);
+            InputWitness::random(NoteWitness::new(4840, "CRV", vec![], &mut rng), &mut rng);
         let nmo_10_out = OutputWitness::random(
-            NoteWitness::random(10, "NMO", &mut rng),
+            NoteWitness::new(10, "NMO", vec![], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
         let eth_23_out = OutputWitness::random(
-            NoteWitness::random(23, "ETH", &mut rng),
+            NoteWitness::new(23, "ETH", vec![], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
 
-        bundle_witness.partials.push(PartialTxWitness {
-            inputs: vec![crv_4840_in.clone()],
-            outputs: vec![nmo_10_out.clone(), eth_23_out.clone()],
-        });
+        bundle
+            .partials
+            .push(PartialTx::from_witness(PartialTxWitness {
+                inputs: vec![crv_4840_in.clone()],
+                outputs: vec![nmo_10_out.clone(), eth_23_out.clone()],
+            }));
 
-        let bundle = Bundle::from_witness(bundle_witness);
+        let witness = BundleWitness {
+            balance_blinding: -nmo_10_in.note.balance.blinding - eth_23_in.note.balance.blinding
+                + crv_4840_out.note.balance.blinding
+                - crv_4840_in.note.balance.blinding
+                + nmo_10_out.note.balance.blinding
+                + eth_23_out.note.balance.blinding,
+        };
 
-        let blinding = -nmo_10_in.note.balance.blinding - eth_23_in.note.balance.blinding
-            + crv_4840_out.note.balance.blinding
-            - crv_4840_in.note.balance.blinding
-            + nmo_10_out.note.balance.blinding
-            + eth_23_out.note.balance.blinding;
+        assert_eq!(
+            bundle.balance(),
+            crate::balance::balance(0, "", witness.balance_blinding)
+        );
 
-        assert_eq!(bundle.balance(), crate::balance::balance(0, "", blinding));
-
-        assert!(bundle.is_balanced(blinding));
+        assert!(bundle.is_balanced(witness.balance_blinding));
     }
 }

@@ -51,19 +51,25 @@ pub struct PartialTxProof {
 impl PartialTx {
     pub fn from_witness(w: PartialTxWitness) -> Self {
         Self {
-            inputs: Vec::from_iter(w.inputs.into_iter().map(Input::from_witness)),
-            outputs: Vec::from_iter(w.outputs.into_iter().map(Output::from_witness)),
+            inputs: Vec::from_iter(w.inputs.iter().map(InputWitness::commit)),
+            outputs: Vec::from_iter(w.outputs.iter().map(OutputWitness::commit)),
         }
     }
 
     pub fn root(&self) -> PtxRoot {
         // COMMITMENT TO INPUTS
-        let input_bytes = Vec::from_iter(self.inputs.iter().map(Input::to_bytes));
+        let input_bytes =
+            Vec::from_iter(self.inputs.iter().map(Input::to_bytes).map(Vec::from_iter));
         let input_merkle_leaves = merkle::padded_leaves(&input_bytes);
         let input_root = merkle::root::<MAX_INPUTS>(input_merkle_leaves);
 
         // COMMITMENT TO OUTPUTS
-        let output_bytes = Vec::from_iter(self.outputs.iter().map(Input::to_bytes));
+        let output_bytes = Vec::from_iter(
+            self.outputs
+                .iter()
+                .map(Output::to_bytes)
+                .map(Vec::from_iter),
+        );
         let output_merkle_leaves = merkle::padded_leaves(&output_bytes);
         let output_root = merkle::root::<MAX_OUTPUTS>(output_merkle_leaves);
 
@@ -74,7 +80,7 @@ impl PartialTx {
     pub fn prove(
         &self,
         w: PartialTxWitness,
-        death_proofs: Vec<ProofJson>,
+        death_proofs: Vec<Vec<u8>>,
     ) -> Result<PartialTxProof, Error> {
         if bincode::serialize(&Self::from_witness(w.clone())).unwrap()
             != bincode::serialize(&self).unwrap()
@@ -148,10 +154,10 @@ mod test {
     fn test_partial_tx_proof() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(NoteWitness::random(10, "NMO", &mut rng), &mut rng);
-        let eth_23 = InputWitness::random(NoteWitness::random(23, "ETH", &mut rng), &mut rng);
+        let nmo_10 = InputWitness::random(NoteWitness::new(10, "NMO", vec![], &mut rng), &mut rng);
+        let eth_23 = InputWitness::random(NoteWitness::new(23, "ETH", vec![], &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            NoteWitness::random(4840, "CRV", &mut rng),
+            NoteWitness::new(4840, "CRV", vec![], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -163,7 +169,7 @@ mod test {
 
         let ptx = PartialTx::from_witness(ptx_witness.clone());
 
-        let ptx_proof = ptx.prove(ptx_witness).unwrap();
+        let ptx_proof = ptx.prove(ptx_witness, vec![vec![], vec![]]).unwrap();
 
         assert!(ptx.verify(&ptx_proof));
     }
@@ -172,10 +178,10 @@ mod test {
     fn test_partial_tx_balance() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(NoteWitness::random(10, "NMO", &mut rng), &mut rng);
-        let eth_23 = InputWitness::random(NoteWitness::random(23, "ETH", &mut rng), &mut rng);
+        let nmo_10 = InputWitness::random(NoteWitness::new(10, "NMO", vec![], &mut rng), &mut rng);
+        let eth_23 = InputWitness::random(NoteWitness::new(23, "ETH", vec![], &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            NoteWitness::random(4840, "CRV", &mut rng),
+            NoteWitness::new(4840, "CRV", vec![], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );

@@ -29,6 +29,13 @@ impl OutputWitness {
             nonce: NullifierNonce::random(&mut rng),
         }
     }
+
+    pub fn commit(&self) -> Output {
+        Output {
+            note_comm: self.note.commit(self.nf_pk, self.nonce),
+            balance: self.note.balance(),
+        }
+    }
 }
 
 // as we don't have SNARKS hooked up yet, the witness will be our proof
@@ -36,15 +43,8 @@ impl OutputWitness {
 pub struct OutputProof(OutputWitness);
 
 impl Output {
-    pub fn from_witness(w: OutputWitness) -> Self {
-        Self {
-            note_comm: w.note.commit(w.nf_pk, w.nonce),
-            balance: w.note.balance(),
-        }
-    }
-
     pub fn prove(&self, w: &OutputWitness) -> Result<OutputProof, Error> {
-        if &Self::from_witness(w.clone()) == self {
+        if &w.commit() == self {
             Ok(OutputProof(w.clone()))
         } else {
             Err(Error::ProofFailed)
@@ -78,24 +78,24 @@ mod test {
     fn test_output_proof() {
         let mut rng = seed_rng(0);
 
-        let note = NoteWitness::random(10, "NMO", &mut rng);
+        let note = NoteWitness::new(10, "NMO", vec![], &mut rng);
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);
 
         let witness = OutputWitness { note, nf_pk, nonce };
 
-        let output = Output::from_witness(witness.clone());
+        let output = witness.commit();
         let proof = output.prove(&witness).unwrap();
 
         assert!(output.verify(&proof));
 
         let wrong_witnesses = [
             OutputWitness {
-                note: NoteWitness::random(11, "NMO", &mut rng),
+                note: NoteWitness::new(11, "NMO", vec![], &mut rng),
                 ..witness.clone()
             },
             OutputWitness {
-                note: NoteWitness::random(10, "ETH", &mut rng),
+                note: NoteWitness::new(10, "ETH", vec![], &mut rng),
                 ..witness.clone()
             },
             OutputWitness {
@@ -111,7 +111,7 @@ mod test {
         for wrong_witness in wrong_witnesses {
             assert!(output.prove(&wrong_witness).is_err());
 
-            let wrong_output = Output::from_witness(wrong_witness.clone());
+            let wrong_output = wrong_witness.commit();
             let wrong_proof = wrong_output.prove(&wrong_witness).unwrap();
             assert!(!output.verify(&wrong_proof));
         }

@@ -1,11 +1,10 @@
 use blake2::{Blake2s256, Digest};
 
-pub fn padded_leaves<const N: usize>(elements: &[&[u8]]) -> [[u8; 32]; N] {
-    assert!(elements.len() <= N);
-
+pub fn padded_leaves<const N: usize>(elements: &[Vec<u8>]) -> [[u8; 32]; N] {
     let mut leaves = [[0u8; 32]; N];
 
-    for (i, element) in elements.iter().enumerate() {
+    for (i, element) in elements.into_iter().enumerate() {
+        assert!(i < N);
         leaves[i] = leaf(element);
     }
 
@@ -98,7 +97,7 @@ mod test {
 
     #[test]
     fn test_root_height_1() {
-        let r = root::<1>(padded_leaves(&[b"sand"]));
+        let r = root::<1>(padded_leaves(&[b"sand".into()]));
 
         let expected = leaf(b"sand");
 
@@ -107,7 +106,7 @@ mod test {
 
     #[test]
     fn test_root_height_2() {
-        let r = root::<2>(padded_leaves(&[b"desert", b"sand"]));
+        let r = root::<2>(padded_leaves(&[b"desert".into(), b"sand".into()]));
 
         let expected = node(leaf(b"desert"), leaf(b"sand"));
 
@@ -116,7 +115,12 @@ mod test {
 
     #[test]
     fn test_root_height_3() {
-        let r = root::<4>(padded_leaves(&[b"desert", b"sand", b"feels", b"warm"]));
+        let r = root::<4>(padded_leaves(&[
+            b"desert".into(),
+            b"sand".into(),
+            b"feels".into(),
+            b"warm".into(),
+        ]));
 
         let expected = node(
             node(leaf(b"desert"), leaf(b"sand")),
@@ -129,7 +133,12 @@ mod test {
     #[test]
     fn test_root_height_4() {
         let r = root::<8>(padded_leaves(&[
-            b"desert", b"sand", b"feels", b"warm", b"between", b"toes", b"at", b"night",
+            b"desert".into(),
+            b"sand".into(),
+            b"feels".into(),
+            b"warm".into(),
+            b"at".into(),
+            b"night".into(),
         ]));
 
         let expected = node(
@@ -138,8 +147,8 @@ mod test {
                 node(leaf(b"feels"), leaf(b"warm")),
             ),
             node(
-                node(leaf(b"between"), leaf(b"toes")),
                 node(leaf(b"at"), leaf(b"night")),
+                node([0u8; 32], [0u8; 32]),
             ),
         );
 
@@ -148,7 +157,7 @@ mod test {
 
     #[test]
     fn test_path_height_1() {
-        let r = root::<1>(padded_leaves(&[b"desert"]));
+        let r = root::<1>(padded_leaves(&[b"desert".into()]));
 
         let p = path([b"desert"], 0);
         let expected = vec![];
@@ -158,7 +167,7 @@ mod test {
 
     #[test]
     fn test_path_height_2() {
-        let r = root::<2>(padded_leaves(&[b"desert", b"sand"]));
+        let r = root::<2>(padded_leaves(&[b"desert".into(), b"sand".into()]));
 
         // --- proof for element at idx 0
 
@@ -177,7 +186,12 @@ mod test {
 
     #[test]
     fn test_path_height_3() {
-        let r = root::<4>(padded_leaves(&[b"desert", b"sand", b"feels", b"warm"]));
+        let r = root::<4>(padded_leaves(&[
+            b"desert".into(),
+            b"sand".into(),
+            b"feels".into(),
+            b"warm".into(),
+        ]));
 
         // --- proof for element at idx 0
 
