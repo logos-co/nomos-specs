@@ -104,6 +104,7 @@ class MixGossipChannel:
             if isinstance(elem, bytes):
                 assert elem == build_noise_packet()
                 # Drop packet
+                print("dropping noise")
                 continue
             elif isinstance(elem, SphinxPacket):
                 net_packet = await self.handler(elem)
@@ -132,6 +133,7 @@ class MixOutboundConnection:
             # TODO: time mixing
             if self.queue.empty():
                 elem = build_noise_packet()
+                print("generating noise")
             else:
                 elem = self.queue.get_nowait()
             await self.conn.put(elem)

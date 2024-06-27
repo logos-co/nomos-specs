@@ -1,0 +1,7 @@
+simulation:
+  # The simulation uses a virtual time (integer). Please see README for more details.
+  running_time: 300
+
+mixnet:
+  num_nodes: 100
+  transmission_rate_per_sec: 10
