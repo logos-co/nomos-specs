@@ -20,10 +20,6 @@ pub struct BalanceWitness {
 }
 
 impl Balance {
-    pub fn from_witness(w: BalanceWitness) -> Self {
-        Self(balance(w.value, &w.unit, w.blinding))
-    }
-
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.to_bytes()
     }
@@ -40,6 +36,10 @@ impl BalanceWitness {
 
     pub fn random(value: u64, unit: impl Into<String>, rng: impl RngCore) -> Self {
         Self::new(value, unit, Scalar::random(rng))
+    }
+
+    pub fn commit(&self) -> Balance {
+        Balance(balance(self.value, &self.unit, self.blinding))
     }
 
     pub fn unit_point(&self) -> SubgroupPoint {
@@ -114,8 +114,8 @@ mod test {
         let rng = seed_rng(0);
         let r = Scalar::random(rng);
         assert_eq!(
-            Balance::from_witness(BalanceWitness::new(0, "NMO", r)),
-            Balance::from_witness(BalanceWitness::new(0, "ETH", r)),
+            BalanceWitness::new(0, "NMO", r).commit(),
+            BalanceWitness::new(0, "ETH", r).commit(),
         );
     }
 
@@ -126,13 +126,10 @@ mod test {
         let r2 = Scalar::from(8);
         let a_w = BalanceWitness::new(10, "NMO", r1);
         let b_w = BalanceWitness::new(10, "NMO", r2);
-        let a = Balance::from_witness(a_w);
-        let b = Balance::from_witness(b_w);
+        let a = a_w.commit();
+        let b = b_w.commit();
         assert_ne!(a, b);
-        assert_eq!(
-            a.0 - b.0,
-            Balance::from_witness(BalanceWitness::new(0, "NMO", r1 - r2)).0
-        );
+        assert_eq!(a.0 - b.0, BalanceWitness::new(0, "NMO", r1 - r2).commit().0);
     }
 
     #[test]
@@ -141,7 +138,7 @@ mod test {
         let r = Scalar::from(1337);
         let nmo = BalanceWitness::new(10, "NMO", r);
         let eth = BalanceWitness::new(10, "ETH", r);
-        assert_ne!(Balance::from_witness(nmo), Balance::from_witness(eth));
+        assert_ne!(nmo.commit(), eth.commit());
     }
 
     #[test]
@@ -154,16 +151,13 @@ mod test {
         let two = BalanceWitness::new(2, "NMO", 0.into());
 
         // Values of same unit are homomorphic
-        assert_eq!(
-            Balance::from_witness(ten).0 - Balance::from_witness(eight).0,
-            Balance::from_witness(two).0
-        );
+        assert_eq!(ten.commit().0 - eight.commit().0, two.commit().0);
 
         // Blinding factors are also homomorphic.
         assert_eq!(
-            Balance::from_witness(BalanceWitness::new(10, "NMO", r1)).0
-                - Balance::from_witness(BalanceWitness::new(10, "NMO", r2)).0,
-            Balance::from_witness(BalanceWitness::new(0, "NMO", r1 - r2)).0
+            BalanceWitness::new(10, "NMO", r1).commit().0
+                - BalanceWitness::new(10, "NMO", r2).commit().0,
+            BalanceWitness::new(0, "NMO", r1 - r2).commit().0
         );
     }
 }

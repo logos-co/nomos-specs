@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 
-use blake2::{Blake2s256, Digest};
 use jubjub::SubgroupPoint;
 use rand_core::RngCore;
 use risc0_groth16::ProofJson;

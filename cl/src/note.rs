@@ -1,6 +1,5 @@
 use blake2::{Blake2s256, Digest};
 use group::GroupEncoding;
-use rand_core::RngCore;
 use risc0_groth16::VerifyingKeyJson;
 use serde::{Deserialize, Serialize};
 
@@ -20,22 +19,19 @@ impl NoteCommitment {
 
 // TODO: Rename Note to NoteWitness and NoteCommitment to Note
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct NoteWitness {
     pub balance: BalanceWitness,
-    pub death_constraint: Vec<u8>, // serialized death_constraint
+    pub death_constraint: Vec<u8>, // serialized verification key of death constraint
+    pub state: [u8; 32],
 }
 
 impl NoteWitness {
-    pub fn random(
-        value: u64,
-        unit: impl Into<String>,
-        death_constraint: &VerifyingKeyJson,
-        rng: impl RngCore,
-    ) -> Self {
+    pub fn new(balance: BalanceWitness, death_constraint: Vec<u8>) -> Self {
         Self {
-            balance: BalanceWitness::random(value, unit, rng),
-            death_constraint: bincode::serialize(death_constraint).unwrap(),
+            balance,
+            death_constraint,
+            state: [0u8; 32],
         }
     }
 
@@ -47,6 +43,9 @@ impl NoteWitness {
         hasher.update(self.balance.value.to_le_bytes());
         hasher.update(self.balance.unit_point().to_bytes());
         // Important! we don't commit to the balance blinding factor as that may make the notes linkable.
+
+        // COMMIT TO STATE
+        hasher.update(self.state);
 
         // COMMIT TO DEATH CONSTRAINT
         hasher.update(&self.death_constraint);
@@ -60,7 +59,7 @@ impl NoteWitness {
     }
 
     pub fn balance(&self) -> Balance {
-        Balance::from_witness(self.balance.clone())
+        self.balance.commit()
     }
 }
 
@@ -73,8 +72,8 @@ mod test {
     #[test]
     fn test_note_commitments_dont_commit_to_balance_blinding() {
         let mut rng = seed_rng(0);
-        let n1 = NoteWitness::random(12, "NMO", &mut rng);
-        let n2 = NoteWitness::random(12, "NMO", &mut rng);
+        let n1 = NoteWitness::new(BalanceWitness::random(12, "NMO", &mut rng), vec![]);
+        let n2 = NoteWitness::new(BalanceWitness::random(12, "NMO", &mut rng), vec![]);
 
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);
