@@ -4,10 +4,8 @@ from unittest import TestCase
 from da.encoder import DAEncoderParams, DAEncoder
 from da.test_encoder import TestEncoder
 from da.verifier import DAVerifier, DABlob
-from da.common import NodeId, Attestation, Bitfield
+from da.common import NodeId, Attestation, Bitfield, NomosDaG2ProofOfPossession as bls_pop
 from da.dispersal import Dispersal, EncodedData, DispersalSettings
-
-from py_ecc.bls import G2ProofOfPossession as bls_pop
 
 
 class TestDispersal(TestCase):

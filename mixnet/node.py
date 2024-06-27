@@ -1,107 +1,144 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
-from typing import Self, Tuple, TypeAlias
+from typing import Awaitable, Callable, TypeAlias
 
-from cryptography.hazmat.primitives.asymmetric.x25519 import (
-    X25519PrivateKey,
-)
+from pysphinx.payload import DEFAULT_PAYLOAD_SIZE
 from pysphinx.sphinx import (
     Payload,
     ProcessedFinalHopPacket,
     ProcessedForwardHopPacket,
     SphinxPacket,
-    UnknownHeaderTypeError,
 )
 
-from mixnet.config import MixNodeConfig, NodeAddress
-from mixnet.poisson import poisson_interval_sec
+from mixnet.config import MixMembership, NodeConfig
+from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
-PacketQueue: TypeAlias = "asyncio.Queue[Tuple[NodeAddress, SphinxPacket]]"
-PacketPayloadQueue: TypeAlias = (
-    "asyncio.Queue[Tuple[NodeAddress, SphinxPacket | Payload]]"
-)
+NetworkPacket: TypeAlias = "SphinxPacket | bytes"
+NetworkPacketQueue: TypeAlias = "asyncio.Queue[NetworkPacket]"
+Connection: TypeAlias = NetworkPacketQueue
+BroadcastChannel: TypeAlias = "asyncio.Queue[bytes]"
 
 
-class MixNode:
-    """
-    A class handling incoming packets with delays
+class Node:
+    config: NodeConfig
+    membership: MixMembership
+    mixgossip_channel: MixGossipChannel
+    reconstructor: MessageReconstructor
+    broadcast_channel: BroadcastChannel
 
-    This class is defined separated with the MixNode class,
-    in order to define the MixNode as a simple dataclass for clarity.
-    """
-
-    config: MixNodeConfig
-    inbound_socket: PacketQueue
-    outbound_socket: PacketPayloadQueue
-    task: asyncio.Task  # A reference just to prevent task from being garbage collected
-
-    @classmethod
-    async def new(
-        cls,
-        config: MixNodeConfig,
-    ) -> Self:
-        self = cls()
+    def __init__(self, config: NodeConfig, membership: MixMembership):
         self.config = config
-        self.inbound_socket = asyncio.Queue()
-        self.outbound_socket = asyncio.Queue()
-        self.task = asyncio.create_task(self.__run())
-        return self
+        self.membership = membership
+        self.mixgossip_channel = MixGossipChannel(self.__process_sphinx_packet)
+        self.reconstructor = MessageReconstructor()
+        self.broadcast_channel = asyncio.Queue()
 
-    async def __run(self):
-        """
-        Read SphinxPackets from inbound socket and spawn a thread for each packet to process it.
+    async def __process_sphinx_packet(
+        self, packet: SphinxPacket
+    ) -> NetworkPacket | None:
+        try:
+            processed = packet.process(self.config.private_key)
+            match processed:
+                case ProcessedForwardHopPacket():
+                    return processed.next_packet
+                case ProcessedFinalHopPacket():
+                    await self.__process_sphinx_payload(processed.payload)
+        except Exception:
+            # Return SphinxPacket as it is, if this node cannot unwrap it.
+            return packet
 
-        This thread approximates a M/M/inf queue.
-        """
+    async def __process_sphinx_payload(self, payload: Payload):
+        msg_with_flag = self.reconstructor.add(
+            Fragment.from_bytes(payload.recover_plain_playload())
+        )
+        if msg_with_flag is not None:
+            flag, msg = PacketBuilder.parse_msg_and_flag(msg_with_flag)
+            if flag == MessageFlag.MESSAGE_FLAG_REAL:
+                await self.broadcast_channel.put(msg)
 
+    def connect(self, peer: Node):
+        conn = asyncio.Queue()
+        peer.mixgossip_channel.add_inbound(conn)
+        self.mixgossip_channel.add_outbound(
+            MixOutboundConnection(conn, self.config.transmission_rate_per_sec)
+        )
+
+    async def send_message(self, msg: bytes):
+        for packet, _ in PacketBuilder.build_real_packets(msg, self.membership):
+            await self.mixgossip_channel.gossip(packet)
+
+
+class MixGossipChannel:
+    inbound_conns: list[Connection]
+    outbound_conns: list[MixOutboundConnection]
+    handler: Callable[[SphinxPacket], Awaitable[NetworkPacket | None]]
+
+    def __init__(
+        self,
+        handler: Callable[[SphinxPacket], Awaitable[NetworkPacket | None]],
+    ):
+        self.inbound_conns = []
+        self.outbound_conns = []
+        self.handler = handler
         # A set just for gathering a reference of tasks to prevent them from being garbage collected.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self.tasks = set()
 
+    def add_inbound(self, conn: Connection):
+        self.inbound_conns.append(conn)
+        task = asyncio.create_task(self.__process_inbound_conn(conn))
+        self.tasks.add(task)
+        # To discard the task from the set automatically when it is done.
+        task.add_done_callback(self.tasks.discard)
+
+    def add_outbound(self, conn: MixOutboundConnection):
+        self.outbound_conns.append(conn)
+
+    async def __process_inbound_conn(self, conn: Connection):
         while True:
-            _, packet = await self.inbound_socket.get()
-            task = asyncio.create_task(
-                self.__process_packet(
-                    packet,
-                    self.config.encryption_private_key,
-                    self.config.delay_rate_per_min,
-                )
-            )
-            self.tasks.add(task)
-            # To discard the task from the set automatically when it is done.
-            task.add_done_callback(self.tasks.discard)
+            elem = await conn.get()
+            # In practice, data transmitted through connections is going to be always 'bytes'.
+            # But here, we use the SphinxPacket type explicitly for simplicity
+            # without implementing serde for SphinxPacket.
+            if isinstance(elem, bytes):
+                assert elem == build_noise_packet()
+                # Drop packet
+                continue
+            elif isinstance(elem, SphinxPacket):
+                net_packet = await self.handler(elem)
+                if net_packet is not None:
+                    await self.gossip(net_packet)
 
-    async def __process_packet(
-        self,
-        packet: SphinxPacket,
-        encryption_private_key: X25519PrivateKey,
-        delay_rate_per_min: int,  # Poisson rate parameter: mu
-    ):
-        """
-        Process a single packet with a delay that follows exponential distribution,
-        and forward it to the next mix node or the mix destination
+    async def gossip(self, packet: NetworkPacket):
+        for conn in self.outbound_conns:
+            await conn.send(packet)
 
-        This thread is a single server (worker) in a M/M/inf queue that MixNodeRunner approximates.
-        """
-        delay_sec = poisson_interval_sec(delay_rate_per_min)
-        await asyncio.sleep(delay_sec)
 
-        processed = packet.process(encryption_private_key)
-        match processed:
-            case ProcessedForwardHopPacket():
-                await self.outbound_socket.put(
-                    (processed.next_node_address, processed.next_packet)
-                )
-            case ProcessedFinalHopPacket():
-                await self.outbound_socket.put(
-                    (processed.destination_node_address, processed.payload)
-                )
-            case _:
-                raise UnknownHeaderTypeError
+class MixOutboundConnection:
+    queue: NetworkPacketQueue
+    conn: Connection
+    transmission_rate_per_sec: int
 
-    async def cancel(self) -> None:
-        self.task.cancel()
-        with suppress(asyncio.CancelledError):
-            await self.task
+    def __init__(self, conn: Connection, transmission_rate_per_sec: int):
+        self.queue = asyncio.Queue()
+        self.conn = conn
+        self.transmission_rate_per_sec = transmission_rate_per_sec
+        self.task = asyncio.create_task(self.__run())
+
+    async def __run(self):
+        while True:
+            await asyncio.sleep(1 / self.transmission_rate_per_sec)
+            # TODO: time mixing
+            if self.queue.empty():
+                elem = build_noise_packet()
+            else:
+                elem = self.queue.get_nowait()
+            await self.conn.put(elem)
+
+    async def send(self, elem: NetworkPacket):
+        await self.queue.put(elem)
+
+
+def build_noise_packet() -> bytes:
+    return bytes(DEFAULT_PAYLOAD_SIZE)

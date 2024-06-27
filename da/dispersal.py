@@ -2,9 +2,7 @@ from dataclasses import dataclass
 from hashlib import sha3_256
 from typing import List, Optional, Generator, Sequence
 
-from py_ecc.bls import G2ProofOfPossession as bls_pop
-
-from da.common import Certificate, NodeId, BLSPublicKey, Bitfield, build_attestation_message
+from da.common import Certificate, NodeId, BLSPublicKey, Bitfield, build_attestation_message, NomosDaG2ProofOfPossession as bls_pop
 from da.encoder import EncodedData
 from da.verifier import DABlob, Attestation
 

@@ -4,7 +4,7 @@ from itertools import chain, zip_longest, compress
 from typing import List, Generator, Self, Sequence
 
 from eth2spec.eip7594.mainnet import Bytes32, KZGCommitment as Commitment
-from py_ecc.bls import G2ProofOfPossession as bls_pop
+from py_ecc.bls import G2ProofOfPossession
 
 
 class NodeId(Bytes32):
@@ -67,7 +67,7 @@ class Certificate:
         # we sort them as the signers bitfield is sorted by the public keys as well
         signers_keys = list(compress(sorted(nodes_public_keys), self.signers))
         message = build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
-        return bls_pop.AggregateVerify(signers_keys, [message]*len(signers_keys), self.aggregated_signatures)
+        return NomosDaG2ProofOfPossession.AggregateVerify(signers_keys, [message]*len(signers_keys), self.aggregated_signatures)
 
 
 def build_attestation_message(aggregated_column_commitment: Commitment, row_commitments: Sequence[Commitment]) -> bytes:
@@ -76,3 +76,7 @@ def build_attestation_message(aggregated_column_commitment: Commitment, row_comm
     for c in row_commitments:
         hasher.update(bytes(c))
     return hasher.digest()
+
+class NomosDaG2ProofOfPossession(G2ProofOfPossession):
+    # Domain specific tag for Nomos DA protocol
+    DST = b"NOMOS_DA_AVAIL"
