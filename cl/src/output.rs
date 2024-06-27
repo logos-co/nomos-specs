@@ -78,7 +78,7 @@ mod test {
     fn test_output_proof() {
         let mut rng = seed_rng(0);
 
-        let note = NoteWitness::new(10, "NMO", vec![], &mut rng);
+        let note = NoteWitness::new(10, "NMO", [0u8; 32], &mut rng);
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);
 
@@ -91,11 +91,11 @@ mod test {
 
         let wrong_witnesses = [
             OutputWitness {
-                note: NoteWitness::new(11, "NMO", vec![], &mut rng),
+                note: NoteWitness::new(11, "NMO", [0u8; 32], &mut rng),
                 ..witness.clone()
             },
             OutputWitness {
-                note: NoteWitness::new(10, "ETH", vec![], &mut rng),
+                note: NoteWitness::new(10, "ETH", [0u8; 32], &mut rng),
                 ..witness.clone()
             },
             OutputWitness {

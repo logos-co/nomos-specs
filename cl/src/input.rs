@@ -125,7 +125,7 @@ mod test {
 
         let ptx_root = PtxRoot::default();
 
-        let note = NoteWitness::new(10, "NMO", vec![], &mut rng);
+        let note = NoteWitness::new(10, "NMO", [0u8; 32], &mut rng);
         let nf_sk = NullifierSecret::random(&mut rng);
         let nonce = NullifierNonce::random(&mut rng);
 
@@ -138,11 +138,11 @@ mod test {
 
         let wrong_witnesses = [
             InputWitness {
-                note: NoteWitness::new(11, "NMO", vec![], &mut rng),
+                note: NoteWitness::new(11, "NMO", [0u8; 32], &mut rng),
                 ..input_witness.clone()
             },
             InputWitness {
-                note: NoteWitness::new(10, "ETH", vec![], &mut rng),
+                note: NoteWitness::new(10, "ETH", [0u8; 32], &mut rng),
                 ..input_witness.clone()
             },
             InputWitness {
@@ -168,7 +168,7 @@ mod test {
     fn test_input_ptx_coupling() {
         let mut rng = seed_rng(0);
 
-        let note = NoteWitness::new(10, "NMO", vec![], &mut rng);
+        let note = NoteWitness::new(10, "NMO", [0u8; 32], &mut rng);
         let nf_sk = NullifierSecret::random(&mut rng);
         let nonce = NullifierNonce::random(&mut rng);
 

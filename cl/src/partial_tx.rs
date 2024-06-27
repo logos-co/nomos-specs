@@ -56,14 +56,14 @@ impl PartialTx {
         }
     }
 
-    pub fn root(&self) -> PtxRoot {
-        // COMMITMENT TO INPUTS
+    pub fn input_root(&self) -> [u8; 32] {
         let input_bytes =
             Vec::from_iter(self.inputs.iter().map(Input::to_bytes).map(Vec::from_iter));
         let input_merkle_leaves = merkle::padded_leaves(&input_bytes);
-        let input_root = merkle::root::<MAX_INPUTS>(input_merkle_leaves);
+        merkle::root::<MAX_INPUTS>(input_merkle_leaves)
+    }
 
-        // COMMITMENT TO OUTPUTS
+    pub fn output_root(&self) -> [u8; 32] {
         let output_bytes = Vec::from_iter(
             self.outputs
                 .iter()
@@ -71,8 +71,30 @@ impl PartialTx {
                 .map(Vec::from_iter),
         );
         let output_merkle_leaves = merkle::padded_leaves(&output_bytes);
-        let output_root = merkle::root::<MAX_OUTPUTS>(output_merkle_leaves);
+        merkle::root::<MAX_OUTPUTS>(output_merkle_leaves)
+    }
 
+    pub fn input_merkle_path(&self, idx: usize) -> Vec<merkle::PathNode> {
+        let input_bytes =
+            Vec::from_iter(self.inputs.iter().map(Input::to_bytes).map(Vec::from_iter));
+        let input_merkle_leaves = merkle::padded_leaves::<MAX_INPUTS>(&input_bytes);
+        merkle::path(input_merkle_leaves, idx)
+    }
+
+    pub fn output_merkle_path(&self, idx: usize) -> Vec<merkle::PathNode> {
+        let output_bytes = Vec::from_iter(
+            self.outputs
+                .iter()
+                .map(Output::to_bytes)
+                .map(Vec::from_iter),
+        );
+        let output_merkle_leaves = merkle::padded_leaves::<MAX_OUTPUTS>(&output_bytes);
+        merkle::path(output_merkle_leaves, idx)
+    }
+
+    pub fn root(&self) -> PtxRoot {
+        let input_root = self.input_root();
+        let output_root = self.output_root();
         let root = merkle::node(input_root, output_root);
         PtxRoot(root)
     }
@@ -154,10 +176,12 @@ mod test {
     fn test_partial_tx_proof() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(NoteWitness::new(10, "NMO", vec![], &mut rng), &mut rng);
-        let eth_23 = InputWitness::random(NoteWitness::new(23, "ETH", vec![], &mut rng), &mut rng);
+        let nmo_10 =
+            InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
+        let eth_23 =
+            InputWitness::random(NoteWitness::new(23, "ETH", [0u8; 32], &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            NoteWitness::new(4840, "CRV", vec![], &mut rng),
+            NoteWitness::new(4840, "CRV", [0u8; 32], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -178,10 +202,12 @@ mod test {
     fn test_partial_tx_balance() {
         let mut rng = seed_rng(0);
 
-        let nmo_10 = InputWitness::random(NoteWitness::new(10, "NMO", vec![], &mut rng), &mut rng);
-        let eth_23 = InputWitness::random(NoteWitness::new(23, "ETH", vec![], &mut rng), &mut rng);
+        let nmo_10 =
+            InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
+        let eth_23 =
+            InputWitness::random(NoteWitness::new(23, "ETH", [0u8; 32], &mut rng), &mut rng);
         let crv_4840 = OutputWitness::random(
-            NoteWitness::new(4840, "CRV", vec![], &mut rng),
+            NoteWitness::new(4840, "CRV", [0u8; 32], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );

@@ -12,10 +12,11 @@ lazy_static! {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Balance(#[serde(with = "serde_point")] pub SubgroupPoint);
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BalanceWitness {
     pub value: u64,
     pub unit: String,
+    #[serde(with = "serde_scalar")]
     pub blinding: Scalar,
 }
 
@@ -54,6 +55,51 @@ pub fn unit_point(unit: &str) -> SubgroupPoint {
 pub fn balance(value: u64, unit: &str, blinding: Scalar) -> SubgroupPoint {
     let value_scalar = Scalar::from(value);
     unit_point(unit) * value_scalar + *PEDERSON_COMMITMENT_BLINDING_POINT * blinding
+}
+
+mod serde_scalar {
+    use super::Scalar;
+    use serde::de::{self, Visitor};
+    use serde::{Deserializer, Serializer};
+    use std::fmt;
+
+    // Serialize a SubgroupPoint by converting it to bytes.
+    pub fn serialize<S>(scalar: &Scalar, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let bytes = scalar.to_bytes();
+        serializer.serialize_bytes(&bytes)
+    }
+
+    // Deserialize a SubgroupPoint by converting it from bytes.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Scalar, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BytesVisitor;
+
+        impl<'de> Visitor<'de> for BytesVisitor {
+            type Value = Scalar;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid Scalar in byte representation")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let mut bytes = <jubjub::SubgroupPoint as group::GroupEncoding>::Repr::default();
+                assert_eq!(bytes.len(), v.len());
+                bytes.copy_from_slice(v);
+
+                Ok(Scalar::from_bytes(&bytes).unwrap())
+            }
+        }
+
+        deserializer.deserialize_bytes(BytesVisitor)
+    }
 }
 
 mod serde_point {

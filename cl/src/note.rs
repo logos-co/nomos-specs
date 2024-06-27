@@ -19,7 +19,7 @@ impl NoteCommitment {
 
 // TODO: Rename Note to NoteWitness and NoteCommitment to Note
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct NoteWitness {
     pub balance: BalanceWitness,
     pub death_constraint: Vec<u8>, // serialized verification key of death constraint
@@ -27,16 +27,11 @@ pub struct NoteWitness {
 }
 
 impl NoteWitness {
-    pub fn new(
-        value: u64,
-        unit: impl Into<String>,
-        death_constraint: Vec<u8>,
-        rng: impl RngCore,
-    ) -> Self {
+    pub fn new(value: u64, unit: impl Into<String>, state: [u8; 32], rng: impl RngCore) -> Self {
         Self {
             balance: BalanceWitness::random(value, unit, rng),
-            death_constraint,
-            state: [0u8; 32],
+            death_constraint: vec![],
+            state,
         }
     }
 
@@ -77,8 +72,8 @@ mod test {
     #[test]
     fn test_note_commitments_dont_commit_to_balance_blinding() {
         let mut rng = seed_rng(0);
-        let n1 = NoteWitness::new(12, "NMO", vec![], &mut rng);
-        let n2 = NoteWitness::new(12, "NMO", vec![], &mut rng);
+        let n1 = NoteWitness::new(12, "NMO", [0u8; 32], &mut rng);
+        let n2 = NoteWitness::new(12, "NMO", [0u8; 32], &mut rng);
 
         let nf_pk = NullifierSecret::random(&mut rng).commit();
         let nonce = NullifierNonce::random(&mut rng);

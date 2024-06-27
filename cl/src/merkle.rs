@@ -1,9 +1,10 @@
 use blake2::{Blake2s256, Digest};
+use serde::{Deserialize, Serialize};
 
 pub fn padded_leaves<const N: usize>(elements: &[Vec<u8>]) -> [[u8; 32]; N] {
     let mut leaves = [[0u8; 32]; N];
 
-    for (i, element) in elements.into_iter().enumerate() {
+    for (i, element) in elements.iter().enumerate() {
         assert!(i < N);
         leaves[i] = leaf(element);
     }
@@ -42,7 +43,7 @@ pub fn root<const N: usize>(elements: [[u8; 32]; N]) -> [u8; 32] {
     nodes[0]
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PathNode {
     Left([u8; 32]),
     Right([u8; 32]),
@@ -65,12 +66,12 @@ pub fn verify_path(leaf: [u8; 32], path: &[PathNode], root: [u8; 32]) -> bool {
     computed_hash == root
 }
 
-pub fn path<const N: usize>(elements: [&[u8]; N], idx: usize) -> Vec<PathNode> {
-    let n = elements.len();
+pub fn path<const N: usize>(leaves: [[u8; 32]; N], idx: usize) -> Vec<PathNode> {
+    let n = leaves.len();
     assert!(n.is_power_of_two());
     assert!(idx < n);
 
-    let mut nodes = Vec::from_iter(elements.into_iter().map(leaf));
+    let mut nodes = leaves;
     let mut path = Vec::new();
     let mut idx = idx;
 
@@ -157,9 +158,10 @@ mod test {
 
     #[test]
     fn test_path_height_1() {
-        let r = root::<1>(padded_leaves(&[b"desert".into()]));
+        let leaves = padded_leaves(&[b"desert".into()]);
+        let r = root::<1>(leaves);
 
-        let p = path([b"desert"], 0);
+        let p = path::<1>(leaves, 0);
         let expected = vec![];
         assert_eq!(p, expected);
         assert!(verify_path(leaf(b"desert"), &p, r));
@@ -167,18 +169,19 @@ mod test {
 
     #[test]
     fn test_path_height_2() {
-        let r = root::<2>(padded_leaves(&[b"desert".into(), b"sand".into()]));
+        let leaves = padded_leaves(&[b"desert".into(), b"sand".into()]);
+        let r = root::<2>(leaves);
 
         // --- proof for element at idx 0
 
-        let p0 = path([b"desert", b"sand"], 0);
+        let p0 = path(leaves, 0);
         let expected0 = vec![PathNode::Right(leaf(b"sand"))];
         assert_eq!(p0, expected0);
         assert!(verify_path(leaf(b"desert"), &p0, r));
 
         // --- proof for element at idx 1
 
-        let p1 = path([b"desert", b"sand"], 1);
+        let p1 = path(leaves, 1);
         let expected1 = vec![PathNode::Left(leaf(b"desert"))];
         assert_eq!(p1, expected1);
         assert!(verify_path(leaf(b"sand"), &p1, r));
@@ -186,16 +189,17 @@ mod test {
 
     #[test]
     fn test_path_height_3() {
-        let r = root::<4>(padded_leaves(&[
+        let leaves = padded_leaves(&[
             b"desert".into(),
             b"sand".into(),
             b"feels".into(),
             b"warm".into(),
-        ]));
+        ]);
+        let r = root::<4>(leaves);
 
         // --- proof for element at idx 0
 
-        let p0 = path([b"desert", b"sand", b"feels", b"warm"], 0);
+        let p0 = path(leaves, 0);
         let expected0 = vec![
             PathNode::Right(leaf(b"sand")),
             PathNode::Right(node(leaf(b"feels"), leaf(b"warm"))),
@@ -205,7 +209,7 @@ mod test {
 
         // --- proof for element at idx 1
 
-        let p1 = path([b"desert", b"sand", b"feels", b"warm"], 1);
+        let p1 = path(leaves, 1);
         let expected1 = vec![
             PathNode::Left(leaf(b"desert")),
             PathNode::Right(node(leaf(b"feels"), leaf(b"warm"))),
@@ -215,7 +219,7 @@ mod test {
 
         // --- proof for element at idx 2
 
-        let p2 = path([b"desert", b"sand", b"feels", b"warm"], 2);
+        let p2 = path(leaves, 2);
         let expected2 = vec![
             PathNode::Right(leaf(b"warm")),
             PathNode::Left(node(leaf(b"desert"), leaf(b"sand"))),
@@ -225,7 +229,7 @@ mod test {
 
         // --- proof for element at idx 3
 
-        let p3 = path([b"desert", b"sand", b"feels", b"warm"], 3);
+        let p3 = path(leaves, 3);
         let expected3 = vec![
             PathNode::Left(leaf(b"feels")),
             PathNode::Left(node(leaf(b"desert"), leaf(b"sand"))),

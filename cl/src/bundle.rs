@@ -99,11 +99,11 @@ mod test {
         let mut rng = seed_rng(0);
 
         let nmo_10_in =
-            InputWitness::random(NoteWitness::new(10, "NMO", vec![], &mut rng), &mut rng);
+            InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
         let eth_23_in =
-            InputWitness::random(NoteWitness::new(23, "ETH", vec![], &mut rng), &mut rng);
+            InputWitness::random(NoteWitness::new(23, "ETH", [0u8; 32], &mut rng), &mut rng);
         let crv_4840_out = OutputWitness::random(
-            NoteWitness::new(4840, "CRV", vec![], &mut rng),
+            NoteWitness::new(4840, "CRV", [0u8; 32], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
@@ -132,14 +132,14 @@ mod test {
         );
 
         let crv_4840_in =
-            InputWitness::random(NoteWitness::new(4840, "CRV", vec![], &mut rng), &mut rng);
+            InputWitness::random(NoteWitness::new(4840, "CRV", [0u8; 32], &mut rng), &mut rng);
         let nmo_10_out = OutputWitness::random(
-            NoteWitness::new(10, "NMO", vec![], &mut rng),
+            NoteWitness::new(10, "NMO", [0u8; 32], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
         let eth_23_out = OutputWitness::random(
-            NoteWitness::new(23, "ETH", vec![], &mut rng),
+            NoteWitness::new(23, "ETH", [0u8; 32], &mut rng),
             NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
             &mut rng,
         );
