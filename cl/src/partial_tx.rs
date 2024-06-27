@@ -16,7 +16,7 @@ const MAX_OUTPUTS: usize = 32;
 /// The partial transaction commitment couples an input to a partial transaction.
 /// Prevents partial tx unbundling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct PtxRoot([u8; 32]);
+pub struct PtxRoot(pub [u8; 32]);
 
 impl PtxRoot {
     pub fn random(mut rng: impl RngCore) -> Self {

@@ -20,7 +20,7 @@ pub struct Input {
     pub balance: Balance,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct InputWitness {
     pub note: NoteWitness,
     pub nf_sk: NullifierSecret,
@@ -105,7 +105,7 @@ impl Input {
             && death_constraint_is_satisfied
     }
 
-    pub(crate) fn to_bytes(&self) -> [u8; 96] {
+    pub fn to_bytes(&self) -> [u8; 96] {
         let mut bytes = [0u8; 96];
         bytes[..32].copy_from_slice(self.note_comm.as_bytes());
         bytes[32..64].copy_from_slice(self.nullifier.as_bytes());

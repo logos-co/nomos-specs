@@ -14,7 +14,7 @@ pub struct Output {
     pub balance: Balance,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputWitness {
     pub note: NoteWitness,
     pub nf_pk: NullifierCommitment,
@@ -61,7 +61,7 @@ impl Output {
             && self.balance == witness.note.balance()
     }
 
-    pub(crate) fn to_bytes(&self) -> [u8; 64] {
+    pub fn to_bytes(&self) -> [u8; 64] {
         let mut bytes = [0u8; 64];
         bytes[..32].copy_from_slice(self.note_comm.as_bytes());
         bytes[32..64].copy_from_slice(&self.balance.to_bytes());

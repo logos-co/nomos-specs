@@ -10,19 +10,19 @@ use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 
 // Maintained privately by note holder
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NullifierSecret([u8; 16]);
 
 // Nullifier commitment is public information that
 // can be provided to anyone wishing to transfer
 // you a note
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NullifierCommitment([u8; 32]);
 
 // To allow users to maintain fewer nullifier secrets, we
 // provide a nonce to differentiate notes controlled by the same
 // secret. Each note is assigned a unique nullifier nonce.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NullifierNonce([u8; 16]);
 
 // The nullifier attached to input notes to prove an input has not
