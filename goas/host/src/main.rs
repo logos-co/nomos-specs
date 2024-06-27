@@ -7,8 +7,9 @@ use common::*;
 use cl::note::NoteWitness;
 use cl::input::InputWitness;
 use cl::output::OutputWitness;
-use cl::nullifier::{NullifierCommitment, Nullifier
+use cl::nullifier::NullifierSecret;
 use cl::partial_tx::{PartialTx, PartialTxWitness};
+use cl::merkle;
 
 fn main() {
     // Initialize tracing. In order to view logs, run `RUST_LOG=info cargo run`
@@ -26,42 +27,46 @@ fn main() {
         amount: 10,
     };
 
-    let in_state_cm = calculate_state_hash(&state),
-    let in_journal_cm = calculate_journal_hash(&journal),
-    let in_state_root = merkle::node(in_start_cm, in_journal_cm);
+    let in_state_cm = calculate_state_hash(&state);
+    let in_journal_cm = calculate_journal_hash(&journal);
+    let in_state_root = merkle::node(in_state_cm, in_journal_cm);
     let in_note = NoteWitness::new(1, "ZONE", in_state_root, &mut rng);
 
     let mut out_journal = journal.clone();
     out_journal.push(zone_input);
 
-    let out_state_cm = calculate_state_hash(&stf(state.clone(), zone_input)),
-    let out_journal_cm = calculate_journal_hash(&out_journal),
+    let out_state_cm = calculate_state_hash(&stf(state.clone(), zone_input));
+    let out_journal_cm = calculate_journal_hash(&out_journal);
     let out_state_root = merkle::node(out_state_cm, out_journal_cm);
-        let out_note = NoteWitness::new(1, "ZONE", out_state_root, &mut rng);
+    let out_note = NoteWitness::new(1, "ZONE", out_state_root, &mut rng);
 
+    let input = InputWitness::random(in_note, &mut rng);
+    let output = OutputWitness::random(out_note, NullifierSecret::random(&mut rng).commit(), &mut rng);
     let ptx = PartialTx::from_witness(PartialTxWitness {
-        inputs: vec![InputWitness::random(in_note, &mut rng)],
-        outputs: vec![OutputWitness::random(out_note, NullifierCommitment::random(&mut rng), &mut rng)],
+        inputs: vec![input.clone()],
+        outputs: vec![output.clone()],
     });
 
-    let ptx_root = ptx.root();
+    let ptx_root = ptx.root().0;
     let in_ptx_path = ptx.input_merkle_path(0);
     let out_ptx_path = ptx.output_merkle_path(0);
 
     let env = ExecutorEnv::builder()
         .write(&ptx_root)
         .unwrap()
-        .write(&ptx.input_root)
+        .write(&ptx.input_root())
         .unwrap()
-        .write(&ptx.output_root)
+        .write(&ptx.output_root())
         .unwrap()
         .write(&in_ptx_path)
         .unwrap()
         .write(&out_ptx_path)
         .unwrap()
-        .write(&in_note)
+        .write(&input)
         .unwrap()
-        .write(&out_note)
+        .write(&output)
+        .unwrap()
+        .write(&zone_input)
         .unwrap()
         .write(&state)
         .unwrap()
