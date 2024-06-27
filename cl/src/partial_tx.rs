@@ -8,14 +8,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 use crate::input::{Input, InputProof, InputWitness};
+use crate::merkle;
 use crate::output::{Output, OutputProof, OutputWitness};
+
+const MAX_INPUTS: usize = 32;
+const MAX_OUTPUTS: usize = 32;
 
 /// The partial transaction commitment couples an input to a partial transaction.
 /// Prevents partial tx unbundling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct PtxCommitment([u8; 32]);
+pub struct PtxRoot([u8; 32]);
 
-impl PtxCommitment {
+impl PtxRoot {
     pub fn random(mut rng: impl RngCore) -> Self {
         let mut sk = [0u8; 32];
         rng.fill_bytes(&mut sk);
@@ -53,20 +57,19 @@ impl PartialTx {
         }
     }
 
-    pub fn commitment(&self) -> PtxCommitment {
-        let mut hasher = Blake2s256::new();
-        hasher.update(b"NOMOS_CL_PTX_COMMIT");
-        hasher.update(b"INPUTS");
-        for input in self.inputs.iter() {
-            hasher.update(input.to_bytes());
-        }
-        hasher.update(b"OUTPUTS");
-        for outputs in self.outputs.iter() {
-            hasher.update(outputs.to_bytes());
-        }
+    pub fn root(&self) -> PtxRoot {
+        // COMMITMENT TO INPUTS
+        let input_bytes = Vec::from_iter(self.inputs.iter().map(Input::to_bytes));
+        let input_merkle_leaves = merkle::padded_leaves(&input_bytes);
+        let input_root = merkle::root::<MAX_INPUTS>(input_merkle_leaves);
 
-        let commit_bytes: [u8; 32] = hasher.finalize().into();
-        PtxCommitment(commit_bytes)
+        // COMMITMENT TO OUTPUTS
+        let output_bytes = Vec::from_iter(self.outputs.iter().map(Input::to_bytes));
+        let output_merkle_leaves = merkle::padded_leaves(&output_bytes);
+        let output_root = merkle::root::<MAX_OUTPUTS>(output_merkle_leaves);
+
+        let root = merkle::node(input_root, output_root);
+        PtxRoot(root)
     }
 
     pub fn prove(
@@ -88,14 +91,14 @@ impl PartialTx {
             return Err(Error::ProofFailed);
         }
 
-        let ptx_comm = self.commitment();
+        let ptx_root = self.root();
 
         let input_proofs: Vec<InputProof> = Result::from_iter(
             self.inputs
                 .iter()
                 .zip(&w.inputs)
                 .zip(death_proofs.into_iter())
-                .map(|((i, i_w), death_p)| i.prove(i_w, ptx_comm, death_p)),
+                .map(|((i, i_w), death_p)| i.prove(i_w, ptx_root, death_p)),
         )?;
 
         let output_proofs: Vec<OutputProof> = Result::from_iter(
@@ -112,14 +115,14 @@ impl PartialTx {
     }
 
     pub fn verify(&self, proof: &PartialTxProof) -> bool {
-        let ptx_comm = self.commitment();
+        let ptx_root = self.root();
         self.inputs.len() == proof.inputs.len()
             && self.outputs.len() == proof.outputs.len()
             && self
                 .inputs
                 .iter()
                 .zip(&proof.inputs)
-                .all(|(i, p)| i.verify(ptx_comm, p))
+                .all(|(i, p)| i.verify(ptx_root, p))
             && self
                 .outputs
                 .iter()
