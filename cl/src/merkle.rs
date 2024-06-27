@@ -1,13 +1,25 @@
 use blake2::{Blake2s256, Digest};
 
-fn leaf(data: &[u8]) -> [u8; 32] {
+pub fn padded_leaves<const N: usize>(elements: &[&[u8]]) -> [[u8; 32]; N] {
+    assert!(elements.len() <= N);
+
+    let mut leaves = [[0u8; 32]; N];
+
+    for (i, element) in elements.iter().enumerate() {
+        leaves[i] = leaf(element);
+    }
+
+    leaves
+}
+
+pub fn leaf(data: &[u8]) -> [u8; 32] {
     let mut hasher = Blake2s256::new();
     hasher.update(b"NOMOS_MERKLE_LEAF");
     hasher.update(data);
     hasher.finalize().into()
 }
 
-fn node(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
+pub fn node(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
     let mut hasher = Blake2s256::new();
     hasher.update(b"NOMOS_MERKLE_NODE");
     hasher.update(a);
@@ -15,12 +27,12 @@ fn node(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-pub fn root<const N: usize>(elements: [&[u8]; N]) -> [u8; 32] {
+pub fn root<const N: usize>(elements: [[u8; 32]; N]) -> [u8; 32] {
     let n = elements.len();
 
     assert!(n.is_power_of_two());
 
-    let mut nodes = Vec::from_iter(elements.into_iter().map(leaf));
+    let mut nodes = elements;
 
     for h in (1..=n.ilog2()).rev() {
         for i in 0..2usize.pow(h - 1) {
@@ -37,8 +49,8 @@ pub enum PathNode {
     Right([u8; 32]),
 }
 
-pub fn verify_path(element: &[u8], path: &[PathNode], root: [u8; 32]) -> bool {
-    let mut computed_hash = leaf(element);
+pub fn verify_path(leaf: [u8; 32], path: &[PathNode], root: [u8; 32]) -> bool {
+    let mut computed_hash = leaf;
 
     for path_node in path {
         match path_node {
@@ -86,7 +98,7 @@ mod test {
 
     #[test]
     fn test_root_height_1() {
-        let r = root([b"sand"]);
+        let r = root::<1>(padded_leaves(&[b"sand"]));
 
         let expected = leaf(b"sand");
 
@@ -95,7 +107,7 @@ mod test {
 
     #[test]
     fn test_root_height_2() {
-        let r = root([b"desert", b"sand"]);
+        let r = root::<2>(padded_leaves(&[b"desert", b"sand"]));
 
         let expected = node(leaf(b"desert"), leaf(b"sand"));
 
@@ -104,7 +116,7 @@ mod test {
 
     #[test]
     fn test_root_height_3() {
-        let r = root([b"desert", b"sand", b"feels", b"warm"]);
+        let r = root::<4>(padded_leaves(&[b"desert", b"sand", b"feels", b"warm"]));
 
         let expected = node(
             node(leaf(b"desert"), leaf(b"sand")),
@@ -116,9 +128,9 @@ mod test {
 
     #[test]
     fn test_root_height_4() {
-        let r = root([
+        let r = root::<8>(padded_leaves(&[
             b"desert", b"sand", b"feels", b"warm", b"between", b"toes", b"at", b"night",
-        ]);
+        ]));
 
         let expected = node(
             node(
@@ -136,36 +148,36 @@ mod test {
 
     #[test]
     fn test_path_height_1() {
-        let r = root([b"desert"]);
+        let r = root::<1>(padded_leaves(&[b"desert"]));
 
         let p = path([b"desert"], 0);
         let expected = vec![];
         assert_eq!(p, expected);
-        assert!(verify_path(b"desert", &p, r));
+        assert!(verify_path(leaf(b"desert"), &p, r));
     }
 
     #[test]
     fn test_path_height_2() {
-        let r = root([b"desert", b"sand"]);
+        let r = root::<2>(padded_leaves(&[b"desert", b"sand"]));
 
         // --- proof for element at idx 0
 
         let p0 = path([b"desert", b"sand"], 0);
         let expected0 = vec![PathNode::Right(leaf(b"sand"))];
         assert_eq!(p0, expected0);
-        assert!(verify_path(b"desert", &p0, r));
+        assert!(verify_path(leaf(b"desert"), &p0, r));
 
         // --- proof for element at idx 1
 
         let p1 = path([b"desert", b"sand"], 1);
         let expected1 = vec![PathNode::Left(leaf(b"desert"))];
         assert_eq!(p1, expected1);
-        assert!(verify_path(b"sand", &p1, r));
+        assert!(verify_path(leaf(b"sand"), &p1, r));
     }
 
     #[test]
     fn test_path_height_3() {
-        let r = root([b"desert", b"sand", b"feels", b"warm"]);
+        let r = root::<4>(padded_leaves(&[b"desert", b"sand", b"feels", b"warm"]));
 
         // --- proof for element at idx 0
 
@@ -175,7 +187,7 @@ mod test {
             PathNode::Right(node(leaf(b"feels"), leaf(b"warm"))),
         ];
         assert_eq!(p0, expected0);
-        assert!(verify_path(b"desert", &p0, r));
+        assert!(verify_path(leaf(b"desert"), &p0, r));
 
         // --- proof for element at idx 1
 
@@ -185,7 +197,7 @@ mod test {
             PathNode::Right(node(leaf(b"feels"), leaf(b"warm"))),
         ];
         assert_eq!(p1, expected1);
-        assert!(verify_path(b"sand", &p1, r));
+        assert!(verify_path(leaf(b"sand"), &p1, r));
 
         // --- proof for element at idx 2
 
@@ -195,7 +207,7 @@ mod test {
             PathNode::Left(node(leaf(b"desert"), leaf(b"sand"))),
         ];
         assert_eq!(p2, expected2);
-        assert!(verify_path(b"feels", &p2, r));
+        assert!(verify_path(leaf(b"feels"), &p2, r));
 
         // --- proof for element at idx 3
 
@@ -205,6 +217,6 @@ mod test {
             PathNode::Left(node(leaf(b"desert"), leaf(b"sand"))),
         ];
         assert_eq!(p3, expected3);
-        assert!(verify_path(b"warm", &p3, r));
+        assert!(verify_path(leaf(b"warm"), &p3, r));
     }
 }
