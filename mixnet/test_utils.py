@@ -8,7 +8,9 @@ from mixnet.config import (
 )
 
 
-def init_mixnet_config(num_nodes: int) -> tuple[GlobalConfig, list[NodeConfig]]:
+def init_mixnet_config(
+    num_nodes: int,
+) -> tuple[GlobalConfig, list[NodeConfig], dict[bytes, X25519PrivateKey]]:
     transmission_rate_per_sec = 3
     max_mix_path_length = 3
     node_configs = [
@@ -17,9 +19,16 @@ def init_mixnet_config(num_nodes: int) -> tuple[GlobalConfig, list[NodeConfig]]:
     ]
     global_config = GlobalConfig(
         MixMembership(
-            [NodeInfo(node_config.private_key) for node_config in node_configs]
+            [
+                NodeInfo(node_config.private_key.public_key())
+                for node_config in node_configs
+            ]
         ),
         transmission_rate_per_sec,
         max_mix_path_length,
     )
-    return (global_config, node_configs)
+    key_map = {
+        node_config.private_key.public_key().public_bytes_raw(): node_config.private_key
+        for node_config in node_configs
+    }
+    return (global_config, node_configs, key_map)

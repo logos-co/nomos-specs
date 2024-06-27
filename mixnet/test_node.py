@@ -9,7 +9,7 @@ from mixnet.test_utils import (
 
 class TestNode(IsolatedAsyncioTestCase):
     async def test_node(self):
-        global_config, node_configs = init_mixnet_config(10)
+        global_config, node_configs, _ = init_mixnet_config(10)
         nodes = [Node(node_config, global_config) for node_config in node_configs]
         for i, node in enumerate(nodes):
             node.connect(nodes[(i + 1) % len(nodes)])
