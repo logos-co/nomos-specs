@@ -16,7 +16,7 @@ from mixnet.test_utils import init_mixnet_config
 
 class TestPacket(TestCase):
     def test_real_packet(self):
-        membership = init_mixnet_config(10).membership
+        membership = init_mixnet_config(10)[0].membership
         msg = self.random_bytes(3500)
         packets_and_routes = PacketBuilder.build_real_packets(msg, membership)
         self.assertEqual(4, len(packets_and_routes))
@@ -47,7 +47,7 @@ class TestPacket(TestCase):
         )
 
     def test_cover_packet(self):
-        membership = init_mixnet_config(10).membership
+        membership = init_mixnet_config(10)[0].membership
         msg = b"cover"
         packets_and_routes = PacketBuilder.build_drop_cover_packets(msg, membership)
         self.assertEqual(1, len(packets_and_routes))

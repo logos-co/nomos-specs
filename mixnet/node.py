@@ -11,7 +11,7 @@ from pysphinx.sphinx import (
     SphinxPacket,
 )
 
-from mixnet.config import MixMembership, NodeConfig
+from mixnet.config import GlobalConfig, NodeConfig
 from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
 NetworkPacket: TypeAlias = "SphinxPacket | bytes"
@@ -22,14 +22,14 @@ BroadcastChannel: TypeAlias = "asyncio.Queue[bytes]"
 
 class Node:
     config: NodeConfig
-    membership: MixMembership
+    global_config: GlobalConfig
     mixgossip_channel: MixGossipChannel
     reconstructor: MessageReconstructor
     broadcast_channel: BroadcastChannel
 
-    def __init__(self, config: NodeConfig, membership: MixMembership):
+    def __init__(self, config: NodeConfig, global_config: GlobalConfig):
         self.config = config
-        self.membership = membership
+        self.global_config = global_config
         self.mixgossip_channel = MixGossipChannel(self.__process_sphinx_packet)
         self.reconstructor = MessageReconstructor()
         self.broadcast_channel = asyncio.Queue()
@@ -61,11 +61,13 @@ class Node:
         conn = asyncio.Queue()
         peer.mixgossip_channel.add_inbound(conn)
         self.mixgossip_channel.add_outbound(
-            MixOutboundConnection(conn, self.config.transmission_rate_per_sec)
+            MixOutboundConnection(conn, self.global_config.transmission_rate_per_sec)
         )
 
     async def send_message(self, msg: bytes):
-        for packet, _ in PacketBuilder.build_real_packets(msg, self.membership):
+        for packet, _ in PacketBuilder.build_real_packets(
+            msg, self.global_config.membership
+        ):
             await self.mixgossip_channel.gossip(packet)
 
 

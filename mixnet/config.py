@@ -12,15 +12,17 @@ from pysphinx.sphinx import Node as SphinxNode
 
 
 @dataclass
-class MixnetConfig:
-    node_configs: List[NodeConfig]
+class GlobalConfig:
     membership: MixMembership
+    transmission_rate_per_sec: int  # Global Transmission Rate
+    # TODO: use this to make the size of Sphinx packet constant
+    max_mix_path_length: int
 
 
 @dataclass
 class NodeConfig:
     private_key: X25519PrivateKey
-    transmission_rate_per_sec: int  # Global Transmission Rate
+    mix_path_length: int  # TODO: use this when creating Sphinx packets
 
 
 @dataclass
