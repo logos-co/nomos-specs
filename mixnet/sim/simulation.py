@@ -1,6 +1,5 @@
+import asyncio
 import random
-
-import simpy
 
 from mixnet.config import MixMembership, NodeInfo
 from mixnet.node import Node
@@ -11,8 +10,8 @@ class Simulation:
     def __init__(self, config: Config):
         random.seed()
         self.config = config
-        self.env = simpy.Environment()
 
+    async def run(self):
         # Initialize mixnet nodes and establish connections
         node_configs = self.config.mixnet.node_configs()
         membership = MixMembership(
@@ -22,5 +21,4 @@ class Simulation:
         for i, node in enumerate(nodes):
             node.connect(nodes[(i + 1) % len(nodes)])
 
-    def run(self):
-        self.env.run(until=self.config.simulation.running_time)
+        await asyncio.sleep(self.config.simulation.duration_sec)

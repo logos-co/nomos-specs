@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import dacite
 import yaml
 from pysphinx.sphinx import X25519PrivateKey
-from simpy.core import SimTime
 
 from mixnet.config import NodeConfig
 
@@ -33,14 +32,13 @@ class Config:
 
 @dataclass
 class SimulationConfig:
-    running_time: SimTime
+    duration_sec: int
 
     def validate(self):
-        # SimTime supports float but better to use int for time accuracy
-        assert isinstance(self.running_time, int) and self.running_time > 0
+        assert self.duration_sec > 0
 
     def description(self):
-        return f"running_time: {self.running_time}"
+        return f"running_secs: {self.duration_sec}"
 
 
 @dataclass
