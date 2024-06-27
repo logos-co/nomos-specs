@@ -1,17 +1,18 @@
 use std::collections::BTreeSet;
 
-use jubjub::SubgroupPoint;
 use rand_core::RngCore;
 use risc0_groth16::ProofJson;
 use serde::{Deserialize, Serialize};
+use k256::ProjectivePoint;
+use k256::elliptic_curve::group::prime::PrimeCurveAffine;
 
 use crate::error::Error;
 use crate::input::{Input, InputProof, InputWitness};
 use crate::merkle;
 use crate::output::{Output, OutputProof, OutputWitness};
 
-const MAX_INPUTS: usize = 32;
-const MAX_OUTPUTS: usize = 32;
+const MAX_INPUTS: usize = 8;
+const MAX_OUTPUTS: usize = 8;
 
 /// The partial transaction commitment couples an input to a partial transaction.
 /// Prevents partial tx unbundling.
@@ -157,9 +158,9 @@ impl PartialTx {
                 .all(|(o, p)| o.verify(p))
     }
 
-    pub fn balance(&self) -> SubgroupPoint {
-        let in_sum: SubgroupPoint = self.inputs.iter().map(|i| i.balance.0).sum();
-        let out_sum: SubgroupPoint = self.outputs.iter().map(|o| o.balance.0).sum();
+    pub fn balance(&self) -> ProjectivePoint {
+        let in_sum: ProjectivePoint = self.inputs.iter().map(|i| i.balance.0.to_curve()).sum();
+        let out_sum: ProjectivePoint = self.outputs.iter().map(|o| o.balance.0.to_curve()).sum();
 
         out_sum - in_sum
     }

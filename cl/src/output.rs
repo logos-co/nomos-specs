@@ -61,10 +61,10 @@ impl Output {
             && self.balance == witness.note.balance()
     }
 
-    pub fn to_bytes(&self) -> [u8; 64] {
-        let mut bytes = [0u8; 64];
+    pub fn to_bytes(&self) -> [u8; 65] {
+        let mut bytes = [0u8; 65];
         bytes[..32].copy_from_slice(self.note_comm.as_bytes());
-        bytes[32..64].copy_from_slice(&self.balance.to_bytes());
+        bytes[32..65].copy_from_slice(&self.balance.to_bytes());
         bytes
     }
 }

@@ -1,7 +1,7 @@
 use blake2::{Blake2s256, Digest};
-use group::GroupEncoding;
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
+use k256::elliptic_curve::group::GroupEncoding;
 
 use crate::{
     balance::{Balance, BalanceWitness},

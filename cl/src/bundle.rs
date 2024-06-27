@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
-use jubjub::{Scalar, SubgroupPoint};
 use serde::{Deserialize, Serialize};
+
+use k256::{Scalar, ProjectivePoint};
 
 use crate::{
     error::Error,
@@ -30,7 +31,7 @@ pub struct BundleProof {
 }
 
 impl Bundle {
-    pub fn balance(&self) -> SubgroupPoint {
+    pub fn balance(&self) -> ProjectivePoint {
         self.partials.iter().map(|ptx| ptx.balance()).sum()
     }
 

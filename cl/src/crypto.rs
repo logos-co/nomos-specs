@@ -1,13 +1,8 @@
-use blake2::{Blake2s256, Digest};
-use group::Group;
-use jubjub::SubgroupPoint;
-use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
+use k256::{Secp256k1, ProjectivePoint,  elliptic_curve::{
+        hash2curve::{GroupDigest, ExpandMsgXmd},
+},sha2::Sha256
+};
 
-pub fn hash_to_curve(bytes: &[u8]) -> SubgroupPoint {
-    let mut hasher = Blake2s256::new();
-    hasher.update(b"NOMOS_HASH_TO_CURVE");
-    hasher.update(bytes);
-    let seed: [u8; 32] = hasher.finalize().into();
-    SubgroupPoint::random(ChaCha20Rng::from_seed(seed))
+pub fn hash_to_curve(bytes: &[u8]) -> ProjectivePoint {
+    Secp256k1::hash_from_bytes::<ExpandMsgXmd<Sha256>>(&[bytes], &[b"NOMOS_HASH_TO_CURVE"]).unwrap()
 }

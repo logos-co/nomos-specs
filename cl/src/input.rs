@@ -105,11 +105,11 @@ impl Input {
             && death_constraint_is_satisfied
     }
 
-    pub fn to_bytes(&self) -> [u8; 96] {
-        let mut bytes = [0u8; 96];
+    pub fn to_bytes(&self) -> [u8; 97] {
+        let mut bytes = [0u8; 97];
         bytes[..32].copy_from_slice(self.note_comm.as_bytes());
         bytes[32..64].copy_from_slice(self.nullifier.as_bytes());
-        bytes[64..96].copy_from_slice(&self.balance.to_bytes());
+        bytes[64..97].copy_from_slice(&self.balance.to_bytes());
         bytes
     }
 }
