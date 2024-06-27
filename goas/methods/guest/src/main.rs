@@ -1,6 +1,8 @@
 use blake2::{Blake2s256, Digest};
 use risc0_zkvm::guest::env;
 use common::*;
+use cl::merkle;
+use cl::note::NoteWitness
 
 /// Public Inputs:
 /// * ptx_root: the root of the partial tx merkle tree of inputs/outputs
@@ -22,38 +24,39 @@ fn verify_ptx_outputs(ptx_root: [u8; 32], ptx_path: &[[u8; 32]], note: &Note) {
 
 fn execute(
     ptx_root: [u8; 32],
-    in_ptx_path: Vec<[u8; 32]>,
-    out_ptx_path: Vec<[u8; 32]>,
-    in_note: Note,
-    out_note: Note,
+    input_root: [u8; 32],
+    output_root: [u8; 32],
+    in_ptx_path: Vec<merkle::PathNode>,
+    out_ptx_path: Vec<merkle::PathNode>,
+    in_note: NoteWitness,
+    out_note: NotWitness,
+    input: Input,
     state: State,
     mut journal: Journal,
-) -> (State, Journal) {
+) {
     // verify ptx/cl preconditions
-    verify_ptx_inputs(ptx_root, &in_ptx_path, &in_note);
+
+    assert_eq!(ptx_root, merkle::node(input_root, output_root));
+    assert!(merkle::verify_path(in_note.commit().0, in_ptx_path, input_root));
 
     // check the commitments match the actual data
     let state_cm = calculate_state_hash(&state);
     let journal_cm = calculate_journal_hash(&journal);
-    assert_eq!(state_cm, in_note.state_cm);
-    assert_eq!(journal_cm, in_note.journal_cm);
+    let state_root = merkle::node(state_cm, journal_cm);
+    assert_eq!(state_root, in_note.state);
 
     // then run the state transition function
-    let input = in_note.zone_input;
     let state = stf(state, input);
     journal.push(input);
 
-    let state_cm = calculate_state_hash(&state);
-    let journal_cm = calculate_journal_hash(&journal);
-
-    // TODO: verify death constraints are propagated
-    assert_eq!(state_cm, out_note.state_cm);
-    assert_eq!(journal_cm, out_note.journal_cm);
-
     // verifying ptx/cl postconditions
-    verify_ptx_outputs(ptx_root, &out_ptx_path, &out_note);
-    // output the new state and the execution receipt
-    (state, journal)
+
+    let out_state_cm = calculate_state_hash(&state);
+    let out_journal_cm = calculate_journal_hash(&journal);
+    let out_state_root = merkle::node(out_state_cm, out_journal_cm);
+    // TODO: verify death constraints are propagated
+    assert_eq!(out_state_root, out_note.state);
+    assert!(merkle::verify_path(out_note.commit().0, out_ptx_path, output_root));
 }
 
 fn main() {
@@ -61,14 +64,17 @@ fn main() {
     let ptx_root: [u8; 32] = env::read();
 
     // private input
-    let in_ptx_path: Vec<[u8; 32]> = env::read();
-    let out_ptx_path: Vec<[u8; 32]> = env::read();
-    let in_note: Note = env::read();
-    let out_note: Note = env::read();
+    let input_root: [u8; 32] = env::read();
+    let output_root: [u8; 32] = env::read();
+    let in_ptx_path: Vec<merkle::PathNode> = env::read();
+    let out_ptx_path: Vec<merkle::PathNode> = env::read();
+    let in_note: NoteWitness = env::read();
+    let out_note: NoteWitness = env::read();
+    let input: Input = env::read()
     let state: State = env::read();
     let journal: Journal = env::read();
 
-    execute(ptx_root, in_ptx_path, out_ptx_path, in_note, out_note, state, journal);
+    execute(ptx_root, input_root, output_root, in_ptx_path, out_ptx_path, in_note, out_note, input, state, journal);
 }
 
 fn calculate_state_hash(state: &State) -> [u8; 32] {

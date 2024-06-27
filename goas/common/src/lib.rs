@@ -1,13 +1,6 @@
 use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Note {
-    pub state_cm: [u8; 32],
-    pub journal_cm: [u8; 32],
-    pub zone_input: Input,
-}
-
 // state of the zone
 pub type State = BTreeMap<u32, u32>;
 // list of all inputs that were executed up to this point

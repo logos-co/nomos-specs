@@ -4,13 +4,19 @@ use blake2::{Blake2s256, Digest};
 use methods::{METHOD_ELF, METHOD_ID};
 use risc0_zkvm::{default_prover, ExecutorEnv};
 use common::*;
-
+use cl::note::NoteWitness;
+use cl::input::InputWitness;
+use cl::output::OutputWitness;
+use cl::nullifier::{NullifierCommitment, Nullifier
+use cl::partial_tx::{PartialTx, PartialTxWitness};
 
 fn main() {
     // Initialize tracing. In order to view logs, run `RUST_LOG=info cargo run`
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
         .init();
+
+    let mut rng = rand::thread_rng();
 
     let state: State = [(0, 1000)].into_iter().collect();
     let journal = vec![];
@@ -20,27 +26,34 @@ fn main() {
         amount: 10,
     };
 
-    let in_note = Note {
-        state_cm: calculate_state_hash(&state),
-        journal_cm: calculate_journal_hash(&journal),
-        zone_input,
-    };
+    let in_state_cm = calculate_state_hash(&state),
+    let in_journal_cm = calculate_journal_hash(&journal),
+    let in_state_root = merkle::node(in_start_cm, in_journal_cm);
+    let in_note = NoteWitness::new(1, "ZONE", in_state_root, &mut rng);
 
     let mut out_journal = journal.clone();
     out_journal.push(zone_input);
 
-    let out_note = Note {
-        state_cm: calculate_state_hash(&stf(state.clone(), zone_input)),
-        journal_cm: calculate_journal_hash(&out_journal),
-        zone_input: Input::None,
-    };
+    let out_state_cm = calculate_state_hash(&stf(state.clone(), zone_input)),
+    let out_journal_cm = calculate_journal_hash(&out_journal),
+    let out_state_root = merkle::node(out_state_cm, out_journal_cm);
+        let out_note = NoteWitness::new(1, "ZONE", out_state_root, &mut rng);
 
-    let ptx_root = [0u8; 32];
-    let in_ptx_path: Vec<[u8; 32]> = vec![[0; 32]];
-    let out_ptx_path: Vec<[u8; 32]> = vec![[0; 32]];
+    let ptx = PartialTx::from_witness(PartialTxWitness {
+        inputs: vec![InputWitness::random(in_note, &mut rng)],
+        outputs: vec![OutputWitness::random(out_note, NullifierCommitment::random(&mut rng), &mut rng)],
+    });
+
+    let ptx_root = ptx.root();
+    let in_ptx_path = ptx.input_merkle_path(0);
+    let out_ptx_path = ptx.output_merkle_path(0);
 
     let env = ExecutorEnv::builder()
         .write(&ptx_root)
+        .unwrap()
+        .write(&ptx.input_root)
+        .unwrap()
+        .write(&ptx.output_root)
         .unwrap()
         .write(&in_ptx_path)
         .unwrap()
