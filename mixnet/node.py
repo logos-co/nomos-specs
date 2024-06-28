@@ -30,7 +30,9 @@ class Node:
     def __init__(self, config: NodeConfig, global_config: GlobalConfig):
         self.config = config
         self.global_config = global_config
-        self.mixgossip_channel = MixGossipChannel(self.__process_sphinx_packet)
+        self.mixgossip_channel = MixGossipChannel(
+            config.peering_degree, self.__process_sphinx_packet
+        )
         self.reconstructor = MessageReconstructor()
         self.broadcast_channel = asyncio.Queue()
 
@@ -58,10 +60,22 @@ class Node:
                 await self.broadcast_channel.put(msg)
 
     def connect(self, peer: Node):
-        conn = asyncio.Queue()
-        peer.mixgossip_channel.add_inbound(conn)
-        self.mixgossip_channel.add_outbound(
-            MixOutboundConnection(conn, self.global_config.transmission_rate_per_sec)
+        inbound_conn, outbound_conn = asyncio.Queue(), asyncio.Queue()
+        self.mixgossip_channel.add_conn(
+            DuplexConnection(
+                inbound_conn,
+                MixOutboundConnection(
+                    outbound_conn, self.global_config.transmission_rate_per_sec
+                ),
+            )
+        )
+        peer.mixgossip_channel.add_conn(
+            DuplexConnection(
+                outbound_conn,
+                MixOutboundConnection(
+                    inbound_conn, self.global_config.transmission_rate_per_sec
+                ),
+            )
         )
 
     async def send_message(self, msg: bytes):
@@ -72,34 +86,36 @@ class Node:
 
 
 class MixGossipChannel:
-    inbound_conns: list[Connection]
-    outbound_conns: list[MixOutboundConnection]
+    peering_degree: int
+    conns: list[DuplexConnection]
     handler: Callable[[SphinxPacket], Awaitable[NetworkPacket | None]]
 
     def __init__(
         self,
+        peer_degree: int,
         handler: Callable[[SphinxPacket], Awaitable[NetworkPacket | None]],
     ):
-        self.inbound_conns = []
-        self.outbound_conns = []
+        self.peering_degree = peer_degree
+        self.conns = []
         self.handler = handler
         # A set just for gathering a reference of tasks to prevent them from being garbage collected.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self.tasks = set()
 
-    def add_inbound(self, conn: Connection):
-        self.inbound_conns.append(conn)
+    def add_conn(self, conn: DuplexConnection):
+        if len(self.conns) >= self.peering_degree:
+            # For simplicity of the spec, reject the connection if the peering degree is reached.
+            raise ValueError("The peering degree is reached.")
+
+        self.conns.append(conn)
         task = asyncio.create_task(self.__process_inbound_conn(conn))
         self.tasks.add(task)
         # To discard the task from the set automatically when it is done.
         task.add_done_callback(self.tasks.discard)
 
-    def add_outbound(self, conn: MixOutboundConnection):
-        self.outbound_conns.append(conn)
-
-    async def __process_inbound_conn(self, conn: Connection):
+    async def __process_inbound_conn(self, conn: DuplexConnection):
         while True:
-            elem = await conn.get()
+            elem = await conn.recv()
             # In practice, data transmitted through connections is going to be always 'bytes'.
             # But here, we use the SphinxPacket type explicitly for simplicity
             # without implementing serde for SphinxPacket.
@@ -113,8 +129,23 @@ class MixGossipChannel:
                     await self.gossip(net_packet)
 
     async def gossip(self, packet: NetworkPacket):
-        for conn in self.outbound_conns:
+        for conn in self.conns:
             await conn.send(packet)
+
+
+class DuplexConnection:
+    inbound: Connection
+    outbound: MixOutboundConnection
+
+    def __init__(self, inbound: Connection, outbound: MixOutboundConnection):
+        self.inbound = inbound
+        self.outbound = outbound
+
+    async def recv(self) -> NetworkPacket:
+        return await self.inbound.get()
+
+    async def send(self, packet: NetworkPacket):
+        await self.outbound.send(packet)
 
 
 class MixOutboundConnection:

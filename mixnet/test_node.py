@@ -12,7 +12,10 @@ class TestNode(IsolatedAsyncioTestCase):
         global_config, node_configs, _ = init_mixnet_config(10)
         nodes = [Node(node_config, global_config) for node_config in node_configs]
         for i, node in enumerate(nodes):
-            node.connect(nodes[(i + 1) % len(nodes)])
+            try:
+                node.connect(nodes[(i + 1) % len(nodes)])
+            except ValueError as e:
+                print(e)
 
         await nodes[0].send_message(b"block selection")
 

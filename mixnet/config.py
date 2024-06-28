@@ -22,6 +22,8 @@ class GlobalConfig:
 @dataclass
 class NodeConfig:
     private_key: X25519PrivateKey
+    # The max number of peers a node should maintain in its p2p network
+    peering_degree: int
     mix_path_length: int  # TODO: use this when creating Sphinx packets
 
 

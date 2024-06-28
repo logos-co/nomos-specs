@@ -12,9 +12,10 @@ def init_mixnet_config(
     num_nodes: int,
 ) -> tuple[GlobalConfig, list[NodeConfig], dict[bytes, X25519PrivateKey]]:
     transmission_rate_per_sec = 3
+    peering_degree = 6
     max_mix_path_length = 3
     node_configs = [
-        NodeConfig(X25519PrivateKey.generate(), max_mix_path_length)
+        NodeConfig(X25519PrivateKey.generate(), peering_degree, max_mix_path_length)
         for _ in range(num_nodes)
     ]
     global_config = GlobalConfig(
