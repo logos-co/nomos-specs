@@ -1,0 +1,146 @@
+from __future__ import annotations
+
+import hashlib
+import random
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from typing import TYPE_CHECKING
+
+from adversary import Adversary
+from config import Config
+from environment import Environment, Time
+from measurement import Measurement
+from sphinx import SphinxPacket
+
+if TYPE_CHECKING:
+    from node import Node
+
+
+class P2P(ABC):
+    def __init__(self, env: Environment, config: Config):
+        self.env = env
+        self.config = config
+        self.nodes = []
+        self.measurement = Measurement(env, config)
+        self.adversary = Adversary(env, config)
+
+    def set_nodes(self, nodes: list["Node"]):
+        self.nodes = nodes
+        self.measurement.set_nodes(nodes)
+
+    def get_nodes(self, n: int, exclude_node_id: int) -> list["Node"]:
+        candidates = self.nodes[:exclude_node_id] + self.nodes[exclude_node_id + 1:]
+        return random.sample(candidates, n)
+
+    # This should accept only bytes in practice,
+    # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
+    @abstractmethod
+    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops_traveled: int = 0):
+        # Yield 0 to ensure that the broadcast is done in the same time step.
+        # Without any yield, SimPy complains that the broadcast func is not a generator.
+        yield self.env.timeout(0)
+
+    def send(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node",
+             is_first_of_broadcasting: bool):
+        time_sent = self.env.now()
+        if sender != receiver:
+            if is_first_of_broadcasting:
+                self.adversary.inspect_message_size(msg)
+                self.adversary.observe_sending_node(sender)
+            self.measurement.measure_egress(sender, msg)
+
+            # simulate network latency
+            yield self.env.timeout(self.config.p2p.random_network_latency())
+
+            self.measurement.measure_ingress(receiver, msg)
+            self.adversary.observe_receiving_node(sender, receiver, time_sent)
+        self.receive(msg, hops_traveled + 1, sender, receiver, time_sent)
+
+    @abstractmethod
+    def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node",
+                time_sent: Time):
+        pass
+
+    def log(self, msg):
+        print(f"t={self.env.now():.3f}: P2P: {msg}")
+
+
+class NaiveBroadcastP2P(P2P):
+    def __init__(self, env: Environment, config: Config):
+        super().__init__(env, config)
+        self.nodes = []
+
+    # This should accept only bytes in practice,
+    # but we accept SphinxPacket as well because we don't implement Sphinx deserialization.
+    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops_traveled: int = 0):
+        yield from super().broadcast(sender, msg)
+
+        self.log(f"Node:{sender.id}: Broadcasting a msg: {len(msg)} bytes")
+        for i, receiver in enumerate(self.nodes):
+            self.env.process(self.send(msg, 0, sender, receiver, i == 0))
+
+    def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node",
+                time_sent: Time):
+        msg_hash = hashlib.sha256(bytes(msg)).digest()
+        self.measurement.update_message_hops(msg_hash, hops_traveled)
+        self.adversary.observe_if_final_msg(sender, receiver, time_sent, msg)
+        self.env.process(receiver.receive_message(msg))
+
+
+class GossipP2P(P2P):
+    def __init__(self, env: Environment, config: Config):
+        super().__init__(env, config)
+        self.topology = defaultdict(set)
+        self.message_cache = defaultdict(dict)  # dict[receiver, dict[msg_hash, sender]]
+
+    def set_nodes(self, nodes: list["Node"]):
+        super().set_nodes(nodes)
+        for i, node in enumerate(nodes):
+            # Each node is chained with the right neighbor, so that no node is not orphaned.
+            # And then, each node is connected to a random subset of other nodes.
+            front, back = nodes[:i], nodes[i + 1:]
+            if len(back) > 0:
+                neighbor = back[0]
+                back = back[1:]
+            elif len(front) > 0:
+                neighbor = front[0]
+                front = front[1:]
+            else:
+                continue
+
+            others = front + back
+            n = min(self.config.p2p.connection_density - 1, len(others))
+            conns = set(random.sample(others, n))
+            conns.add(neighbor)
+            self.topology[node] = conns
+
+    def broadcast(self, sender: "Node", msg: SphinxPacket | bytes, hops_traveled: int = 0):
+        yield from super().broadcast(sender, msg)
+        self.log(f"Node:{sender.id}: Gossiping a msg: {len(msg)} bytes")
+
+        # if the msg is created originally by the sender (not forwarded from others), cache it with the sender itself.
+        msg_hash = hashlib.sha256(bytes(msg)).digest()
+        if msg_hash not in self.message_cache[sender]:
+            self.message_cache[sender][msg_hash] = sender
+
+        cnt = 0
+        for receiver in self.topology[sender]:
+            # Don't gossip the message if it was received from the node who is going to be the receiver,
+            # which means that the node already knows the message.
+            if receiver != self.message_cache[sender][msg_hash]:
+                self.env.process(self.send(msg, hops_traveled, sender, receiver, cnt == 0))
+                cnt += 1
+
+    def receive(self, msg: SphinxPacket | bytes, hops_traveled: int, sender: "Node", receiver: "Node",
+                time_sent: Time):
+        # Receive/gossip the msg only if it hasn't been received before. If not, just ignore the msg.
+        # i.e. each message is received/gossiped at most once by each node.
+        msg_hash = hashlib.sha256(bytes(msg)).digest()
+        if msg_hash not in self.message_cache[receiver]:
+            self.message_cache[receiver][msg_hash] = sender
+            self.measurement.update_message_hops(msg_hash, hops_traveled)
+            self.adversary.observe_if_final_msg(sender, receiver, time_sent, msg)
+
+            # Receive and gossip
+            self.env.process(receiver.receive_message(msg))
+            self.env.process(self.broadcast(receiver, msg, hops_traveled))
