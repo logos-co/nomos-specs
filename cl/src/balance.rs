@@ -11,8 +11,8 @@ use k256::elliptic_curve::ops::LinearCombinationExt;
 
 
 lazy_static! {
-    static ref PEDERSON_COMMITMENT_BLINDING_POINT: ProjectivePoint =
-        crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING");
+    // Precompute of `crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING")`
+    static ref PEDERSON_COMMITMENT_BLINDING_POINT: ProjectivePoint = ProjectivePoint::from_bytes((&[3, 130, 21, 159, 218, 6, 221, 181, 55, 169, 198, 220, 102, 48, 164, 23, 206, 225, 58, 54, 247, 64, 180, 120, 247, 101, 88, 97, 2, 206, 144, 92, 9]).into()).unwrap();
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -154,8 +154,15 @@ mod test {
 
     use crate::test_util::seed_rng;
     use k256::elliptic_curve::group::prime::PrimeCurveAffine;
-
     use super::*;
+
+    #[test]
+    fn test_pederson_blinding_point_pre_compute() {
+        // use k256::elliptic_curve::group::GroupEncoding;
+        // println!("{:?}", <[u8;33]>::from((*PEDERSON_COMMITMENT_BLINDING_POINT).to_bytes()));
+        
+        assert_eq!(*PEDERSON_COMMITMENT_BLINDING_POINT, crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING"));
+    }
 
     #[test]
     fn test_balance_zero_unitless() {
