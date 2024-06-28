@@ -36,7 +36,7 @@ impl Bundle {
     }
 
     pub fn is_balanced(&self, balance_blinding_witness: Scalar) -> bool {
-        self.balance() == crate::balance::balance(0, "", balance_blinding_witness)
+        self.balance() == crate::balance::balance(0, ProjectivePoint::GENERATOR, balance_blinding_witness)
     }
 
     pub fn prove(
@@ -65,7 +65,7 @@ impl Bundle {
             return Err(Error::ProofFailed);
         }
 
-        if self.balance() != crate::balance::balance(0, "", w.balance_blinding) {
+        if self.balance() != crate::balance::balance(0, ProjectivePoint::GENERATOR, w.balance_blinding) {
             return Err(Error::ProofFailed);
         }
 
@@ -91,6 +91,7 @@ mod test {
     use crate::{
         input::InputWitness, note::NoteWitness, nullifier::NullifierSecret, output::OutputWitness,
         partial_tx::PartialTxWitness, test_util::seed_rng,
+        crypto::hash_to_curve,
     };
 
     use super::*;
@@ -127,9 +128,9 @@ mod test {
         assert!(!bundle.is_balanced(bundle_witness.balance_blinding));
         assert_eq!(
             bundle.balance(),
-            crate::balance::balance(4840, "CRV", crv_4840_out.note.balance.blinding)
-                - (crate::balance::balance(10, "NMO", nmo_10_in.note.balance.blinding)
-                    + crate::balance::balance(23, "ETH", eth_23_in.note.balance.blinding))
+            crate::balance::balance(4840, hash_to_curve(b"CRV"), crv_4840_out.note.balance.blinding)
+                - (crate::balance::balance(10, hash_to_curve(b"NMO"), nmo_10_in.note.balance.blinding)
+                    + crate::balance::balance(23, hash_to_curve(b"ETH"), eth_23_in.note.balance.blinding))
         );
 
         let crv_4840_in =
@@ -162,7 +163,7 @@ mod test {
 
         assert_eq!(
             bundle.balance(),
-            crate::balance::balance(0, "", witness.balance_blinding)
+            crate::balance::balance(0, ProjectivePoint::GENERATOR, witness.balance_blinding)
         );
 
         assert!(bundle.is_balanced(witness.balance_blinding));

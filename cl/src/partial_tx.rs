@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use rand_core::RngCore;
-use risc0_groth16::ProofJson;
+// use risc0_groth16::ProofJson;
 use serde::{Deserialize, Serialize};
 use k256::ProjectivePoint;
 use k256::elliptic_curve::group::prime::PrimeCurveAffine;
@@ -169,7 +169,7 @@ impl PartialTx {
 #[cfg(test)]
 mod test {
 
-    use crate::{note::NoteWitness, nullifier::NullifierSecret, test_util::seed_rng};
+    use crate::{note::NoteWitness, nullifier::NullifierSecret, test_util::seed_rng, crypto::hash_to_curve};
 
     use super::*;
 
@@ -222,9 +222,9 @@ mod test {
 
         assert_eq!(
             ptx.balance(),
-            crate::balance::balance(4840, "CRV", crv_4840.note.balance.blinding)
-                - (crate::balance::balance(10, "NMO", nmo_10.note.balance.blinding)
-                    + crate::balance::balance(23, "ETH", eth_23.note.balance.blinding))
+            crate::balance::balance(4840, hash_to_curve(b"CRV"), crv_4840.note.balance.blinding)
+                - (crate::balance::balance(10, hash_to_curve(b"NMO"), nmo_10.note.balance.blinding)
+                    + crate::balance::balance(23, hash_to_curve(b"ETH"), eth_23.note.balance.blinding))
         );
     }
 }

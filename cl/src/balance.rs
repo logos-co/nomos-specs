@@ -20,7 +20,7 @@ pub struct Balance(pub AffinePoint);
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BalanceWitness {
     pub value: u64,
-    pub unit: String,
+    pub unit: AffinePoint,
     pub blinding: Scalar,
 }
 
@@ -34,7 +34,7 @@ impl BalanceWitness {
     pub fn new(value: u64, unit: impl Into<String>, blinding: Scalar) -> Self {
         Self {
             value,
-            unit: unit.into(),
+            unit: unit_point(&unit.into()).into(),
             blinding,
         }
     }
@@ -44,11 +44,7 @@ impl BalanceWitness {
     }
 
     pub fn commit(&self) -> Balance {
-        Balance(balance(self.value, &self.unit, self.blinding).into())
-    }
-
-    pub fn unit_point(&self) -> ProjectivePoint {
-        unit_point(&self.unit)
+        Balance(balance(self.value, self.unit.into(), self.blinding).into())
     }
 }
 
@@ -56,9 +52,9 @@ pub fn unit_point(unit: &str) -> ProjectivePoint {
     crate::crypto::hash_to_curve(unit.as_bytes())
 }
 
-pub fn balance(value: u64, unit: &str, blinding: Scalar) -> ProjectivePoint {
+pub fn balance(value: u64, unit: ProjectivePoint, blinding: Scalar) -> ProjectivePoint {
     let value_scalar = Scalar::from(value);
-    unit_point(unit) * value_scalar + *PEDERSON_COMMITMENT_BLINDING_POINT * blinding
+    unit * value_scalar + *PEDERSON_COMMITMENT_BLINDING_POINT * blinding
 }
 
 // mod serde_scalar {

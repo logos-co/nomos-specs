@@ -10,7 +10,7 @@ use crate::{
     partial_tx::PtxRoot,
 };
 use rand_core::RngCore;
-use risc0_groth16::{PublicInputsJson, Verifier};
+// use risc0_groth16::{PublicInputsJson, Verifier};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

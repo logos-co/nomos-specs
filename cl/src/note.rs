@@ -41,7 +41,7 @@ impl NoteWitness {
 
         // COMMIT TO BALANCE
         hasher.update(self.balance.value.to_le_bytes());
-        hasher.update(self.balance.unit_point().to_bytes());
+        hasher.update(self.balance.unit.to_bytes());
         // Important! we don't commit to the balance blinding factor as that may make the notes linkable.
 
         // COMMIT TO STATE
