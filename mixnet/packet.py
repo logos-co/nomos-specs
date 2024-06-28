@@ -9,7 +9,7 @@ from typing import Dict, List, Self, Tuple, TypeAlias
 from pysphinx.payload import Payload
 from pysphinx.sphinx import SphinxPacket
 
-from mixnet.config import MixnetTopology, MixNodeInfo
+from mixnet.config import MixMembership, NodeInfo
 
 
 class MessageFlag(Enum):
@@ -23,25 +23,25 @@ class MessageFlag(Enum):
 class PacketBuilder:
     @staticmethod
     def build_real_packets(
-        message: bytes, topology: MixnetTopology
-    ) -> List[Tuple[SphinxPacket, List[MixNodeInfo]]]:
+        message: bytes, membership: MixMembership
+    ) -> List[Tuple[SphinxPacket, List[NodeInfo]]]:
         return PacketBuilder.__build_packets(
-            MessageFlag.MESSAGE_FLAG_REAL, message, topology
+            MessageFlag.MESSAGE_FLAG_REAL, message, membership
         )
 
     @staticmethod
     def build_drop_cover_packets(
-        message: bytes, topology: MixnetTopology
-    ) -> List[Tuple[SphinxPacket, List[MixNodeInfo]]]:
+        message: bytes, membership: MixMembership
+    ) -> List[Tuple[SphinxPacket, List[NodeInfo]]]:
         return PacketBuilder.__build_packets(
-            MessageFlag.MESSAGE_FLAG_DROP_COVER, message, topology
+            MessageFlag.MESSAGE_FLAG_DROP_COVER, message, membership
         )
 
     @staticmethod
     def __build_packets(
-        flag: MessageFlag, message: bytes, topology: MixnetTopology
-    ) -> List[Tuple[SphinxPacket, List[MixNodeInfo]]]:
-        destination = topology.choose_mix_destination()
+        flag: MessageFlag, message: bytes, membership: MixMembership
+    ) -> List[Tuple[SphinxPacket, List[NodeInfo]]]:
+        last_mix = membership.choose()
 
         msg_with_flag = flag.bytes() + message
         # NOTE: We don't encrypt msg_with_flag for destination.
@@ -50,11 +50,11 @@ class PacketBuilder:
 
         out = []
         for fragment in fragment_set.fragments:
-            route = topology.generate_route(destination)
+            route = membership.generate_route(3, last_mix)
             packet = SphinxPacket.build(
                 fragment.bytes(),
                 [mixnode.sphinx_node() for mixnode in route],
-                destination.sphinx_node(),
+                last_mix.sphinx_node(),
             )
             out.append((packet, route))
 
