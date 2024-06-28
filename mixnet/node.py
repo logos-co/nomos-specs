@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from typing import Awaitable, Callable, TypeAlias
 
 from pysphinx.payload import DEFAULT_PAYLOAD_SIZE
@@ -89,6 +90,7 @@ class MixGossipChannel:
     peering_degree: int
     conns: list[DuplexConnection]
     handler: Callable[[SphinxPacket], Awaitable[NetworkPacket | None]]
+    msg_cache: set[NetworkPacket]
 
     def __init__(
         self,
@@ -98,6 +100,7 @@ class MixGossipChannel:
         self.peering_degree = peer_degree
         self.conns = []
         self.handler = handler
+        self.msg_cache = set()
         # A set just for gathering a reference of tasks to prevent them from being garbage collected.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self.tasks = set()
@@ -124,6 +127,12 @@ class MixGossipChannel:
                 # Drop packet
                 continue
             elif isinstance(elem, SphinxPacket):
+                # Don't process the same message twice.
+                msg_hash = hashlib.sha256(elem.bytes()).digest()
+                if msg_hash in self.msg_cache:
+                    continue
+                self.msg_cache.add(msg_hash)
+                # Handle the packet and gossip the result if needed.
                 net_packet = await self.handler(elem)
                 if net_packet is not None:
                     await self.gossip(net_packet)

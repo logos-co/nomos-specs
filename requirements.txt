@@ -3,7 +3,7 @@ cffi==1.16.0
 cryptography==41.0.7
 numpy==1.26.3
 pycparser==2.21
-pysphinx==0.0.2
+pysphinx==0.0.3
 scipy==1.11.4
 black==23.12.1
 sympy==1.12
