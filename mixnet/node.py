@@ -15,10 +15,10 @@ from pysphinx.sphinx import (
 from mixnet.config import GlobalConfig, NodeConfig
 from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
-NetworkPacket: TypeAlias = "SphinxPacket | bytes"
-NetworkPacketQueue: TypeAlias = "asyncio.Queue[NetworkPacket]"
+NetworkPacket: TypeAlias = SphinxPacket | bytes
+NetworkPacketQueue: TypeAlias = asyncio.Queue[NetworkPacket]
 Connection: TypeAlias = NetworkPacketQueue
-BroadcastChannel: TypeAlias = "asyncio.Queue[bytes]"
+BroadcastChannel: TypeAlias = asyncio.Queue[bytes]
 
 
 class Node:
@@ -47,8 +47,8 @@ class Node:
                     return processed.next_packet
                 case ProcessedFinalHopPacket():
                     await self.__process_sphinx_payload(processed.payload)
-        except Exception:
-            # Return SphinxPacket as it is, if this node cannot unwrap it.
+        except ValueError:
+            # Return SphinxPacket as it is, if it cannot be unwrapped by the private key of this node.
             return packet
 
     async def __process_sphinx_payload(self, payload: Payload):
