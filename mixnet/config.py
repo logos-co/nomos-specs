@@ -37,9 +37,7 @@ class MixMembership:
         The pre-selected mix_destination is used as a last mix node in the route,
         so that associated packets can be merged together into a original message.
         """
-        route = [self.choose() for _ in range(num_hops - 1)]
-        route.append(last_mix)
-        return route
+        return [*(self.choose() for _ in range(num_hops - 1)), last_mix]
 
     def choose(self) -> NodeInfo:
         """
