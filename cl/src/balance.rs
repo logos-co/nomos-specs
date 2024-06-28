@@ -7,6 +7,7 @@ use k256::{
     },
     ProjectivePoint, Scalar, AffinePoint
 };
+use k256::elliptic_curve::ops::LinearCombinationExt;
 
 
 lazy_static! {
@@ -54,7 +55,7 @@ pub fn unit_point(unit: &str) -> ProjectivePoint {
 
 pub fn balance(value: u64, unit: ProjectivePoint, blinding: Scalar) -> ProjectivePoint {
     let value_scalar = Scalar::from(value);
-    unit * value_scalar + *PEDERSON_COMMITMENT_BLINDING_POINT * blinding
+    ProjectivePoint::lincomb_ext(&[(unit, value_scalar), (*PEDERSON_COMMITMENT_BLINDING_POINT, blinding)])
 }
 
 // mod serde_scalar {
