@@ -11,7 +11,7 @@ from itertools import chain
 
 
 SUBNETWORK_SIZE: int = 4096
-NODES_OVER_NETWORK_SIZE: List[float] = [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 10.0]
+NODES_OVER_NETWORK_SIZE: List[float] = [0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 10.0]
 HASHERS = [lambda x: sha512(x).digest(), lambda x: blake2b(x).digest()]
 
 
@@ -28,11 +28,11 @@ class TestSubnetworkAssignment(TestCase):
                         generate_distribution_set_with_recursive_hash(
                             blake2b(_id.bytes).digest(),
                             minimum_membership,
-                            SUBNETWORK_SIZE,
+                            modulus=SUBNETWORK_SIZE,
                             hasher=hasher
                         )
                         for _id in nodes
                     )
                 )
-                print(f"Total nodes: {total_nodes}")
+                print(f"Total nodes: {total_nodes}, replication factor: {replication_factor}, channels per node: {minimum_membership}")
                 self.assertGreater(len(subsets), floor(SUBNETWORK_SIZE*0.99))
