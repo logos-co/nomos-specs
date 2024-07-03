@@ -16,6 +16,6 @@ rand_core = "0.6.0"
 rand_chacha = "0.3.1"
 lazy_static = "1.4.0"
 hex = "0.4.3"
-k256 = {version = "0.13.3", features = ["serde", "hash2curve"]}
-
+curve25519-dalek = {version = "4.1", features = ["serde", "digest", "rand_core"]}
+sha2 = "0.10"
 

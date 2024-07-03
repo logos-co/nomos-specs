@@ -1,33 +1,25 @@
+use curve25519_dalek::{ristretto::RistrettoPoint, traits::VartimeMultiscalarMul, Scalar};
 use lazy_static::lazy_static;
-use rand_core::RngCore;
+use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
-use k256::{
-    elliptic_curve::{
-        group::GroupEncoding, Field
-    },
-    ProjectivePoint, Scalar, AffinePoint
-};
-use k256::elliptic_curve::ops::LinearCombinationExt;
-
-
 lazy_static! {
-    // Precompute of `crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING")`
-    static ref PEDERSON_COMMITMENT_BLINDING_POINT: ProjectivePoint = ProjectivePoint::from_bytes((&[3, 130, 21, 159, 218, 6, 221, 181, 55, 169, 198, 220, 102, 48, 164, 23, 206, 225, 58, 54, 247, 64, 180, 120, 247, 101, 88, 97, 2, 206, 144, 92, 9]).into()).unwrap();
+    // Precompute of ``
+    static ref PEDERSON_COMMITMENT_BLINDING_POINT: RistrettoPoint = crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING");
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct Balance(pub AffinePoint);
+pub struct Balance(pub RistrettoPoint);
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BalanceWitness {
     pub value: u64,
-    pub unit: AffinePoint,
+    pub unit: RistrettoPoint,
     pub blinding: Scalar,
 }
 
 impl Balance {
-    pub fn to_bytes(&self) -> [u8; 33] {
-        self.0.to_bytes().into()
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0.compress().to_bytes().into()
     }
 }
 
@@ -40,8 +32,8 @@ impl BalanceWitness {
         }
     }
 
-    pub fn random(value: u64, unit: impl Into<String>, rng: impl RngCore) -> Self {
-        Self::new(value, unit, Scalar::random(rng))
+    pub fn random(value: u64, unit: impl Into<String>, mut rng: impl CryptoRngCore) -> Self {
+        Self::new(value, unit, Scalar::random(&mut rng))
     }
 
     pub fn commit(&self) -> Balance {
@@ -49,13 +41,17 @@ impl BalanceWitness {
     }
 }
 
-pub fn unit_point(unit: &str) -> ProjectivePoint {
+pub fn unit_point(unit: &str) -> RistrettoPoint {
     crate::crypto::hash_to_curve(unit.as_bytes())
 }
 
-pub fn balance(value: u64, unit: ProjectivePoint, blinding: Scalar) -> ProjectivePoint {
+pub fn balance(value: u64, unit: RistrettoPoint, blinding: Scalar) -> RistrettoPoint {
     let value_scalar = Scalar::from(value);
-    ProjectivePoint::lincomb_ext(&[(unit, value_scalar), (*PEDERSON_COMMITMENT_BLINDING_POINT, blinding)])
+    // can vartime leak the number of cycles through the stark proof?
+    RistrettoPoint::vartime_multiscalar_mul(
+        &[value_scalar, blinding],
+        &[unit, *PEDERSON_COMMITMENT_BLINDING_POINT],
+    )
 }
 
 // mod serde_scalar {
@@ -152,16 +148,19 @@ pub fn balance(value: u64, unit: ProjectivePoint, blinding: Scalar) -> Projectiv
 #[cfg(test)]
 mod test {
 
+    use super::*;
     use crate::test_util::seed_rng;
     use k256::elliptic_curve::group::prime::PrimeCurveAffine;
-    use super::*;
 
     #[test]
     fn test_pederson_blinding_point_pre_compute() {
         // use k256::elliptic_curve::group::GroupEncoding;
         // println!("{:?}", <[u8;33]>::from((*PEDERSON_COMMITMENT_BLINDING_POINT).to_bytes()));
-        
-        assert_eq!(*PEDERSON_COMMITMENT_BLINDING_POINT, crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING"));
+
+        assert_eq!(
+            *PEDERSON_COMMITMENT_BLINDING_POINT,
+            crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING")
+        );
     }
 
     #[test]
@@ -185,7 +184,10 @@ mod test {
         let a = a_w.commit();
         let b = b_w.commit();
         assert_ne!(a, b);
-        assert_eq!(a.0.to_curve() - b.0.to_curve(), BalanceWitness::new(0, "NMO", r1 - r2).commit().0.to_curve());
+        assert_eq!(
+            a.0.to_curve() - b.0.to_curve(),
+            BalanceWitness::new(0, "NMO", r1 - r2).commit().0.to_curve()
+        );
     }
 
     #[test]
@@ -207,7 +209,10 @@ mod test {
         let two = BalanceWitness::new(2, "NMO", 0u32.into());
 
         // Values of same unit are homomorphic
-        assert_eq!(ten.commit().0.to_curve() - eight.commit().0.to_curve(), two.commit().0.to_curve());
+        assert_eq!(
+            ten.commit().0.to_curve() - eight.commit().0.to_curve(),
+            two.commit().0.to_curve()
+        );
 
         // Blinding factors are also homomorphic.
         assert_eq!(

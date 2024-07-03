@@ -1,5 +1,5 @@
-use blake2::{Blake2s256, Digest};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub fn padded_leaves<const N: usize>(elements: &[Vec<u8>]) -> [[u8; 32]; N] {
     let mut leaves = [[0u8; 32]; N];
@@ -13,14 +13,14 @@ pub fn padded_leaves<const N: usize>(elements: &[Vec<u8>]) -> [[u8; 32]; N] {
 }
 
 pub fn leaf(data: &[u8]) -> [u8; 32] {
-    let mut hasher = Blake2s256::new();
+    let mut hasher = Sha256::new();
     hasher.update(b"NOMOS_MERKLE_LEAF");
     hasher.update(data);
     hasher.finalize().into()
 }
 
 pub fn node(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
-    let mut hasher = Blake2s256::new();
+    let mut hasher = Sha256::new();
     hasher.update(b"NOMOS_MERKLE_NODE");
     hasher.update(a);
     hasher.update(b);

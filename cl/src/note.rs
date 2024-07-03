@@ -1,7 +1,6 @@
 use blake2::{Blake2s256, Digest};
-use rand_core::RngCore;
+use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
-use k256::elliptic_curve::group::GroupEncoding;
 
 use crate::{
     balance::{Balance, BalanceWitness},
@@ -27,7 +26,12 @@ pub struct NoteWitness {
 }
 
 impl NoteWitness {
-    pub fn new(value: u64, unit: impl Into<String>, state: [u8; 32], rng: impl RngCore) -> Self {
+    pub fn new(
+        value: u64,
+        unit: impl Into<String>,
+        state: [u8; 32],
+        rng: impl CryptoRngCore,
+    ) -> Self {
         Self {
             balance: BalanceWitness::random(value, unit, rng),
             death_constraint: vec![],
@@ -41,7 +45,7 @@ impl NoteWitness {
 
         // COMMIT TO BALANCE
         hasher.update(self.balance.value.to_le_bytes());
-        hasher.update(self.balance.unit.to_bytes());
+        hasher.update(self.balance.unit.compress().to_bytes());
         // Important! we don't commit to the balance blinding factor as that may make the notes linkable.
 
         // COMMIT TO STATE
