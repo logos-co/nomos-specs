@@ -94,10 +94,10 @@ class MixGossipChannel:
 
     def __init__(
         self,
-        peer_degree: int,
+        peering_degree: int,
         handler: Callable[[SphinxPacket], Awaitable[SphinxPacket | None]],
     ):
-        self.peering_degree = peer_degree
+        self.peering_degree = peering_degree
         self.conns = []
         self.handler = handler
         self.msg_cache = set()
