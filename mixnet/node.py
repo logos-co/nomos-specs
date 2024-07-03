@@ -14,10 +14,10 @@ from pysphinx.sphinx import (
 )
 
 from mixnet.config import GlobalConfig, NodeConfig
+from mixnet.connection import LocalSimplexConnection, SimplexConnection
 from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
 NetworkPacketQueue: TypeAlias = asyncio.Queue[bytes]
-Connection: TypeAlias = NetworkPacketQueue
 BroadcastChannel: TypeAlias = asyncio.Queue[bytes]
 
 
@@ -58,14 +58,19 @@ class Node:
         if msg_with_flag is not None:
             flag, msg = PacketBuilder.parse_msg_and_flag(msg_with_flag)
             if flag == MessageFlag.MESSAGE_FLAG_REAL:
+                print(f"Broadcasting message finally: {msg}")
                 await self.broadcast_channel.put(msg)
 
-    def connect(self, peer: Node):
-        inbound_conn, outbound_conn = asyncio.Queue(), asyncio.Queue()
+    def connect(
+        self,
+        peer: Node,
+        inbound_conn: SimplexConnection = LocalSimplexConnection(),
+        outbound_conn: SimplexConnection = LocalSimplexConnection(),
+    ):
         self.mixgossip_channel.add_conn(
             DuplexConnection(
                 inbound_conn,
-                MixOutboundConnection(
+                MixSimplexConnection(
                     outbound_conn, self.global_config.transmission_rate_per_sec
                 ),
             )
@@ -73,13 +78,14 @@ class Node:
         peer.mixgossip_channel.add_conn(
             DuplexConnection(
                 outbound_conn,
-                MixOutboundConnection(
+                MixSimplexConnection(
                     inbound_conn, self.global_config.transmission_rate_per_sec
                 ),
             )
         )
 
     async def send_message(self, msg: bytes):
+        print(f"Sending message: {msg}")
         for packet, _ in PacketBuilder.build_real_packets(
             msg, self.global_config.membership
         ):
@@ -145,26 +151,26 @@ class MixGossipChannel:
 
 
 class DuplexConnection:
-    inbound: Connection
-    outbound: MixOutboundConnection
+    inbound: SimplexConnection
+    outbound: MixSimplexConnection
 
-    def __init__(self, inbound: Connection, outbound: MixOutboundConnection):
+    def __init__(self, inbound: SimplexConnection, outbound: MixSimplexConnection):
         self.inbound = inbound
         self.outbound = outbound
 
     async def recv(self) -> bytes:
-        return await self.inbound.get()
+        return await self.inbound.recv()
 
     async def send(self, packet: bytes):
         await self.outbound.send(packet)
 
 
-class MixOutboundConnection:
+class MixSimplexConnection:
     queue: NetworkPacketQueue
-    conn: Connection
-    transmission_rate_per_sec: int
+    conn: SimplexConnection
+    transmission_rate_per_sec: float
 
-    def __init__(self, conn: Connection, transmission_rate_per_sec: int):
+    def __init__(self, conn: SimplexConnection, transmission_rate_per_sec: float):
         self.queue = asyncio.Queue()
         self.conn = conn
         self.transmission_rate_per_sec = transmission_rate_per_sec
@@ -178,7 +184,7 @@ class MixOutboundConnection:
                 elem = build_noise_packet()
             else:
                 elem = self.queue.get_nowait()
-            await self.conn.put(elem)
+            await self.conn.send(elem)
 
     async def send(self, elem: bytes):
         await self.queue.put(elem)

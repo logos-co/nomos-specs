@@ -1,0 +1,16 @@
+simulation:
+  time_scale: 0.001
+  duration_sec: 10000
+  net_latency_sec: 0.01
+  meter_interval_sec: 1
+
+
+logic:
+  lottery_interval_sec: 1
+  sender_prob: 0.01
+  
+mixnet:
+  num_nodes: 5
+  transmission_rate_per_sec: 10
+  peering_degree: 6
+  max_mix_path_length: 3

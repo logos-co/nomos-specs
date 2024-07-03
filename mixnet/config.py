@@ -14,7 +14,7 @@ from pysphinx.sphinx import Node as SphinxNode
 @dataclass
 class GlobalConfig:
     membership: MixMembership
-    transmission_rate_per_sec: int  # Global Transmission Rate
+    transmission_rate_per_sec: float  # Global Transmission Rate
     # TODO: use this to make the size of Sphinx packet constant
     max_mix_path_length: int
 
