@@ -17,7 +17,7 @@ class Simulation:
     async def run(self):
         nodes, conn_measurement = self.init_nodes()
 
-        deadline = time.time() + self.scaled_time(self.config.simulation.duration_sec)
+        deadline = time.time() + self.config.simulation.scaled_duration()
         tasks: list[asyncio.Task] = []
         for node in nodes:
             tasks.append(asyncio.create_task(self.run_logic(node, deadline)))
@@ -34,7 +34,9 @@ class Simulation:
                     for node_config in node_configs
                 ]
             ),
-            self.scaled_rate(self.config.mixnet.transmission_rate_per_sec),
+            self.config.simulation.scale_rate(
+                self.config.mixnet.transmission_rate_per_sec
+            ),
             self.config.mixnet.max_mix_path_length,
         )
         nodes = [Node(node_config, global_config) for node_config in node_configs]
@@ -42,28 +44,23 @@ class Simulation:
         conn_stats = ConnectionStats()
         for i, node in enumerate(nodes):
             inbound_conn, outbound_conn = self.create_conn(), self.create_conn()
-            node.connect(nodes[(i + 1) % len(nodes)], inbound_conn, outbound_conn)
+            peer = nodes[(i + 1) % len(nodes)]
+            node.connect(peer, inbound_conn, outbound_conn)
             conn_stats.register(node, inbound_conn, outbound_conn)
+            conn_stats.register(peer, outbound_conn, inbound_conn)
 
         return nodes, conn_stats
 
     def create_conn(self) -> MeteredRemoteSimplexConnection:
-        return MeteredRemoteSimplexConnection(
-            latency=self.scaled_time(self.config.simulation.net_latency_sec),
-            meter_interval=self.scaled_time(self.config.simulation.meter_interval_sec),
-        )
+        return MeteredRemoteSimplexConnection(self.config.simulation)
 
     async def run_logic(self, node: Node, deadline: float):
         while time.time() < deadline:
             await asyncio.sleep(
-                self.scaled_time(self.config.logic.lottery_interval_sec)
+                self.config.simulation.scale_time(
+                    self.config.logic.lottery_interval_sec
+                )
             )
 
             if random.random() < self.config.logic.sender_prob:
                 await node.send_message(b"selected block")
-
-    def scaled_time(self, time: float) -> float:
-        return time * self.config.simulation.time_scale
-
-    def scaled_rate(self, rate: int) -> float:
-        return float(rate / self.config.simulation.time_scale)

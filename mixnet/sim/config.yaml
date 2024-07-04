@@ -2,8 +2,6 @@ simulation:
   time_scale: 0.001
   duration_sec: 10000
   net_latency_sec: 0.01
-  meter_interval_sec: 1
-
 
 logic:
   lottery_interval_sec: 1

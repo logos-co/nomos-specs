@@ -34,13 +34,23 @@ class SimulationConfig:
     time_scale: float
     duration_sec: int
     net_latency_sec: float
-    meter_interval_sec: float
 
     def validate(self):
         assert self.time_scale > 0
         assert self.duration_sec > 0
         assert self.net_latency_sec > 0
-        assert self.meter_interval_sec > 0
+
+    def scale_time(self, time: float) -> float:
+        return time * self.time_scale
+
+    def scale_rate(self, rate: int) -> float:
+        return float(rate / self.time_scale)
+
+    def scaled_duration(self) -> float:
+        return self.scale_time(self.duration_sec)
+
+    def scaled_net_latency(self) -> float:
+        return self.scale_time(self.net_latency_sec)
 
 
 @dataclass

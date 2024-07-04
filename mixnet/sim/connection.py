@@ -5,11 +5,11 @@ import time
 import pandas
 
 from mixnet.connection import SimplexConnection
+from mixnet.sim.config import SimulationConfig
 
 
 class MeteredRemoteSimplexConnection(SimplexConnection):
-    latency: float
-    meter_interval: float
+    config: SimulationConfig
     outputs: asyncio.Queue
     conn: asyncio.Queue
     inputs: asyncio.Queue
@@ -18,9 +18,8 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
     input_task: asyncio.Task
     input_meters: list[int]
 
-    def __init__(self, latency: float, meter_interval: float):
-        self.latency = latency
-        self.meter_interval = meter_interval
+    def __init__(self, config: SimulationConfig):
+        self.config = config
         self.outputs = asyncio.Queue()
         self.conn = asyncio.Queue()
         self.inputs = asyncio.Queue()
@@ -45,13 +44,13 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
     async def __run_input_task(self):
         start_time = time.time()
         while True:
-            await asyncio.sleep(self.latency)
+            await asyncio.sleep(self.config.scaled_net_latency())
             data = await self.conn.get()
             self.__update_meter(self.input_meters, len(data), start_time)
             await self.inputs.put(data)
 
     def __update_meter(self, meters: list[int], size: int, start_time: float):
-        slot = math.floor((time.time() - start_time) / self.meter_interval)
+        slot = math.floor((time.time() - start_time) / self.config.time_scale)
         assert slot >= len(meters) - 1
         meters.extend([0] * (slot - len(meters) + 1))
         meters[-1] += size
@@ -63,6 +62,4 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         return self.__bandwidths(self.input_meters)
 
     def __bandwidths(self, meters: list[int]) -> pandas.Series:
-        return pandas.Series(meters, name="bandwidth").map(
-            lambda x: x / self.meter_interval
-        )
+        return pandas.Series(meters, name="bandwidth")
