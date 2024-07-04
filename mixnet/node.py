@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 from enum import Enum
 from typing import Awaitable, Callable, TypeAlias
@@ -14,28 +13,33 @@ from pysphinx.sphinx import (
 )
 
 from mixnet.config import GlobalConfig, NodeConfig
-from mixnet.connection import LocalSimplexConnection, SimplexConnection
+from mixnet.connection import SimplexConnection
+from mixnet.framework.framework import Framework, Queue
 from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
-NetworkPacketQueue: TypeAlias = asyncio.Queue[bytes]
-BroadcastChannel: TypeAlias = asyncio.Queue[bytes]
+NetworkPacketQueue: TypeAlias = Queue
+BroadcastChannel: TypeAlias = Queue
 
 
 class Node:
+    framework: Framework
     config: NodeConfig
     global_config: GlobalConfig
     mixgossip_channel: MixGossipChannel
     reconstructor: MessageReconstructor
     broadcast_channel: BroadcastChannel
 
-    def __init__(self, config: NodeConfig, global_config: GlobalConfig):
+    def __init__(
+        self, framework: Framework, config: NodeConfig, global_config: GlobalConfig
+    ):
+        self.framework = framework
         self.config = config
         self.global_config = global_config
         self.mixgossip_channel = MixGossipChannel(
-            config.peering_degree, self.__process_sphinx_packet
+            framework, config.peering_degree, self.__process_sphinx_packet
         )
         self.reconstructor = MessageReconstructor()
-        self.broadcast_channel = asyncio.Queue()
+        self.broadcast_channel = framework.queue()
 
     async def __process_sphinx_packet(
         self, packet: SphinxPacket
@@ -64,14 +68,16 @@ class Node:
     def connect(
         self,
         peer: Node,
-        inbound_conn: SimplexConnection = LocalSimplexConnection(),
-        outbound_conn: SimplexConnection = LocalSimplexConnection(),
+        inbound_conn: SimplexConnection,
+        outbound_conn: SimplexConnection,
     ):
         self.mixgossip_channel.add_conn(
             DuplexConnection(
                 inbound_conn,
                 MixSimplexConnection(
-                    outbound_conn, self.global_config.transmission_rate_per_sec
+                    self.framework,
+                    outbound_conn,
+                    self.global_config.transmission_rate_per_sec,
                 ),
             )
         )
@@ -79,7 +85,9 @@ class Node:
             DuplexConnection(
                 outbound_conn,
                 MixSimplexConnection(
-                    inbound_conn, self.global_config.transmission_rate_per_sec
+                    self.framework,
+                    inbound_conn,
+                    self.global_config.transmission_rate_per_sec,
                 ),
             )
         )
@@ -93,6 +101,7 @@ class Node:
 
 
 class MixGossipChannel:
+    framework: Framework
     peering_degree: int
     conns: list[DuplexConnection]
     handler: Callable[[SphinxPacket], Awaitable[SphinxPacket | None]]
@@ -100,9 +109,11 @@ class MixGossipChannel:
 
     def __init__(
         self,
+        framework: Framework,
         peering_degree: int,
         handler: Callable[[SphinxPacket], Awaitable[SphinxPacket | None]],
     ):
+        self.framework = framework
         self.peering_degree = peering_degree
         self.conns = []
         self.handler = handler
@@ -117,10 +128,8 @@ class MixGossipChannel:
             raise ValueError("The peering degree is reached.")
 
         self.conns.append(conn)
-        task = asyncio.create_task(self.__process_inbound_conn(conn))
+        task = self.framework.spawn(self.__process_inbound_conn(conn))
         self.tasks.add(task)
-        # To discard the task from the set automatically when it is done.
-        task.add_done_callback(self.tasks.discard)
 
     async def __process_inbound_conn(self, conn: DuplexConnection):
         while True:
@@ -166,24 +175,31 @@ class DuplexConnection:
 
 
 class MixSimplexConnection:
+    framework: Framework
     queue: NetworkPacketQueue
     conn: SimplexConnection
     transmission_rate_per_sec: float
 
-    def __init__(self, conn: SimplexConnection, transmission_rate_per_sec: float):
-        self.queue = asyncio.Queue()
+    def __init__(
+        self,
+        framework: Framework,
+        conn: SimplexConnection,
+        transmission_rate_per_sec: float,
+    ):
+        self.framework = framework
+        self.queue = framework.queue()
         self.conn = conn
         self.transmission_rate_per_sec = transmission_rate_per_sec
-        self.task = asyncio.create_task(self.__run())
+        self.task = framework.spawn(self.__run())
 
     async def __run(self):
         while True:
-            await asyncio.sleep(1 / self.transmission_rate_per_sec)
+            await self.framework.sleep(1 / self.transmission_rate_per_sec)
             # TODO: time mixing
             if self.queue.empty():
                 elem = build_noise_packet()
             else:
-                elem = self.queue.get_nowait()
+                elem = await self.queue.get()
             await self.conn.send(elem)
 
     async def send(self, elem: bytes):

@@ -1,5 +1,6 @@
 import abc
-import asyncio
+
+from mixnet.framework.framework import Framework
 
 
 class SimplexConnection(abc.ABC):
@@ -13,8 +14,8 @@ class SimplexConnection(abc.ABC):
 
 
 class LocalSimplexConnection(SimplexConnection):
-    def __init__(self):
-        self.queue = asyncio.Queue()
+    def __init__(self, framework: Framework):
+        self.queue = framework.queue()
 
     async def send(self, data: bytes) -> None:
         await self.queue.put(data)

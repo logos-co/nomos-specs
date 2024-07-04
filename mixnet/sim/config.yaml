@@ -1,6 +1,5 @@
 simulation:
-  time_scale: 0.001
-  duration_sec: 10000
+  duration_sec: 1000
   net_latency_sec: 0.01
 
 logic:

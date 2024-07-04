@@ -1,5 +1,6 @@
 import argparse
-import asyncio
+
+import usim
 
 from mixnet.sim.config import Config
 from mixnet.sim.simulation import Simulation
@@ -16,6 +17,6 @@ if __name__ == "__main__":
 
     config = Config.load(args.config)
     sim = Simulation(config)
-    asyncio.run(sim.run())
+    usim.run(sim.run())
 
     print("Simulation complete!")
