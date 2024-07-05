@@ -71,6 +71,12 @@ class Node:
         inbound_conn: SimplexConnection,
         outbound_conn: SimplexConnection,
     ):
+        if (
+            not self.mixgossip_channel.can_accept_conn()
+            or not peer.mixgossip_channel.can_accept_conn()
+        ):
+            raise PeeringDegreeReached
+
         self.mixgossip_channel.add_conn(
             DuplexConnection(
                 inbound_conn,
@@ -122,10 +128,13 @@ class MixGossipChannel:
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         self.tasks = set()
 
+    def can_accept_conn(self) -> bool:
+        return len(self.conns) < self.peering_degree
+
     def add_conn(self, conn: DuplexConnection):
-        if len(self.conns) >= self.peering_degree:
+        if not self.can_accept_conn():
             # For simplicity of the spec, reject the connection if the peering degree is reached.
-            raise ValueError("The peering degree is reached.")
+            raise PeeringDegreeReached()
 
         self.conns.append(conn)
         task = self.framework.spawn(self.__process_inbound_conn(conn))
@@ -223,3 +232,7 @@ def parse_msg(data: bytes) -> tuple[MsgType, bytes]:
 
 def build_noise_packet() -> bytes:
     return build_msg(MsgType.NOISE, bytes(DEFAULT_PAYLOAD_SIZE))
+
+
+class PeeringDegreeReached(Exception):
+    pass

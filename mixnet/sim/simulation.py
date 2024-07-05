@@ -3,7 +3,7 @@ import usim
 import mixnet.framework.usim as usimfw
 from mixnet.config import GlobalConfig, MixMembership, NodeInfo
 from mixnet.framework.framework import Framework
-from mixnet.node import Node
+from mixnet.node import Node, PeeringDegreeReached
 from mixnet.sim.config import Config
 from mixnet.sim.connection import MeteredRemoteSimplexConnection
 from mixnet.sim.stats import ConnectionStats
@@ -54,7 +54,10 @@ class Simulation:
                 self.create_conn(),
             )
             peer = nodes[(i + 1) % len(nodes)]
-            node.connect(peer, inbound_conn, outbound_conn)
+            try:
+                node.connect(peer, inbound_conn, outbound_conn)
+            except PeeringDegreeReached:
+                continue
             conn_stats.register(node, inbound_conn, outbound_conn)
             conn_stats.register(peer, outbound_conn, inbound_conn)
 
