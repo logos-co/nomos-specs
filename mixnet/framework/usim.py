@@ -19,7 +19,8 @@ class Framework(framework.Framework):
         await (usim.time + seconds)
 
     def now(self) -> float:
-        return usim.time.now
+        # round to milliseconds to make analysis not too heavy
+        return int(usim.time.now * 1000) / 1000
 
     def spawn(
         self, coroutine: Coroutine[Any, Any, framework.RT]

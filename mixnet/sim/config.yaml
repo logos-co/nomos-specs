@@ -1,7 +1,7 @@
 simulation:
   duration_sec: 1000
   network:
-    max_latency_sec: 0.01
+    max_latency_sec: 0.1
     seed: 0
 
 logic:

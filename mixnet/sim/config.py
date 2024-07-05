@@ -54,6 +54,10 @@ class NetworkConfig:
         assert self.max_latency_sec > 0
         assert self.seed is not None
 
+    def random_latency(self) -> float:
+        # round to milliseconds to make analysis not too heavy
+        return int(self.seed.random() * self.max_latency_sec * 1000) / 1000
+
 
 @dataclass
 class LogicConfig:

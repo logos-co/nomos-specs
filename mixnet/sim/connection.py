@@ -6,6 +6,7 @@ import pandas
 from mixnet.connection import SimplexConnection
 from mixnet.framework.framework import Framework, Queue
 from mixnet.sim.config import NetworkConfig
+from mixnet.sim.state import NodeState
 
 
 class MeteredRemoteSimplexConnection(SimplexConnection):
@@ -18,10 +19,18 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
     output_meters: list[int]
     input_task: Awaitable
     input_meters: list[int]
+    output_node_states: list[NodeState]
+    input_node_states: list[NodeState]
 
-    def __init__(self, config: NetworkConfig, framework: Framework):
+    def __init__(
+        self,
+        config: NetworkConfig,
+        framework: Framework,
+        output_node_states: list[NodeState],
+        input_node_states: list[NodeState],
+    ):
         self.framework = framework
-        self.latency = config.seed.random() * config.max_latency_sec
+        self.latency = config.random_latency()
         self.outputs = framework.queue()
         self.conn = framework.queue()
         self.inputs = framework.queue()
@@ -29,12 +38,19 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         self.output_task = framework.spawn(self.__run_output_task())
         self.input_meters = []
         self.input_task = framework.spawn(self.__run_input_task())
+        self.output_node_states = output_node_states
+        self.input_node_states = input_node_states
 
     async def send(self, data: bytes) -> None:
         await self.outputs.put(data)
+        ms = math.floor(self.framework.now() * 1000)
+        self.output_node_states[ms] = NodeState.SENDING
 
     async def recv(self) -> bytes:
-        return await self.inputs.get()
+        data = await self.inputs.get()
+        ms = math.floor(self.framework.now() * 1000)
+        self.output_node_states[ms] = NodeState.RECEIVING
+        return data
 
     async def __run_output_task(self):
         start_time = self.framework.now()
