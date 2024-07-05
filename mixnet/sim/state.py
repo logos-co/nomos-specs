@@ -24,7 +24,10 @@ class AllNodeStates:
     def analyze(self):
         df = pandas.DataFrame(self._table).transpose()
         df.columns = [f"Node-{i}" for i in range(len(self._table))]
+        # Convert NodeState enum to their integer values for analysis
+        df = df.map(lambda state: state.value)
         print(df)
+
         csv_path = f"all_node_states_{datetime.now().isoformat(timespec="seconds")}.csv"
         df.to_csv(csv_path)
         print(f"\nSaved DataFrame to {csv_path}\n")
