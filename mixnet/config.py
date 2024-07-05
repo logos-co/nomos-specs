@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
@@ -26,10 +27,19 @@ class NodeConfig:
     peering_degree: int
     mix_path_length: int  # TODO: use this when creating Sphinx packets
 
+    def id(self, short=False) -> str:
+        id = (
+            hashlib.sha256(self.private_key.public_key().public_bytes_raw())
+            .digest()
+            .hex()
+        )
+        return id[:8] if short else id
+
 
 @dataclass
 class MixMembership:
     nodes: List[NodeInfo]
+    rng: random.Random = field(default_factory=random.Random)
 
     def generate_route(self, num_hops: int, last_mix: NodeInfo) -> list[NodeInfo]:
         """
@@ -43,7 +53,7 @@ class MixMembership:
         """
         Choose a mix node as a mix destination that will reconstruct a message from Sphinx packets.
         """
-        return random.choice(self.nodes)
+        return self.rng.choice(self.nodes)
 
 
 @dataclass

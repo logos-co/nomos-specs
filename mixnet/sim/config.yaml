@@ -3,11 +3,17 @@ simulation:
   net_latency_sec: 0.01
 
 logic:
-  lottery_interval_sec: 1
-  sender_prob: 0.01
+  sender_lottery:
+    interval_sec: 1
+    probability: 0.01
+    seed: 10
   
 mixnet:
   num_nodes: 5
   transmission_rate_per_sec: 10
-  peering_degree: 6
-  max_mix_path_length: 3
+  peering:
+    degree: 6
+    seed: 0
+  mix_path:
+    max_length: 3
+    seed: 3

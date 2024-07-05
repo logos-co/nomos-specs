@@ -1,5 +1,3 @@
-import random
-
 import usim
 
 import mixnet.framework.usim as usimfw
@@ -16,7 +14,6 @@ class Simulation:
     framework: Framework
 
     def __init__(self, config: Config):
-        random.seed()
         self.config = config
 
     async def run(self):
@@ -39,10 +36,11 @@ class Simulation:
                 [
                     NodeInfo(node_config.private_key.public_key())
                     for node_config in node_configs
-                ]
+                ],
+                self.config.mixnet.mix_path.seed,
             ),
             self.config.mixnet.transmission_rate_per_sec,
-            self.config.mixnet.max_mix_path_length,
+            self.config.mixnet.mix_path.max_length,
         )
         nodes = [
             Node(self.framework, node_config, global_config)
@@ -66,7 +64,8 @@ class Simulation:
         return MeteredRemoteSimplexConnection(self.config.simulation, self.framework)
 
     async def run_logic(self, node: Node):
+        lottery_config = self.config.logic.sender_lottery
         while True:
-            await (usim.time + self.config.logic.lottery_interval_sec)
-            if random.random() < self.config.logic.sender_prob:
+            await (usim.time + lottery_config.interval_sec)
+            if lottery_config.seed.random() < lottery_config.probability:
                 await node.send_message(b"selected block")

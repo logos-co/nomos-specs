@@ -62,7 +62,7 @@ class Node:
         if msg_with_flag is not None:
             flag, msg = PacketBuilder.parse_msg_and_flag(msg_with_flag)
             if flag == MessageFlag.MESSAGE_FLAG_REAL:
-                print(f"Broadcasting message finally: {msg}")
+                print(f"{self.config.id(True)}: Broadcasting message finally: {msg}")
                 await self.broadcast_channel.put(msg)
 
     def connect(
@@ -93,7 +93,7 @@ class Node:
         )
 
     async def send_message(self, msg: bytes):
-        print(f"Sending message: {msg}")
+        print(f"{self.config.id(True)}: Sending message: {msg}")
         for packet, _ in PacketBuilder.build_real_packets(
             msg, self.global_config.membership
         ):
