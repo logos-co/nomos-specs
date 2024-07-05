@@ -97,11 +97,9 @@ class MixnetConfig:
 @dataclass
 class PeeringConfig:
     degree: int
-    seed: random.Random
 
     def validate(self):
         assert self.degree > 0
-        assert self.seed is not None
 
 
 @dataclass

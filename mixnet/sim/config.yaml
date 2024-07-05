@@ -13,7 +13,6 @@ mixnet:
   transmission_rate_per_sec: 10
   peering:
     degree: 6
-    seed: 0
   mix_path:
     max_length: 3
     seed: 3
