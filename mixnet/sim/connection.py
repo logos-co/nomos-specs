@@ -5,12 +5,12 @@ import pandas
 
 from mixnet.connection import SimplexConnection
 from mixnet.framework.framework import Framework, Queue
-from mixnet.sim.config import SimulationConfig
+from mixnet.sim.config import NetworkConfig
 
 
 class MeteredRemoteSimplexConnection(SimplexConnection):
     framework: Framework
-    config: SimulationConfig
+    latency: float
     outputs: Queue
     conn: Queue
     inputs: Queue
@@ -19,9 +19,9 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
     input_task: Awaitable
     input_meters: list[int]
 
-    def __init__(self, config: SimulationConfig, framework: Framework):
+    def __init__(self, config: NetworkConfig, framework: Framework):
         self.framework = framework
-        self.config = config
+        self.latency = config.seed.random() * config.max_latency_sec
         self.outputs = framework.queue()
         self.conn = framework.queue()
         self.inputs = framework.queue()
@@ -49,7 +49,7 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
             data = await self.conn.get()
             if data is None:
                 break
-            await self.framework.sleep(self.config.net_latency_sec)
+            await self.framework.sleep(self.latency)
             self.__update_meter(self.input_meters, len(data), start_time)
             await self.inputs.put(data)
 

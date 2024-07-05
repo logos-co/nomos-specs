@@ -1,6 +1,8 @@
 simulation:
   duration_sec: 1000
-  net_latency_sec: 0.01
+  network:
+    max_latency_sec: 0.01
+    seed: 0
 
 logic:
   sender_lottery:

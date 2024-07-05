@@ -38,11 +38,21 @@ class Config:
 @dataclass
 class SimulationConfig:
     duration_sec: int
-    net_latency_sec: float
+    network: NetworkConfig
 
     def validate(self):
         assert self.duration_sec > 0
-        assert self.net_latency_sec > 0
+        self.network.validate()
+
+
+@dataclass
+class NetworkConfig:
+    max_latency_sec: float
+    seed: random.Random
+
+    def validate(self):
+        assert self.max_latency_sec > 0
+        assert self.seed is not None
 
 
 @dataclass

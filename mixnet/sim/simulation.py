@@ -64,7 +64,9 @@ class Simulation:
         return nodes, conn_stats
 
     def create_conn(self) -> MeteredRemoteSimplexConnection:
-        return MeteredRemoteSimplexConnection(self.config.simulation, self.framework)
+        return MeteredRemoteSimplexConnection(
+            self.config.simulation.network, self.framework
+        )
 
     async def run_logic(self, node: Node):
         lottery_config = self.config.logic.sender_lottery
