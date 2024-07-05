@@ -1,4 +1,4 @@
-use blake2::{Blake2s256, Digest};
+use sha2::{Digest, Sha256};
 use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +40,7 @@ impl NoteWitness {
     }
 
     pub fn commit(&self, nf_pk: NullifierCommitment, nonce: NullifierNonce) -> NoteCommitment {
-        let mut hasher = Blake2s256::new();
+        let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_CL_NOTE_COMMIT");
 
         // COMMIT TO BALANCE

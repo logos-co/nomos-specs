@@ -78,11 +78,16 @@ fn main() {
     // Obtain the default prover.
     let prover = default_prover();
 
+    
+    use std::time::Instant;
+    let start_t = Instant::now();
+
     // Proof information by proving the specified ELF binary.
     // This struct contains the receipt along with statistics about execution of the guest
     let opts = risc0_zkvm::ProverOpts::succinct();
     let prove_info = prover.prove_with_opts(env, METHOD_ELF, &opts).unwrap();
 
+    println!("STARK prover time: {:.2?}", start_t.elapsed());
     // extract the receipt.
     let receipt = prove_info.receipt;
 
