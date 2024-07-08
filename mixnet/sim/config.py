@@ -75,7 +75,7 @@ class LotteryConfig:
 
     def validate(self):
         assert self.interval_sec > 0
-        assert self.probability > 0
+        assert self.probability >= 0
         assert self.seed is not None
 
 
