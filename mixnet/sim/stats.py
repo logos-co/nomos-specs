@@ -32,29 +32,18 @@ class ConnectionStats:
         self._bandwidths_per_node()
 
     def _bandwidths_per_conn(self):
-        _, axs = plt.subplots(nrows=2, ncols=1, figsize=(12, 6))
+        plt.plot(figsize=(12, 6))
 
-        for _, (inbound_conns, outbound_conns) in self.conns_per_node.items():
-            for conn in inbound_conns:
-                inbound_bandwidths = conn.input_bandwidths().map(lambda x: x / 1024)
-                axs[0].plot(inbound_bandwidths.index, inbound_bandwidths)
-
+        for _, (_, outbound_conns) in self.conns_per_node.items():
             for conn in outbound_conns:
-                outbound_bandwidths = conn.output_bandwidths().map(lambda x: x / 1024)
-                axs[1].plot(outbound_bandwidths.index, outbound_bandwidths)
+                sending_bandwidths = conn.sending_bandwidths().map(lambda x: x / 1024)
+                plt.plot(sending_bandwidths.index, sending_bandwidths)
 
-        axs[0].set_title("Inbound Bandwidths per Connection")
-        axs[0].set_xlabel("Time (s)")
-        axs[0].set_ylabel("Bandwidth (KB/s)")
-        axs[0].set_ylim(bottom=0)
-        axs[0].grid(True)
-
-        axs[1].set_title("Outbound Bandwidths per Connection")
-        axs[1].set_xlabel("Time (s)")
-        axs[1].set_ylabel("Bandwidth (KB/s)")
-        axs[1].set_ylim(bottom=0)
-        axs[1].grid(True)
-
+        plt.title("Unidirectional Bandwidths per Connection")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Bandwidth (KB/s)")
+        plt.ylim(bottom=0)
+        plt.grid(True)
         plt.tight_layout()
         plt.show()
 
@@ -66,14 +55,14 @@ class ConnectionStats:
         ):
             inbound_bandwidths = (
                 pandas.concat(
-                    [conn.input_bandwidths() for conn in inbound_conns], axis=1
+                    [conn.receiving_bandwidths() for conn in inbound_conns], axis=1
                 )
                 .sum(axis=1)
                 .map(lambda x: x / 1024)
             )
             outbound_bandwidths = (
                 pandas.concat(
-                    [conn.output_bandwidths() for conn in outbound_conns], axis=1
+                    [conn.sending_bandwidths() for conn in outbound_conns], axis=1
                 )
                 .sum(axis=1)
                 .map(lambda x: x / 1024)
