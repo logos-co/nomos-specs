@@ -28,11 +28,42 @@ class ConnectionStats:
         self.conns_per_node[node][1].append(outbound_conn)
 
     def bandwidths(self):
-        plt.figure(figsize=(12, 6))
+        self._bandwidths_per_conn()
+        self._bandwidths_per_node()
 
-        plt.subplot(2, 1, 1)
+    def _bandwidths_per_conn(self):
+        _, axs = plt.subplots(nrows=2, ncols=1, figsize=(12, 6))
 
-        for i, (_, (inbound_conns, _)) in enumerate(self.conns_per_node.items()):
+        for _, (inbound_conns, outbound_conns) in self.conns_per_node.items():
+            for conn in inbound_conns:
+                inbound_bandwidths = conn.input_bandwidths().map(lambda x: x / 1024)
+                axs[0].plot(inbound_bandwidths.index, inbound_bandwidths)
+
+            for conn in outbound_conns:
+                outbound_bandwidths = conn.output_bandwidths().map(lambda x: x / 1024)
+                axs[1].plot(outbound_bandwidths.index, outbound_bandwidths)
+
+        axs[0].set_title("Inbound Bandwidths per Connection")
+        axs[0].set_xlabel("Time (s)")
+        axs[0].set_ylabel("Bandwidth (KB/s)")
+        axs[0].set_ylim(bottom=0)
+        axs[0].grid(True)
+
+        axs[1].set_title("Outbound Bandwidths per Connection")
+        axs[1].set_xlabel("Time (s)")
+        axs[1].set_ylabel("Bandwidth (KB/s)")
+        axs[1].set_ylim(bottom=0)
+        axs[1].grid(True)
+
+        plt.tight_layout()
+        plt.show()
+
+    def _bandwidths_per_node(self):
+        _, axs = plt.subplots(nrows=2, ncols=1, figsize=(12, 6))
+
+        for i, (_, (inbound_conns, outbound_conns)) in enumerate(
+            self.conns_per_node.items()
+        ):
             inbound_bandwidths = (
                 pandas.concat(
                     [conn.input_bandwidths() for conn in inbound_conns], axis=1
@@ -40,18 +71,6 @@ class ConnectionStats:
                 .sum(axis=1)
                 .map(lambda x: x / 1024)
             )
-            plt.plot(inbound_bandwidths.index, inbound_bandwidths, label=f"Node-{i}")
-
-        plt.xlabel("Time (s)")
-        plt.ylabel("Bandwidth (KB/s)")
-        plt.title("Inbound Bandwidths per Node")
-        plt.legend()
-        plt.ylim(bottom=0)
-        plt.grid(True)
-
-        plt.subplot(2, 1, 2)
-
-        for i, (_, (_, outbound_conns)) in enumerate(self.conns_per_node.items()):
             outbound_bandwidths = (
                 pandas.concat(
                     [conn.output_bandwidths() for conn in outbound_conns], axis=1
@@ -59,13 +78,24 @@ class ConnectionStats:
                 .sum(axis=1)
                 .map(lambda x: x / 1024)
             )
-            plt.plot(outbound_bandwidths.index, outbound_bandwidths, label=f"Node-{i}")
+            axs[0].plot(inbound_bandwidths.index, inbound_bandwidths, label=f"Node-{i}")
+            axs[1].plot(
+                outbound_bandwidths.index, outbound_bandwidths, label=f"Node-{i}"
+            )
 
-        plt.xlabel("Time (s)")
-        plt.ylabel("Bandwidth (KB/s)")
-        plt.title("Outbound Bandwidths per Node")
-        plt.legend()
-        plt.ylim(bottom=0)
-        plt.grid(True)
+        axs[0].set_title("Inbound Bandwidths per Node")
+        axs[0].set_xlabel("Time (s)")
+        axs[0].set_ylabel("Bandwidth (KB/s)")
+        axs[0].legend()
+        axs[0].set_ylim(bottom=0)
+        axs[0].grid(True)
+
+        axs[1].set_title("Outbound Bandwidths per Node")
+        axs[1].set_xlabel("Time (s)")
+        axs[1].set_ylabel("Bandwidth (KB/s)")
+        axs[1].legend()
+        axs[1].set_ylim(bottom=0)
+        axs[1].grid(True)
 
         plt.tight_layout()
+        plt.show()
