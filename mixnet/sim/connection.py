@@ -1,4 +1,5 @@
 import math
+from collections import Counter
 from typing import Awaitable
 
 import pandas
@@ -21,6 +22,7 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
     recv_meters: list[int]
     send_node_states: list[NodeState]
     recv_node_states: list[NodeState]
+    msg_sizes: Counter[int]
 
     def __init__(
         self,
@@ -40,9 +42,11 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         self.recv_task = framework.spawn(self.__run_recv_task())
         self.send_node_states = send_node_states
         self.recv_node_states = recv_node_states
+        self.msg_sizes = Counter()
 
     async def send(self, data: bytes) -> None:
         await self.send_queue.put(data)
+        self.msg_sizes.update([len(data)])
         ms = math.floor(self.framework.now() * 1000)
         self.send_node_states[ms] = NodeState.SENDING
 

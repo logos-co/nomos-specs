@@ -1,3 +1,5 @@
+from collections import Counter
+
 import matplotlib.pyplot as plt
 import pandas
 
@@ -27,9 +29,20 @@ class ConnectionStats:
         self.conns_per_node[node][0].append(inbound_conn)
         self.conns_per_node[node][1].append(outbound_conn)
 
-    def bandwidths(self):
+    def analyze(self):
+        self._message_sizes()
         self._bandwidths_per_conn()
         self._bandwidths_per_node()
+
+    def _message_sizes(self):
+        sizes = Counter()
+        for _, (_, outbound_conns) in self.conns_per_node.items():
+            for conn in outbound_conns:
+                sizes.update(conn.msg_sizes)
+
+        df = pandas.DataFrame.from_dict(sizes, orient="index").reset_index()
+        df.columns = ["msg_size", "count"]
+        print(df)
 
     def _bandwidths_per_conn(self):
         plt.plot(figsize=(12, 6))

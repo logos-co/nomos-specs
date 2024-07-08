@@ -19,7 +19,7 @@ class Simulation:
 
     async def run(self):
         conn_stats, all_node_states = await self._run()
-        conn_stats.bandwidths()
+        conn_stats.analyze()
         all_node_states.analyze()
 
     async def _run(self) -> tuple[ConnectionStats, AllNodeStates]:
