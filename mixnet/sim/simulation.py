@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import usim
 
 import mixnet.framework.usim as usimfw
@@ -21,6 +22,8 @@ class Simulation:
         conn_stats, all_node_states = await self._run()
         conn_stats.bandwidths()
         all_node_states.analyze()
+        # Show all plots that have been created so far
+        plt.show()
 
     async def _run(self) -> tuple[ConnectionStats, AllNodeStates]:
         async with usim.until(usim.time + self.config.simulation.duration_sec) as scope:
