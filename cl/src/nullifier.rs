@@ -9,6 +9,12 @@ use blake2::{Blake2s256, Digest};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 
+// TODO: create a nullifier witness and use it throughout.
+// struct NullifierWitness {
+//     nf_sk: NullifierSecret,
+//     nonce: NullifierNonce
+// }
+
 // Maintained privately by note holder
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NullifierSecret([u8; 16]);

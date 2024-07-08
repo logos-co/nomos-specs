@@ -67,15 +67,14 @@ pub fn verify_path(leaf: [u8; 32], path: &[PathNode], root: [u8; 32]) -> bool {
 }
 
 pub fn path<const N: usize>(leaves: [[u8; 32]; N], idx: usize) -> Vec<PathNode> {
-    let n = leaves.len();
-    assert!(n.is_power_of_two());
-    assert!(idx < n);
+    assert!(N.is_power_of_two());
+    assert!(idx < N);
 
     let mut nodes = leaves;
     let mut path = Vec::new();
     let mut idx = idx;
 
-    for h in (1..=n.ilog2()).rev() {
+    for h in (1..=N.ilog2()).rev() {
         if idx % 2 == 0 {
             path.push(PathNode::Right(nodes[idx + 1]));
         } else {
