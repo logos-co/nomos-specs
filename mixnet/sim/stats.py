@@ -41,7 +41,7 @@ class ConnectionStats:
 
         plt.title("Unidirectional Bandwidths per Connection")
         plt.xlabel("Time (s)")
-        plt.ylabel("Bandwidth (KB/s)")
+        plt.ylabel("Bandwidth (KiB/s)")
         plt.ylim(bottom=0)
         plt.grid(True)
         plt.tight_layout()
@@ -74,14 +74,14 @@ class ConnectionStats:
 
         axs[0].set_title("Inbound Bandwidths per Node")
         axs[0].set_xlabel("Time (s)")
-        axs[0].set_ylabel("Bandwidth (KB/s)")
+        axs[0].set_ylabel("Bandwidth (KiB/s)")
         axs[0].legend()
         axs[0].set_ylim(bottom=0)
         axs[0].grid(True)
 
         axs[1].set_title("Outbound Bandwidths per Node")
         axs[1].set_xlabel("Time (s)")
-        axs[1].set_ylabel("Bandwidth (KB/s)")
+        axs[1].set_ylabel("Bandwidth (KiB/s)")
         axs[1].legend()
         axs[1].set_ylim(bottom=0)
         axs[1].grid(True)
