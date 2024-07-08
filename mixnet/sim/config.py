@@ -37,6 +37,8 @@ class Config:
 
 @dataclass
 class SimulationConfig:
+    # Desired duration of the simulation in seconds
+    # Since the simulation uses discrete time steps, the actual duration may be longer or shorter.
     duration_sec: int
     network: NetworkConfig
 
@@ -47,7 +49,10 @@ class SimulationConfig:
 
 @dataclass
 class NetworkConfig:
+    # Maximum network latency between nodes in seconds.
+    # A constant latency will be chosen randomly for each connection within the range [0, max_latency_sec].
     max_latency_sec: float
+    # Seed for the random number generator used to determine the network latencies.
     seed: random.Random
 
     def validate(self):
@@ -69,8 +74,11 @@ class LogicConfig:
 
 @dataclass
 class LotteryConfig:
+    # Interval between lottery draws in seconds.
     interval_sec: float
+    # Probability of a node being selected as a sender in each lottery draw.
     probability: float
+    # Seed for the random number generator used to determine the lottery winners.
     seed: random.Random
 
     def validate(self):
@@ -81,7 +89,9 @@ class LotteryConfig:
 
 @dataclass
 class MixnetConfig:
+    # Total number of nodes in the entire network.
     num_nodes: int
+    # Global constant transmission rate of each connection in messages per second.
     transmission_rate_per_sec: int
     peering: PeeringConfig
     mix_path: MixPathConfig
@@ -110,6 +120,7 @@ class MixnetConfig:
 
 @dataclass
 class PeeringConfig:
+    # Target number of peers each node can connect to (both inbound and outbound).
     degree: int
 
     def validate(self):
@@ -118,7 +129,9 @@ class PeeringConfig:
 
 @dataclass
 class MixPathConfig:
+    # Maximum number of mix nodes to be chosen for a Sphinx packet.
     max_length: int
+    # Seed for the random number generator used to determine the mix path.
     seed: random.Random
 
     def validate(self):

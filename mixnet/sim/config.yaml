@@ -1,20 +1,33 @@
 simulation:
+  # Desired duration of the simulation in seconds
+  # Since the simulation uses discrete time steps, the actual duration may be longer or shorter.
   duration_sec: 1000
   network:
+    # Maximum network latency between nodes in seconds.
+    # A constant latency will be chosen randomly for each connection within the range [0, max_latency_sec].
     max_latency_sec: 0.1
+    # Seed for the random number generator used to determine the network latencies.
     seed: 0
 
 logic:
   sender_lottery:
+    # Interval between lottery draws in seconds.
     interval_sec: 1
+    # Probability of a node being selected as a sender in each lottery draw.
     probability: 0.001
+    # Seed for the random number generator used to determine the lottery winners.
     seed: 10
   
 mixnet:
+  # Total number of nodes in the entire network.
   num_nodes: 5
+  # Global constant transmission rate of each connection in messages per second.
   transmission_rate_per_sec: 10
   peering:
+    # Target number of peers each node can connect to (both inbound and outbound).
     degree: 6
   mix_path:
+    # Maximum number of mix nodes to be chosen for a Sphinx packet.
     max_length: 3
+    # Seed for the random number generator used to determine the mix path.
     seed: 3
