@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
+import matplotlib.pyplot as plt
 import pandas
 
 
@@ -42,3 +43,37 @@ class AllNodeStates:
         print(state_counts)
         print("\nState Percentages per Node:")
         print(state_percentages)
+
+        # Draw dot plot
+        plt.figure(figsize=(15, 8))
+
+        # Iterate through the DataFrame to plot the dots
+        for node in df.columns:
+            times = df.index
+            states = df[node]
+
+            sending_times = times[states == NodeState.SENDING.value]
+            receiving_times = times[states == NodeState.RECEIVING.value]
+
+            plt.scatter(
+                sending_times,
+                [node] * len(sending_times),
+                color="red",
+                marker="o",
+                s=10,
+                label="SENDING" if node == df.columns[0] else "",
+            )
+            plt.scatter(
+                receiving_times,
+                [node] * len(receiving_times),
+                color="blue",
+                marker="x",
+                s=10,
+                label="RECEIVING" if node == df.columns[0] else "",
+            )
+
+        plt.xlabel("Time")
+        plt.ylabel("Node")
+        plt.title("Node States Over Time")
+        plt.legend(loc="upper right")
+        plt.show()
