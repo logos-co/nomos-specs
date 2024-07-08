@@ -4,7 +4,6 @@ import hashlib
 from enum import Enum
 from typing import Awaitable, Callable, TypeAlias
 
-from pysphinx.payload import DEFAULT_PAYLOAD_SIZE
 from pysphinx.sphinx import (
     Payload,
     ProcessedFinalHopPacket,
@@ -28,6 +27,7 @@ class Node:
     mixgossip_channel: MixGossipChannel
     reconstructor: MessageReconstructor
     broadcast_channel: BroadcastChannel
+    packet_size: int
 
     def __init__(
         self, framework: Framework, config: NodeConfig, global_config: GlobalConfig
@@ -40,6 +40,11 @@ class Node:
         )
         self.reconstructor = MessageReconstructor()
         self.broadcast_channel = framework.queue()
+
+        sample_packet, _ = PacketBuilder.build_real_packets(
+            bytes(1), global_config.membership
+        )[0]
+        self.packet_size = len(sample_packet.bytes())
 
     async def __process_sphinx_packet(
         self, packet: SphinxPacket
@@ -77,6 +82,8 @@ class Node:
         ):
             raise PeeringDegreeReached
 
+        noise_msg = build_msg(MsgType.NOISE, bytes(self.packet_size))
+
         self.mixgossip_channel.add_conn(
             DuplexConnection(
                 inbound_conn,
@@ -84,6 +91,7 @@ class Node:
                     self.framework,
                     outbound_conn,
                     self.global_config.transmission_rate_per_sec,
+                    noise_msg,
                 ),
             )
         )
@@ -94,6 +102,7 @@ class Node:
                     self.framework,
                     inbound_conn,
                     self.global_config.transmission_rate_per_sec,
+                    noise_msg,
                 ),
             )
         )
@@ -188,17 +197,20 @@ class MixSimplexConnection:
     queue: NetworkPacketQueue
     conn: SimplexConnection
     transmission_rate_per_sec: float
+    noise_msg: bytes
 
     def __init__(
         self,
         framework: Framework,
         conn: SimplexConnection,
         transmission_rate_per_sec: float,
+        noise_msg: bytes,
     ):
         self.framework = framework
         self.queue = framework.queue()
         self.conn = conn
         self.transmission_rate_per_sec = transmission_rate_per_sec
+        self.noise_msg = noise_msg
         self.task = framework.spawn(self.__run())
 
     async def __run(self):
@@ -206,7 +218,7 @@ class MixSimplexConnection:
             await self.framework.sleep(1 / self.transmission_rate_per_sec)
             # TODO: time mixing
             if self.queue.empty():
-                elem = build_noise_packet()
+                elem = self.noise_msg
             else:
                 elem = await self.queue.get()
             await self.conn.send(elem)
@@ -228,10 +240,6 @@ def parse_msg(data: bytes) -> tuple[MsgType, bytes]:
     if len(data) < 1:
         raise ValueError("Invalid message format")
     return (MsgType(data[:1]), data[1:])
-
-
-def build_noise_packet() -> bytes:
-    return build_msg(MsgType.NOISE, bytes(DEFAULT_PAYLOAD_SIZE))
 
 
 class PeeringDegreeReached(Exception):
