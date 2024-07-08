@@ -32,7 +32,7 @@ class MeteredRemoteSimplexConnection(SimplexConnection):
         recv_node_states: list[NodeState],
     ):
         self.framework = framework
-        self.latency = config.random_latency()
+        self.latency = config.latency.random_latency()
         self.send_queue = framework.queue()
         self.mid_queue = framework.queue()
         self.recv_queue = framework.queue()

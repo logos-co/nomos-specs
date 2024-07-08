@@ -32,17 +32,17 @@ class Simulation:
         assert False  # unreachable
 
     def init_nodes(self) -> tuple[list[Node], ConnectionStats, AllNodeStates]:
-        node_configs = self.config.mixnet.node_configs()
+        node_configs = self.config.node_configs()
         global_config = GlobalConfig(
             MixMembership(
                 [
                     NodeInfo(node_config.private_key.public_key())
                     for node_config in node_configs
                 ],
-                self.config.mixnet.mix_path.seed,
+                self.config.mix.mix_path.seed,
             ),
-            self.config.mixnet.transmission_rate_per_sec,
-            self.config.mixnet.mix_path.max_length,
+            self.config.mix.transmission_rate_per_sec,
+            self.config.mix.mix_path.max_length,
         )
         nodes = [
             Node(self.framework, node_config, global_config)
@@ -74,7 +74,7 @@ class Simulation:
         self, sender_states: list[NodeState], receiver_states: list[NodeState]
     ) -> MeteredRemoteSimplexConnection:
         return MeteredRemoteSimplexConnection(
-            self.config.simulation.network,
+            self.config.network,
             self.framework,
             sender_states,
             receiver_states,
