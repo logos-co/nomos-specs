@@ -5,17 +5,10 @@ from typing import Self
 
 import multiaddr
 import trio
+from constants import *
 from libp2p import host, new_host
 from libp2p.network.stream.net_stream_interface import INetStream
 from libp2p.peer.peerinfo import info_from_p2p_addr
-from libp2p.typing import TProtocol
-
-PROTOCOL_ID = TProtocol("/nomosda/1.0.0")
-MAX_READ_LEN = 2**32 - 1
-# make this ocnfigurable
-DATA_SIZE = 1024
-# make this ocnfigurable
-COL_SIZE = 4096
 
 
 class Executor:
@@ -52,8 +45,11 @@ class Executor:
     def get_port(self):
         return self.port
 
+    def get_hash(self, index: int):
+        return self.data_hashes[index]
+
     def __create_data(self):
-        for i in range(COL_SIZE):
+        for i in range(COL_SIZE - 1):
             self.data[i] = randbytes(DATA_SIZE)
             self.data_hashes[i] = sha256(self.data[i]).hexdigest()
 
