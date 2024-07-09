@@ -12,7 +12,7 @@ from pysphinx.sphinx import (
     SphinxPacket,
 )
 
-from mixnet.config import GlobalConfig, NodeConfig
+from mixnet.config import GlobalConfig, GossipConfig, NodeConfig
 from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
 NetworkPacketQueue: TypeAlias = asyncio.Queue[bytes]
@@ -32,7 +32,7 @@ class Node:
         self.config = config
         self.global_config = global_config
         self.mixgossip_channel = MixGossipChannel(
-            config.peering_degree, self.__process_sphinx_packet
+            config.gossip, self.__process_sphinx_packet
         )
         self.reconstructor = MessageReconstructor()
         self.broadcast_channel = asyncio.Queue()
@@ -97,17 +97,17 @@ class Node:
 
 
 class MixGossipChannel:
-    peering_degree: int
+    config: GossipConfig
     conns: list[DuplexConnection]
     handler: Callable[[SphinxPacket], Awaitable[SphinxPacket | None]]
     msg_cache: set[bytes]
 
     def __init__(
         self,
-        peering_degree: int,
+        config: GossipConfig,
         handler: Callable[[SphinxPacket], Awaitable[SphinxPacket | None]],
     ):
-        self.peering_degree = peering_degree
+        self.config = config
         self.conns = []
         self.handler = handler
         self.msg_cache = set()
@@ -116,7 +116,7 @@ class MixGossipChannel:
         self.tasks = set()
 
     def add_conn(self, conn: DuplexConnection):
-        if len(self.conns) >= self.peering_degree:
+        if len(self.conns) >= self.config.peering_degree:
             # For simplicity of the spec, reject the connection if the peering degree is reached.
             raise ValueError("The peering degree is reached.")
 

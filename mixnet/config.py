@@ -22,9 +22,14 @@ class GlobalConfig:
 @dataclass
 class NodeConfig:
     private_key: X25519PrivateKey
+    mix_path_length: int  # TODO: use this when creating Sphinx packets
+    gossip: GossipConfig
+
+
+@dataclass
+class GossipConfig:
     # The target number of peers a node should maintain in its p2p network
     peering_degree: int
-    mix_path_length: int  # TODO: use this when creating Sphinx packets
 
 
 @dataclass
