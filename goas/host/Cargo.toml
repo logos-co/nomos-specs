@@ -1,0 +1,19 @@
+[package]
+name = "host"
+version = "0.1.0"
+edition = "2021"
+default-run = "host"
+
+[dependencies]
+methods = { path = "../methods" }
+risc0-zkvm = { version = "1.0.1", features = ["prove"] }
+risc0-groth16 = { version = "1.0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = "1.0"
+blake2 = "0.10"
+bincode = "1"
+common = { path = "../common" }
+tempfile = "3"
+clap = { version = "4", features = ["derive"] }
+rand = "0.8.5"
+cl = { path = "../../cl" }

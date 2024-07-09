@@ -7,3 +7,9 @@ pysphinx==0.0.1
 scipy==1.11.4
 black==23.12.1
 sympy==1.12
+sh==2.0.6 # used for shelling out to noir
+toml==0.10.2 # used for noir
+portalocker==2.8.2 # portable file locking
+keum==0.2.0 # for CL's use of more obscure curves
+poseidon-hash==0.1.4 # used as the algebraic hash in CL
+hypothesis==6.103.0
