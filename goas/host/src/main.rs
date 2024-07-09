@@ -4,6 +4,15 @@ use blake2::{Blake2s256, Digest};
 use common::*;
 use risc0_zkvm::{default_prover, ExecutorEnv};
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+enum Action {
+    Stf,
+    Nullifier,
+}
+
 fn stf_prove_stark() {
     let mut rng = rand::thread_rng();
 
@@ -157,8 +166,12 @@ fn main() {
         .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
         .init();
 
-    // stf_prove_stark();
-    nf_prove_stark();
+    let action = Action::parse();
+
+    match action {
+        Action::Stf => stf_prove_stark(),
+        Action::Nullifier => nf_prove_stark(),
+    }
 }
 
 fn calculate_state_hash(state: &State) -> [u8; 32] {
