@@ -33,7 +33,34 @@ async def run_subnets(net, num_nodes, nursery, shutdown):
     print("nodes ready")
     nodes = net.get_nodes()
     subnets = calculate_subnets(nodes)
+    await print_subnet_info(subnets)
 
+    print("Establishing connections...")
+    node_list = {}
+    all_node_instances = set()
+    await establish_connections(subnets, node_list, all_node_instances)
+
+    print("starting executor...")
+    exe = Executor.new(7766, node_list)
+    await exe.execute(nursery)
+
+    all_nodes = list(all_node_instances)
+    checked = []
+
+    await trio.sleep(1)
+
+    print("starting sampling...")
+    for _ in range(SAMPLE_THRESHOLD):
+        nursery.start_soon(sample_node, exe, subnets, checked)
+
+    print("waiting for sampling to finish...")
+    await check_complete(checked)
+
+    print("Test completed")
+    shutdown.set()
+
+
+async def print_subnet_info(subnets):
     print()
     print("By subnets: ")
     for subnet in subnets:
@@ -44,15 +71,13 @@ async def run_subnets(net, num_nodes, nursery, shutdown):
         print()
 
     print()
-
     print()
-    print("Establishing connections...")
 
-    node_list = []
-    all_node_instances = set()
 
+async def establish_connections(subnets, node_list, all_node_instances):
     for subnet in subnets:
         for n in subnets[subnet]:
+            this_nodes_peers = n.net_iface().get_peerstore().peer_ids()
             all_node_instances.add(n)
             for i, nn in enumerate(subnets[subnet]):
                 if nn.get_id() == n.get_id():
@@ -61,45 +86,30 @@ async def run_subnets(net, num_nodes, nursery, shutdown):
                 remote_port = nn.get_port()
                 addr = "/ip4/127.0.0.1/tcp/{}/p2p/{}/".format(remote_port, remote_id)
                 remote_addr = multiaddr.Multiaddr(addr)
-                print("{} connecting to {}...".format(n.get_id(), addr))
                 remote = info_from_p2p_addr(remote_addr)
-                if i == 0:
-                    node_list.append(remote)
+                if subnet not in node_list:
+                    node_list[subnet] = []
+                node_list[subnet].append(remote)
+                if nn.get_id() in this_nodes_peers:
+                    continue
+                print("{} connecting to {}...".format(n.get_id(), addr))
                 await n.net_iface().connect(remote)
 
     print()
-    print("starting executor...")
-    exe = Executor.new(7766, node_list)
-    await exe.execute(nursery)
-
-    all_nodes = list(all_node_instances)
-    checked = []
-
-    print("starting sampling...")
-    for _ in range(SAMPLE_THRESHOLD):
-        nursery.start_soon(sample_node, exe, all_nodes, checked)
-
-    print("waiting for sampling to finish...")
-    await check_complete(checked)
-
-    print("Test completed")
-    shutdown.set()
 
 
 async def check_complete(checked):
     while len(checked) < SAMPLE_THRESHOLD:
         await trio.sleep(0.5)
-        print(len(checked))
-        print("waited")
     print("check_complete exiting")
     return
 
 
-async def sample_node(exe, all_nodes, checked):
-    r = randint(0, COL_SIZE - 1)
-    hashstr = exe.get_hash(r)
-    n = randint(0, len(all_nodes) - 1)
-    node = all_nodes[n]
+async def sample_node(exe, subnets, checked):
+    s = randint(0, len(subnets) - 1)
+    n = randint(0, len(subnets[s]) - 1)
+    node = subnets[s][n]
+    hashstr = exe.get_hash(s)
     has = await node.has_hash(hashstr)
     if has:
         print("node {} has hash {}".format(node.get_id().pretty(), hashstr))

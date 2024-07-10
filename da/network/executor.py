@@ -20,7 +20,7 @@ class Executor:
     listen_addr: multiaddr.Multiaddr
     host: host
     port: int
-    node_list: []
+    node_list: {}
     data: []
     data_hashes: []
 
@@ -49,18 +49,19 @@ class Executor:
         return self.data_hashes[index]
 
     def __create_data(self):
-        for i in range(COL_SIZE - 1):
+        for i in range(COL_SIZE):
             self.data[i] = randbytes(DATA_SIZE)
             self.data_hashes[i] = sha256(self.data[i]).hexdigest()
 
     async def execute(self, nursery):
         """ """
         async with self.host.run(listen_addrs=[self.listen_addr]):
-            for i, n in enumerate(self.node_list):
+            for subnet, nodes in self.node_list.items():
+                n = nodes[0]
                 await self.host.connect(n)
 
                 stream = await self.host.new_stream(n.peer_id, [PROTOCOL_ID])
-                nursery.start_soon(self.write_data, stream, i)
+                nursery.start_soon(self.write_data, stream, subnet)
 
     async def write_data(self, stream: INetStream, index: int) -> None:
         await stream.write(self.data[index])
