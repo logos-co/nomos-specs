@@ -6,10 +6,10 @@ from constants import *
 REPLICATION_FACTOR = 4
 
 
-def calculate_subnets(node_list):
+def calculate_subnets(node_list, num_subnets):
     subnets = {}
     for i, n in enumerate(node_list):
-        idx = i % COL_SIZE
+        idx = i % num_subnets
 
         if idx not in subnets:
             subnets[idx] = []
@@ -17,12 +17,12 @@ def calculate_subnets(node_list):
 
     listlen = len(node_list)
     i = listlen
-    while i < COL_SIZE:
+    while i < num_subnets:
         subnets[i] = []
         subnets[i].append(node_list[i % listlen])
         i += 1
 
-    if listlen < REPLICATION_FACTOR * COL_SIZE:
+    if listlen < REPLICATION_FACTOR * num_subnets:
         for subnet in subnets:
             last = subnets[subnet][len(subnets[subnet]) - 1].get_id()
             idx = -1

@@ -20,18 +20,22 @@ class Executor:
     listen_addr: multiaddr.Multiaddr
     host: host
     port: int
+    num_subnets: int
+    data_size: int
     node_list: {}
     data: []
     data_hashes: []
 
     @classmethod
-    def new(cls, port, node_list) -> Self:
+    def new(cls, port, node_list, num_subnets, data_size) -> Self:
         self = cls()
         self.listen_addr = multiaddr.Multiaddr(f"/ip4/0.0.0.0/tcp/{port}")
         self.host = new_host()
         self.port = port
-        self.data = [[] * DATA_SIZE] * COL_SIZE
-        self.data_hashes = [[] * 256] * COL_SIZE
+        self.num_subnets = num_subnets
+        self.data_size = data_size
+        self.data = [[] * data_size] * num_subnets
+        self.data_hashes = [[] * 256] * num_subnets
         self.node_list = node_list
         self.__create_data()
         return self
@@ -49,8 +53,8 @@ class Executor:
         return self.data_hashes[index]
 
     def __create_data(self):
-        for i in range(COL_SIZE):
-            self.data[i] = randbytes(DATA_SIZE)
+        for i in range(self.num_subnets):
+            self.data[i] = randbytes(self.data_size)
             self.data_hashes[i] = sha256(self.data[i]).hexdigest()
 
     async def execute(self, nursery):
