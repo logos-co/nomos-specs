@@ -19,7 +19,7 @@ class TestPacket(TestCase):
         global_config, _, key_map = init_mixnet_config(10)
         msg = self.random_bytes(3500)
         packets_and_routes = PacketBuilder.build_real_packets(
-            msg, global_config.membership
+            msg, global_config.membership, 3
         )
         self.assertEqual(4, len(packets_and_routes))
 
@@ -60,7 +60,7 @@ class TestPacket(TestCase):
         global_config, _, key_map = init_mixnet_config(10)
         msg = b"cover"
         packets_and_routes = PacketBuilder.build_drop_cover_packets(
-            msg, global_config.membership
+            msg, global_config.membership, 3
         )
         self.assertEqual(1, len(packets_and_routes))
 

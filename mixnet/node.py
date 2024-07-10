@@ -35,7 +35,7 @@ class Node:
         self.broadcast_channel = asyncio.Queue()
 
         sample_packet, _ = PacketBuilder.build_real_packets(
-            bytes(1), global_config.membership
+            bytes(1), global_config.membership, self.global_config.max_mix_path_length
         )[0]
         self.packet_size = len(sample_packet.bytes())
 
@@ -102,7 +102,9 @@ class Node:
 
     async def send_message(self, msg: bytes):
         for packet, _ in PacketBuilder.build_real_packets(
-            msg, self.global_config.membership
+            msg,
+            self.global_config.membership,
+            self.config.mix_path_length,
         ):
             await self.mixgossip_channel.gossip(
                 Node.__build_msg(MsgType.REAL, packet.bytes())

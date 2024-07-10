@@ -23,24 +23,27 @@ class MessageFlag(Enum):
 class PacketBuilder:
     @staticmethod
     def build_real_packets(
-        message: bytes, membership: MixMembership
+        message: bytes, membership: MixMembership, path_len: int
     ) -> List[Tuple[SphinxPacket, List[NodeInfo]]]:
         return PacketBuilder.__build_packets(
-            MessageFlag.MESSAGE_FLAG_REAL, message, membership
+            MessageFlag.MESSAGE_FLAG_REAL, message, membership, path_len
         )
 
     @staticmethod
     def build_drop_cover_packets(
-        message: bytes, membership: MixMembership
+        message: bytes, membership: MixMembership, path_len: int
     ) -> List[Tuple[SphinxPacket, List[NodeInfo]]]:
         return PacketBuilder.__build_packets(
-            MessageFlag.MESSAGE_FLAG_DROP_COVER, message, membership
+            MessageFlag.MESSAGE_FLAG_DROP_COVER, message, membership, path_len
         )
 
     @staticmethod
     def __build_packets(
-        flag: MessageFlag, message: bytes, membership: MixMembership
+        flag: MessageFlag, message: bytes, membership: MixMembership, path_len: int
     ) -> List[Tuple[SphinxPacket, List[NodeInfo]]]:
+        if path_len <= 0:
+            raise ValueError("path_len must be greater than 0")
+
         last_mix = membership.choose()
 
         msg_with_flag = flag.bytes() + message
@@ -50,7 +53,7 @@ class PacketBuilder:
 
         out = []
         for fragment in fragment_set.fragments:
-            route = membership.generate_route(3, last_mix)
+            route = membership.generate_route(path_len, last_mix)
             packet = SphinxPacket.build(
                 fragment.bytes(),
                 [mixnode.sphinx_node() for mixnode in route],

@@ -22,7 +22,7 @@ class GlobalConfig:
 @dataclass
 class NodeConfig:
     private_key: X25519PrivateKey
-    mix_path_length: int  # TODO: use this when creating Sphinx packets
+    mix_path_length: int
     gossip: GossipConfig
 
 
