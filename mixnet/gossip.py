@@ -7,9 +7,17 @@ from mixnet.connection import DuplexConnection
 
 
 class GossipChannel:
+    """
+    A gossip channel that broadcasts messages to all connected peers.
+    Peers are connected via DuplexConnection.
+    This class simplifies and simulates the libp2p gossipsub.
+    """
+
     config: GossipConfig
     conns: list[DuplexConnection]
+    # A handler to process inbound messages.
     handler: Callable[[bytes], Awaitable[bytes | None]]
+    # A set of message hashes to prevent processing the same message twice.
     msg_cache: set[bytes]
 
     def __init__(

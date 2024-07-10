@@ -20,6 +20,13 @@ BroadcastChannel: TypeAlias = asyncio.Queue[bytes]
 
 
 class Node:
+    """
+    This represents any node in the network, which:
+    - generates/gossips mix messages (Sphinx packets)
+    - performs cryptographic mix (unwrapping Sphinx packets)
+    - generates noise
+    """
+
     config: NodeConfig
     global_config: GlobalConfig
     mixgossip_channel: GossipChannel
@@ -40,6 +47,9 @@ class Node:
         self.packet_size = len(sample_packet.bytes())
 
     async def __process_msg(self, msg: bytes) -> bytes | None:
+        """
+        A handler to process messages received via gossip channel
+        """
         flag, msg = Node.__parse_msg(msg)
         match flag:
             case MsgType.NOISE:
@@ -56,6 +66,9 @@ class Node:
     async def __process_sphinx_packet(
         self, packet: SphinxPacket
     ) -> SphinxPacket | None:
+        """
+        Unwrap the Sphinx packet and process the next Sphinx packet or the payload.
+        """
         try:
             processed = packet.process(self.config.private_key)
             match processed:
@@ -68,6 +81,9 @@ class Node:
             return packet
 
     async def __process_sphinx_payload(self, payload: Payload):
+        """
+        Process the Sphinx payload and broadcast it if it is a real message.
+        """
         msg_with_flag = self.reconstructor.add(
             Fragment.from_bytes(payload.recover_plain_playload())
         )
@@ -77,8 +93,13 @@ class Node:
                 await self.broadcast_channel.put(msg)
 
     def connect(self, peer: Node):
+        """
+        Establish a duplex connection with a peer node.
+        """
         noise_msg = Node.__build_msg(MsgType.NOISE, bytes(self.packet_size))
         inbound_conn, outbound_conn = asyncio.Queue(), asyncio.Queue()
+
+        # Register a duplex connection for its own use
         self.mixgossip_channel.add_conn(
             DuplexConnection(
                 inbound_conn,
@@ -89,6 +110,7 @@ class Node:
                 ),
             )
         )
+        # Register the same duplex connection for the peer
         peer.mixgossip_channel.add_conn(
             DuplexConnection(
                 outbound_conn,
@@ -101,6 +123,11 @@ class Node:
         )
 
     async def send_message(self, msg: bytes):
+        """
+        Build a Sphinx packet and gossip it to all connected peers.
+        """
+        # Here, we handle the case in which a msg is split into multiple Sphinx packets.
+        # But, in practice, we expect a message to be small enough to fit in a single Sphinx packet.
         for packet, _ in PacketBuilder.build_real_packets(
             msg,
             self.global_config.membership,
@@ -112,10 +139,16 @@ class Node:
 
     @staticmethod
     def __build_msg(flag: MsgType, data: bytes) -> bytes:
+        """
+        Prepend a flag to the message, right before sending it via network channel.
+        """
         return flag.value + data
 
     @staticmethod
     def __parse_msg(data: bytes) -> tuple[MsgType, bytes]:
+        """
+        Parse the message and extract the flag.
+        """
         if len(data) < 1:
             raise ValueError("Invalid message format")
         return (MsgType(data[:1]), data[1:])

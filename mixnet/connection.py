@@ -7,6 +7,11 @@ SimplexConnection = NetworkPacketQueue
 
 
 class DuplexConnection:
+    """
+    A duplex connection in which data can be transmitted and received simultaneously in both directions.
+    This is to mimic duplex communication in a real network (such as TCP or QUIC).
+    """
+
     inbound: SimplexConnection
     outbound: MixSimplexConnection
 
@@ -22,6 +27,10 @@ class DuplexConnection:
 
 
 class MixSimplexConnection:
+    """
+    Wraps a SimplexConnection to add a transmission rate and noise to the connection.
+    """
+
     queue: NetworkPacketQueue
     conn: SimplexConnection
     transmission_rate_per_sec: int
@@ -39,12 +48,13 @@ class MixSimplexConnection:
     async def __run(self):
         while True:
             await asyncio.sleep(1 / self.transmission_rate_per_sec)
-            # TODO: time mixing
+            # TODO: temporal mixing
             if self.queue.empty():
-                elem = self.noise_msg
+                # To guarantee GTR, send noise if there is no message to send
+                msg = self.noise_msg
             else:
-                elem = self.queue.get_nowait()
-            await self.conn.put(elem)
+                msg = self.queue.get_nowait()
+            await self.conn.put(msg)
 
-    async def send(self, elem: bytes):
-        await self.queue.put(elem)
+    async def send(self, msg: bytes):
+        await self.queue.put(msg)

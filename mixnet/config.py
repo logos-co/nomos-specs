@@ -13,6 +13,10 @@ from pysphinx.sphinx import Node as SphinxNode
 
 @dataclass
 class GlobalConfig:
+    """
+    Global parameters used across all nodes in the network
+    """
+
     membership: MixMembership
     transmission_rate_per_sec: int  # Global Transmission Rate
     # TODO: use this to make the size of Sphinx packet constant
@@ -21,6 +25,10 @@ class GlobalConfig:
 
 @dataclass
 class NodeConfig:
+    """
+    Node-specific parameters
+    """
+
     private_key: X25519PrivateKey
     mix_path_length: int
     gossip: GossipConfig
@@ -34,6 +42,11 @@ class GossipConfig:
 
 @dataclass
 class MixMembership:
+    """
+    A list of public information of nodes in the network.
+    We assume that this list is eventually known to all nodes in the network (e.g. via p2p advertising).
+    """
+
     nodes: List[NodeInfo]
 
     def generate_route(self, num_hops: int, last_mix: NodeInfo) -> list[NodeInfo]:
@@ -53,6 +66,10 @@ class MixMembership:
 
 @dataclass
 class NodeInfo:
+    """
+    Public information of a node to be shared to all nodes in the network
+    """
+
     public_key: X25519PublicKey
 
     def sphinx_node(self) -> SphinxNode:
