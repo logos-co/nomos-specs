@@ -32,6 +32,8 @@ class Node:
     mixgossip_channel: GossipChannel
     reconstructor: MessageReconstructor
     broadcast_channel: BroadcastChannel
+    # The actual packet size is calculated based on the max length of mix path by Sphinx encoding
+    # when the node is initialized, so that it can be used to generate noise packets.
     packet_size: int
 
     def __init__(self, config: NodeConfig, global_config: GlobalConfig):
