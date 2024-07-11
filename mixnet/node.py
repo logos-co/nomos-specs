@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from enum import Enum
 from typing import TypeAlias
 
 from pysphinx.sphinx import (
@@ -12,7 +11,6 @@ from pysphinx.sphinx import (
 )
 
 from mixnet.config import GlobalConfig, NodeConfig
-from mixnet.connection import DuplexConnection, MixSimplexConnection
 from mixnet.nomssip import Nomssip
 from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
@@ -32,44 +30,52 @@ class Node:
     nomssip: Nomssip
     reconstructor: MessageReconstructor
     broadcast_channel: BroadcastChannel
-    # The actual packet size is calculated based on the max length of mix path by Sphinx encoding
-    # when the node is initialized, so that it can be used to generate noise packets.
-    packet_size: int
 
     def __init__(self, config: NodeConfig, global_config: GlobalConfig):
         self.config = config
         self.global_config = global_config
-        self.nomssip = Nomssip(config.nomssip, self.__process_msg)
+        self.nomssip = Nomssip(
+            Nomssip.Config(
+                global_config.transmission_rate_per_sec,
+                config.nomssip.peering_degree,
+                self.__calculate_message_size(global_config),
+            ),
+            self.__process_msg,
+        )
         self.reconstructor = MessageReconstructor()
         self.broadcast_channel = asyncio.Queue()
 
+    @staticmethod
+    def __calculate_message_size(global_config: GlobalConfig) -> int:
+        """
+        Calculate the actual message size to be gossiped, which depends on the maximum length of mix path.
+        """
         sample_packet, _ = PacketBuilder.build_real_packets(
-            bytes(1), global_config.membership, self.global_config.max_mix_path_length
+            bytes(1), global_config.membership, global_config.max_mix_path_length
         )[0]
-        self.packet_size = len(sample_packet.bytes())
+        return len(sample_packet.bytes())
 
-    async def __process_msg(self, msg: bytes) -> bytes | None:
+    async def __process_msg(self, msg: bytes) -> None:
         """
         A handler to process messages received via gossip channel
         """
-        flag, msg = Node.__parse_msg(msg)
-        match flag:
-            case MsgType.NOISE:
-                # Drop noise packet
-                return None
-            case MsgType.REAL:
-                # Handle the packet and gossip the result if needed.
-                sphinx_packet = SphinxPacket.from_bytes(msg)
-                new_sphinx_packet = await self.__process_sphinx_packet(sphinx_packet)
-                if new_sphinx_packet is None:
-                    return None
-                return Node.__build_msg(MsgType.REAL, new_sphinx_packet.bytes())
+        sphinx_packet = SphinxPacket.from_bytes(msg)
+        result = await self.__process_sphinx_packet(sphinx_packet)
+        match result:
+            case SphinxPacket():
+                # Gossip the next Sphinx packet
+                await self.nomssip.gossip(result.bytes())
+            case bytes():
+                # Broadcast the message fully recovered from Sphinx packets
+                await self.broadcast_channel.put(result)
+            case None:
+                return
 
     async def __process_sphinx_packet(
         self, packet: SphinxPacket
-    ) -> SphinxPacket | None:
+    ) -> SphinxPacket | bytes | None:
         """
-        Unwrap the Sphinx packet and process the next Sphinx packet or the payload.
+        Unwrap the Sphinx packet and process the next Sphinx packet or the payload if possible
         """
         try:
             processed = packet.process(self.config.private_key)
@@ -77,14 +83,14 @@ class Node:
                 case ProcessedForwardHopPacket():
                     return processed.next_packet
                 case ProcessedFinalHopPacket():
-                    await self.__process_sphinx_payload(processed.payload)
+                    return await self.__process_sphinx_payload(processed.payload)
         except ValueError:
-            # Return SphinxPacket as it is, if it cannot be unwrapped by the private key of this node.
-            return packet
+            # Return nothing, if it cannot be unwrapped by the private key of this node.
+            return None
 
-    async def __process_sphinx_payload(self, payload: Payload):
+    async def __process_sphinx_payload(self, payload: Payload) -> bytes | None:
         """
-        Process the Sphinx payload and broadcast it if it is a real message.
+        Process the Sphinx payload if possible
         """
         msg_with_flag = self.reconstructor.add(
             Fragment.from_bytes(payload.recover_plain_playload())
@@ -92,37 +98,18 @@ class Node:
         if msg_with_flag is not None:
             flag, msg = PacketBuilder.parse_msg_and_flag(msg_with_flag)
             if flag == MessageFlag.MESSAGE_FLAG_REAL:
-                await self.broadcast_channel.put(msg)
+                return msg
+        return None
 
     def connect(self, peer: Node):
         """
         Establish a duplex connection with a peer node.
         """
-        noise_msg = Node.__build_msg(MsgType.NOISE, bytes(self.packet_size))
         inbound_conn, outbound_conn = asyncio.Queue(), asyncio.Queue()
-
         # Register a duplex connection for its own use
-        self.nomssip.add_conn(
-            DuplexConnection(
-                inbound_conn,
-                MixSimplexConnection(
-                    outbound_conn,
-                    self.global_config.transmission_rate_per_sec,
-                    noise_msg,
-                ),
-            )
-        )
-        # Register the same duplex connection for the peer
-        peer.nomssip.add_conn(
-            DuplexConnection(
-                outbound_conn,
-                MixSimplexConnection(
-                    inbound_conn,
-                    self.global_config.transmission_rate_per_sec,
-                    noise_msg,
-                ),
-            )
-        )
+        self.nomssip.add_conn(inbound_conn, outbound_conn)
+        # Register a duplex connection for the peer
+        peer.nomssip.add_conn(outbound_conn, inbound_conn)
 
     async def send_message(self, msg: bytes):
         """
@@ -135,25 +122,4 @@ class Node:
             self.global_config.membership,
             self.config.mix_path_length,
         ):
-            await self.nomssip.gossip(Node.__build_msg(MsgType.REAL, packet.bytes()))
-
-    @staticmethod
-    def __build_msg(flag: MsgType, data: bytes) -> bytes:
-        """
-        Prepend a flag to the message, right before sending it via network channel.
-        """
-        return flag.value + data
-
-    @staticmethod
-    def __parse_msg(data: bytes) -> tuple[MsgType, bytes]:
-        """
-        Parse the message and extract the flag.
-        """
-        if len(data) < 1:
-            raise ValueError("Invalid message format")
-        return (MsgType(data[:1]), data[1:])
-
-
-class MsgType(Enum):
-    REAL = b"\x00"
-    NOISE = b"\x01"
+            await self.nomssip.gossip(packet.bytes())
