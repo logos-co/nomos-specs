@@ -2,22 +2,52 @@ syntax = "proto3";
 
 package dispersal;
 
-message DispersalReq {
+message Blob {
     bytes blob_id = 1;
     bytes data = 2;
 }
 
+message BlobId {
+    bytes blob_id = 1;
+}
+
+message Error {
+    string description = 1;
+}
+
+message DispersalErr {
+    oneof message_type {
+        Error chunk_size_err = 1;
+        Error verification_err = 2;
+    }
+}
+
+message DispersalReq {
+    Blob blob = 1;
+}
+
 message DispersalRes {
-    int32 blob_id = 1;
+    oneof message_type {
+        BlobId blob_id = 1;
+        DispersalErr err = 2;
+    }
+}
+
+message SampleErr {
+    oneof message_type {
+        Error not_found = 1;
+    }
 }
 
 message SampleReq {
-    int32 blob_id = 1;
+    BlobId blob_id = 1;
 }
 
 message SampleRes {
-    int32 blob_id = 1;
-    bytes data = 2;
+    oneof message_type {
+        Blob blob = 1;
+        SampleErr err = 2;
+    }
 }
 
 message DispersalMessage {
@@ -28,4 +58,3 @@ message DispersalMessage {
         SampleRes sample_res = 4;
     }
 }
-

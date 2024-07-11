@@ -26,7 +26,7 @@ class Node:
 
     async def _handle(self, conn_id, writer, message):
         if message.HasField('dispersal_req'):
-            print(f"Received DispersalRes: blob_id={message.dispersal_req.blob_id}")
+            print(f"Received DispersalRes: blob_id={message.dispersal_req.blob.blob_id}")
         elif message.HasField('sample_req'):
             print(f"Received SampleRes: blob_id={message.sample_req.blob_id}")
         else:
