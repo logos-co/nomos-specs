@@ -30,9 +30,13 @@ impl OutputWitness {
         }
     }
 
+    pub fn commit_note(&self) -> NoteCommitment {
+        self.note.commit(self.nf_pk, self.nonce)
+    }
+
     pub fn commit(&self) -> Output {
         Output {
-            note_comm: self.note.commit(self.nf_pk, self.nonce),
+            note_comm: self.commit_note(),
             balance: self.note.balance(),
         }
     }
