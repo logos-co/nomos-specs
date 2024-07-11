@@ -43,7 +43,9 @@ class Node:
         Calculate the actual message size to be gossiped, which depends on the maximum length of mix path.
         """
         sample_sphinx_packet, _ = SphinxPacketBuilder.build(
-            bytes(1), global_config.membership, global_config.max_mix_path_length
+            bytes(global_config.max_message_size),
+            global_config,
+            global_config.max_mix_path_length,
         )
         return len(sample_sphinx_packet.bytes())
 
@@ -98,7 +100,7 @@ class Node:
         # But, in practice, we expect a message to be small enough to fit in a single Sphinx packet.
         sphinx_packet, _ = SphinxPacketBuilder.build(
             msg,
-            self.global_config.membership,
+            self.global_config,
             self.config.mix_path_length,
         )
         await self.nomssip.gossip(sphinx_packet.bytes())

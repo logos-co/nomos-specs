@@ -15,7 +15,7 @@ class TestSphinxPacketBuilder(TestCase):
     def test_builder(self):
         global_config, _, key_map = init_mixnet_config(10)
         msg = self.random_bytes(500)
-        packet, route = SphinxPacketBuilder.build(msg, global_config.membership, 3)
+        packet, route = SphinxPacketBuilder.build(msg, global_config, 3)
         self.assertEqual(3, len(route))
 
         processed = packet.process(key_map[route[0].public_key.public_bytes_raw()])

@@ -12,7 +12,6 @@ from mixnet.config import (
 def init_mixnet_config(
     num_nodes: int,
 ) -> tuple[GlobalConfig, list[NodeConfig], dict[bytes, X25519PrivateKey]]:
-    transmission_rate_per_sec = 3
     max_mix_path_length = 3
     gossip_config = NomssipConfig(peering_degree=6)
     node_configs = [
@@ -26,8 +25,9 @@ def init_mixnet_config(
                 for node_config in node_configs
             ]
         ),
-        transmission_rate_per_sec,
-        max_mix_path_length,
+        transmission_rate_per_sec=3,
+        max_message_size=512,
+        max_mix_path_length=max_mix_path_length,
     )
     key_map = {
         node_config.private_key.public_key().public_bytes_raw(): node_config.private_key

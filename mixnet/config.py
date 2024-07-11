@@ -19,7 +19,8 @@ class GlobalConfig:
 
     membership: MixMembership
     transmission_rate_per_sec: int  # Global Transmission Rate
-    # TODO: use this to make the size of Sphinx packet constant
+    # TODO: use these two to make the size of Sphinx packet constant
+    max_message_size: int
     max_mix_path_length: int
 
 

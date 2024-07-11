@@ -2,23 +2,22 @@ from __future__ import annotations
 
 from typing import List, Tuple
 
-from pysphinx.payload import Payload
 from pysphinx.sphinx import SphinxPacket
 
-from mixnet.config import MixMembership, NodeInfo
+from mixnet.config import GlobalConfig, NodeInfo
 
 
 class SphinxPacketBuilder:
     @staticmethod
     def build(
-        message: bytes, membership: MixMembership, path_len: int
+        message: bytes, global_config: GlobalConfig, path_len: int
     ) -> Tuple[SphinxPacket, List[NodeInfo]]:
         if path_len <= 0:
             raise ValueError("path_len must be greater than 0")
-        if len(message) > Payload.max_plain_payload_size():
+        if len(message) > global_config.max_message_size:
             raise ValueError("message is too long")
 
-        route = membership.generate_route(path_len)
+        route = global_config.membership.generate_route(path_len)
         # We don't need the destination (defined in the Loopix Sphinx spec)
         # because the last mix will broadcast the fully unwrapped message.
         # Later, we will optimize the Sphinx according to our requirements.
