@@ -19,25 +19,19 @@ class Nomssip:
         peering_degree: int
         msg_size: int
 
-    config: Config
-    conns: list[DuplexConnection]
-    # A handler to process inbound messages.
-    handler: Callable[[bytes], Awaitable[None]]
-    # A set of packet hashes to prevent gossiping/processing the same packet twice.
-    packet_cache: set[bytes]
-
     def __init__(
         self,
         config: Config,
         handler: Callable[[bytes], Awaitable[None]],
     ):
         self.config = config
-        self.conns = []
+        self.conns: list[DuplexConnection] = []
+        # A handler to process inbound messages.
         self.handler = handler
-        self.packet_cache = set()
+        self.packet_cache: set[bytes] = set()
         # A set just for gathering a reference of tasks to prevent them from being garbage collected.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
-        self.tasks = set()
+        self.tasks: set[asyncio.Task] = set()
 
     def add_conn(self, inbound: SimplexConnection, outbound: SimplexConnection):
         if len(self.conns) >= self.config.peering_degree:

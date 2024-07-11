@@ -12,9 +12,6 @@ class DuplexConnection:
     This is to mimic duplex communication in a real network (such as TCP or QUIC).
     """
 
-    inbound: SimplexConnection
-    outbound: MixSimplexConnection
-
     def __init__(self, inbound: SimplexConnection, outbound: MixSimplexConnection):
         self.inbound = inbound
         self.outbound = outbound
@@ -30,11 +27,6 @@ class MixSimplexConnection:
     """
     Wraps a SimplexConnection to add a transmission rate and noise to the connection.
     """
-
-    queue: NetworkPacketQueue
-    conn: SimplexConnection
-    transmission_rate_per_sec: int
-    noise_msg: bytes
 
     def __init__(
         self, conn: SimplexConnection, transmission_rate_per_sec: int, noise_msg: bytes

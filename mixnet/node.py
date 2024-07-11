@@ -24,11 +24,6 @@ class Node:
     - generates noise
     """
 
-    config: NodeConfig
-    global_config: GlobalConfig
-    nomssip: Nomssip
-    broadcast_channel: BroadcastChannel
-
     def __init__(self, config: NodeConfig, global_config: GlobalConfig):
         self.config = config
         self.global_config = global_config
