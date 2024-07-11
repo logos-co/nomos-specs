@@ -27,13 +27,14 @@ class Node:
     async def _handle(self, conn_id, writer, message):
         if message.HasField('dispersal_req'):
             blob_id = message.dispersal_req.blob.blob_id
-            print(f"Node: Received DispersalRes: blob_id={blob_id}")
+            data = message.dispersal_req.blob.data
+            print(f"Node: Received DispersalRes: blob_id={blob_id}; data={data}")
             # Imitate succesful verification.
             writer.write(proto.new_dispersal_res_success_msg(blob_id))
         elif message.HasField('sample_req'):
             print(f"Node: Received SampleRes: blob_id={message.sample_req.blob_id}")
         else:
-            print("Node: Received unknown message type")
+            print(f"Node: Received unknown message: {message} ")
 
     async def run(self):
         await self.listen()
