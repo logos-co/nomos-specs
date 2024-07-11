@@ -116,4 +116,4 @@ class Nomssip:
         """
         if len(data) < 1:
             raise ValueError("Invalid message format")
-        return (Nomssip.PacketType(data[0]), data[1:])
+        return (Nomssip.PacketType(data[:1]), data[1:])
