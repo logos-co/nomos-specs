@@ -2,10 +2,10 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
 from mixnet.config import (
     GlobalConfig,
-    GossipConfig,
     MixMembership,
     NodeConfig,
     NodeInfo,
+    NomssipConfig,
 )
 
 
@@ -14,7 +14,7 @@ def init_mixnet_config(
 ) -> tuple[GlobalConfig, list[NodeConfig], dict[bytes, X25519PrivateKey]]:
     transmission_rate_per_sec = 3
     max_mix_path_length = 3
-    gossip_config = GossipConfig(peering_degree=6)
+    gossip_config = NomssipConfig(peering_degree=6)
     node_configs = [
         NodeConfig(X25519PrivateKey.generate(), max_mix_path_length, gossip_config)
         for _ in range(num_nodes)

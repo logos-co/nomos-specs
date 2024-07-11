@@ -13,7 +13,7 @@ from pysphinx.sphinx import (
 
 from mixnet.config import GlobalConfig, NodeConfig
 from mixnet.connection import DuplexConnection, MixSimplexConnection
-from mixnet.gossip import GossipChannel
+from mixnet.nomssip import Nomssip
 from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
 
 BroadcastChannel: TypeAlias = asyncio.Queue[bytes]
@@ -29,7 +29,7 @@ class Node:
 
     config: NodeConfig
     global_config: GlobalConfig
-    mixgossip_channel: GossipChannel
+    nomssip: Nomssip
     reconstructor: MessageReconstructor
     broadcast_channel: BroadcastChannel
     # The actual packet size is calculated based on the max length of mix path by Sphinx encoding
@@ -39,7 +39,7 @@ class Node:
     def __init__(self, config: NodeConfig, global_config: GlobalConfig):
         self.config = config
         self.global_config = global_config
-        self.mixgossip_channel = GossipChannel(config.gossip, self.__process_msg)
+        self.nomssip = Nomssip(config.nomssip, self.__process_msg)
         self.reconstructor = MessageReconstructor()
         self.broadcast_channel = asyncio.Queue()
 
@@ -102,7 +102,7 @@ class Node:
         inbound_conn, outbound_conn = asyncio.Queue(), asyncio.Queue()
 
         # Register a duplex connection for its own use
-        self.mixgossip_channel.add_conn(
+        self.nomssip.add_conn(
             DuplexConnection(
                 inbound_conn,
                 MixSimplexConnection(
@@ -113,7 +113,7 @@ class Node:
             )
         )
         # Register the same duplex connection for the peer
-        peer.mixgossip_channel.add_conn(
+        peer.nomssip.add_conn(
             DuplexConnection(
                 outbound_conn,
                 MixSimplexConnection(
@@ -135,9 +135,7 @@ class Node:
             self.global_config.membership,
             self.config.mix_path_length,
         ):
-            await self.mixgossip_channel.gossip(
-                Node.__build_msg(MsgType.REAL, packet.bytes())
-            )
+            await self.nomssip.gossip(Node.__build_msg(MsgType.REAL, packet.bytes()))
 
     @staticmethod
     def __build_msg(flag: MsgType, data: bytes) -> bytes:

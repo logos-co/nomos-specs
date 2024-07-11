@@ -31,11 +31,11 @@ class NodeConfig:
 
     private_key: X25519PrivateKey
     mix_path_length: int
-    gossip: GossipConfig
+    nomssip: NomssipConfig
 
 
 @dataclass
-class GossipConfig:
+class NomssipConfig:
     # The target number of peers a node should maintain in its p2p network
     peering_degree: int
 

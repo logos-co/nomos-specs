@@ -2,18 +2,17 @@ import asyncio
 import hashlib
 from typing import Awaitable, Callable
 
-from mixnet.config import GossipConfig
+from mixnet.config import NomssipConfig
 from mixnet.connection import DuplexConnection
 
 
-class GossipChannel:
+class Nomssip:
     """
-    A gossip channel that broadcasts messages to all connected peers.
+    A NomMix gossip channel that broadcasts messages to all connected peers.
     Peers are connected via DuplexConnection.
-    This class simplifies and simulates the libp2p gossipsub.
     """
 
-    config: GossipConfig
+    config: NomssipConfig
     conns: list[DuplexConnection]
     # A handler to process inbound messages.
     handler: Callable[[bytes], Awaitable[bytes | None]]
@@ -22,7 +21,7 @@ class GossipChannel:
 
     def __init__(
         self,
-        config: GossipConfig,
+        config: NomssipConfig,
         handler: Callable[[bytes], Awaitable[bytes | None]],
     ):
         self.config = config
