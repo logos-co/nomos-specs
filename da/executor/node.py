@@ -20,17 +20,20 @@ class Node:
         server = await asyncio.start_server(
             self._on_conn, self.addr, self.port
         )
-        print(f"Server started at {self.addr}:{self.port}")
+        print(f"Node: Server started at {self.addr}:{self.port}")
         async with server:
             await server.serve_forever()
 
     async def _handle(self, conn_id, writer, message):
         if message.HasField('dispersal_req'):
-            print(f"Received DispersalRes: blob_id={message.dispersal_req.blob.blob_id}")
+            blob_id = message.dispersal_req.blob.blob_id
+            print(f"Node: Received DispersalRes: blob_id={blob_id}")
+            # Imitate succesful verification.
+            writer.write(proto.new_dispersal_res_success_msg(blob_id))
         elif message.HasField('sample_req'):
-            print(f"Received SampleRes: blob_id={message.sample_req.blob_id}")
+            print(f"Node: Received SampleRes: blob_id={message.sample_req.blob_id}")
         else:
-            print("Received unknown message type")
+            print("Node: Received unknown message type")
 
     async def run(self):
         await self.listen()

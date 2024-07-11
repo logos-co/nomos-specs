@@ -24,8 +24,6 @@ def main():
     # TODO: Add args parser.
     app = App()
 
-    # asyncio.run(app.run_nodes(10000, 4096))
-    # asyncio.run(app.run_executor('localhost', 8888, 1))
     asyncio.run(app.run_node_with_executor(1))
 
 if __name__ == '__main__':

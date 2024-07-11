@@ -22,7 +22,7 @@ class Executor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"Error during message sending: {e}")
+                print(f"Executor: Error during message sending: {e}")
 
     async def connect(self):
         try:
@@ -30,18 +30,18 @@ class Executor:
             conn_id = len(self.connections)
             transport = Transport(conn_id, reader, writer, self._handle)
             self.connections.append(transport)
-            print(f"Connected to {self.addr}:{self.port}, ID: {conn_id}")
+            print(f"Executor: Connected to {self.addr}:{self.port}, ID: {conn_id}")
             asyncio.create_task(transport.read_and_process())
         except Exception as e:
-            print(f"Failed to connect or lost connection: {e}")
+            print(f"Executor: Failed to connect or lost connection: {e}")
 
     async def _handle(self, conn_id, writer, message):
         if message.HasField('dispersal_res'):
-            print(f"Received DispersalRes: blob_id={message.dispersal_res.blob_id}")
+            print(f"Executor: Received DispersalRes: blob_id={message.dispersal_res.blob_id}")
         elif message.HasField('sample_res'):
-            print(f"Received SampleRes: blob_id={message.sample_res.blob_id}")
+            print(f"Executor: Received SampleRes: blob_id={message.sample_res.blob_id}")
         else:
-            print("Received unknown message type")
+            print("Executor: Received unknown message type")
 
     async def run(self):
         await asyncio.gather(*(self.connect() for _ in range(self.col_num)))
