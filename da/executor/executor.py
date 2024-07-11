@@ -11,11 +11,12 @@ class Executor:
         self.interval = 10
 
     async def execute(self):
-        data = "TEST DATA"
+        blob_id = b"test"
+        data = b"TEST DATA"
         while True:
             try:
                 for transport in self.connections:
-                    message = proto.new_dispersal_put_msg(data)
+                    message = proto.new_dispersal_req_msg(blob_id, data)
                     await transport.write(message)
                 await asyncio.sleep(self.interval)
             except asyncio.CancelledError:
@@ -35,11 +36,12 @@ class Executor:
             print(f"Failed to connect or lost connection: {e}")
 
     async def _handle(self, conn_id, writer, message):
-        msg_type, msg_id, data = message
-        if msg_type == proto.DISPERSAL_OK:
-            print(f"Executor: Dispersal OK from connection {conn_id}, message ID {msg_id}.")
-        elif msg_type == proto.SAMPLE_OK:
-            print(f"Executor: Sample OK from connection {conn_id}, message ID {msg_id}.")
+        if message.HasField('dispersal_res'):
+            print(f"Received DispersalRes: blob_id={message.dispersal_res.blob_id}")
+        elif message.HasField('sample_res'):
+            print(f"Received SampleRes: blob_id={message.sample_res.blob_id}")
+        else:
+            print("Received unknown message type")
 
     async def run(self):
         await asyncio.gather(*(self.connect() for _ in range(self.col_num)))

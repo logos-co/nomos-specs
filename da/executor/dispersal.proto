@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package dispersal;
+
+message DispersalReq {
+    bytes blob_id = 1;
+    bytes data = 2;
+}
+
+message DispersalRes {
+    int32 blob_id = 1;
+}
+
+message SampleReq {
+    int32 blob_id = 1;
+}
+
+message SampleRes {
+    int32 blob_id = 1;
+    bytes data = 2;
+}
+
+message DispersalMessage {
+    oneof message_type {
+        DispersalReq dispersal_req = 1;
+        DispersalRes dispersal_res = 2;
+        SampleReq sample_req = 3;
+        SampleRes sample_res = 4;
+    }
+}
+

@@ -1,50 +1,35 @@
-import struct
+import dispersal_pb2
 from itertools import count
 
-DISPERSAL_PUT = 0x01
-DISPERSAL_OK = 0x02
-SAMPLE_PUT = 0x03
-SAMPLE_OK = 0x04
+MAX_MSG_LEN_BYTES = 2
 
-HEADER_SIZE = 9
-HEADER_FORMAT = "!B I I"
+def pack_message(message):
+    # SerializeToString method returns an instance of bytes.
+    data = message.SerializeToString()
+    length_prefix = len(data).to_bytes(MAX_MSG_LEN_BYTES, byteorder='big')
+    return length_prefix + data
 
-DISPERSAL_HASH_COL_SIZE = 6
-# First 4 bytes for the hash and the next 2 bytes for the column index.
-DISPERSAL_HASH_COL_FORMAT = "!I H"
+def unpack_message(data):
+    message = dispersal_pb2.DispersalMessage()
+    message.ParseFromString(data)
+    return message
 
-msg_id_counter = count(start=1)
+def new_dispersal_req_msg(blob_id, data):
+    dispersal_req = dispersal_pb2.DispersalReq(blob_id=blob_id, data=data)
+    dispersal_message = dispersal_pb2.DispersalMessage(dispersal_req=dispersal_req)
+    return pack_message(dispersal_message)
 
-def pack_header(msg_type, msg_id, data):
-    encoded_data = data.encode()
-    data_length = len(encoded_data)
-    header = struct.pack(HEADER_FORMAT, msg_type, msg_id, data_length)
-    return header + encoded_data
+def new_dispersal_res_msg(blob_id):
+    dispersal_res = dispersal_pb2.DispersalRes(blob_id=blob_id)
+    dispersal_message = dispersal_pb2.DispersalMessage(dispersal_res=dispersal_res)
+    return pack_message(dispersal_message)
 
-def unpack_header(data):
-    if len(data) < HEADER_SIZE:
-        return None, None, None, None
-    msg_type, msg_id, data_length = struct.unpack(HEADER_FORMAT, data[:HEADER_SIZE])
-    return msg_type, msg_id, data_length
+def new_sample_req_msg(blob_id):
+    sample_req = dispersal_pb2.SampleReq(blob_id=blob_id)
+    dispersal_message = dispersal_pb2.DispersalMessage(sample_req=sample_req)
+    return pack_message(dispersal_message)
 
-def new_dispersal_put_msg(data):
-    msg_id = next(msg_id_counter)
-    return pack_header(DISPERSAL_PUT, msg_id, data)
-
-def new_dispersal_ok_msg(msg_id):
-    return pack_header(DISPERSAL_OK, msg_id, "")
-
-def new_sample_put_msg(data):
-    msg_id = next(msg_id_counter)
-    return pack_header(SAMPLE_PUT, msg_id, data)
-
-def new_sample_ok_msg(msg_id, response_data):
-    return pack_header(SAMPLE_OK, msg_id, response_data)
-
-def parse_dispersal_data(data):
-    if len(data) >= DISPERSAL_HASH_COL_SIZE:
-        hash_value, col_index = struct.unpack(DISPERSAL_HASH_COL_FORMAT, data[:DISPERSAL_HASH_COL_SIZE])
-        remaining_data = data[DISPERSAL_HASH_COL_SIZE:]
-        return hash_value, col_index, remaining_data
-    else:
-        raise ValueError("Data is too short to unpack hash and col.")
+def new_sample_res_msg(blob_id, data):
+    sample_res = dispersal_pb2.SampleRes(blob_id=blob_id, data=data)
+    dispersal_message = dispersal_pb2.DispersalMessage(sample_res=sample_res)
+    return pack_message(dispersal_message)

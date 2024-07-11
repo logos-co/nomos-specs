@@ -25,12 +25,12 @@ class Node:
             await server.serve_forever()
 
     async def _handle(self, conn_id, writer, message):
-        msg_type, msg_id, data = message
-        if msg_type == proto.DISPERSAL_PUT:
-            response = proto.new_dispersal_ok_msg(msg_id)
-            writer.write(response)
-        elif msg_type == proto.SAMPLE_PUT:
-            pass
+        if message.HasField('dispersal_req'):
+            print(f"Received DispersalRes: blob_id={message.dispersal_req.blob_id}")
+        elif message.HasField('sample_req'):
+            print(f"Received SampleRes: blob_id={message.sample_req.blob_id}")
+        else:
+            print("Received unknown message type")
 
     async def run(self):
         await self.listen()
