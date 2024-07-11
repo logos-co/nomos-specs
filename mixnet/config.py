@@ -49,19 +49,11 @@ class MixMembership:
 
     nodes: List[NodeInfo]
 
-    def generate_route(self, num_hops: int, last_mix: NodeInfo) -> list[NodeInfo]:
+    def generate_route(self, length: int) -> list[NodeInfo]:
         """
         Generate a mix route for a Sphinx packet.
-        The pre-selected mix_destination is used as a last mix node in the route,
-        so that associated packets can be merged together into a original message.
         """
-        return [*(self.choose() for _ in range(num_hops - 1)), last_mix]
-
-    def choose(self) -> NodeInfo:
-        """
-        Choose a mix node as a mix destination that will reconstruct a message from Sphinx packets.
-        """
-        return random.choice(self.nodes)
+        return [random.choice(self.nodes) for _ in range(length)]
 
 
 @dataclass

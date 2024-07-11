@@ -4,7 +4,6 @@ import asyncio
 from typing import TypeAlias
 
 from pysphinx.sphinx import (
-    Payload,
     ProcessedFinalHopPacket,
     ProcessedForwardHopPacket,
     SphinxPacket,
@@ -12,7 +11,7 @@ from pysphinx.sphinx import (
 
 from mixnet.config import GlobalConfig, NodeConfig
 from mixnet.nomssip import Nomssip
-from mixnet.packet import Fragment, MessageFlag, MessageReconstructor, PacketBuilder
+from mixnet.sphinx import SphinxPacketBuilder
 
 BroadcastChannel: TypeAlias = asyncio.Queue[bytes]
 
@@ -28,7 +27,6 @@ class Node:
     config: NodeConfig
     global_config: GlobalConfig
     nomssip: Nomssip
-    reconstructor: MessageReconstructor
     broadcast_channel: BroadcastChannel
 
     def __init__(self, config: NodeConfig, global_config: GlobalConfig):
@@ -42,7 +40,6 @@ class Node:
             ),
             self.__process_msg,
         )
-        self.reconstructor = MessageReconstructor()
         self.broadcast_channel = asyncio.Queue()
 
     @staticmethod
@@ -50,10 +47,10 @@ class Node:
         """
         Calculate the actual message size to be gossiped, which depends on the maximum length of mix path.
         """
-        sample_packet, _ = PacketBuilder.build_real_packets(
+        sample_sphinx_packet, _ = SphinxPacketBuilder.build(
             bytes(1), global_config.membership, global_config.max_mix_path_length
-        )[0]
-        return len(sample_packet.bytes())
+        )
+        return len(sample_sphinx_packet.bytes())
 
     async def __process_msg(self, msg: bytes) -> None:
         """
@@ -83,23 +80,10 @@ class Node:
                 case ProcessedForwardHopPacket():
                     return processed.next_packet
                 case ProcessedFinalHopPacket():
-                    return await self.__process_sphinx_payload(processed.payload)
+                    return processed.payload.recover_plain_playload()
         except ValueError:
             # Return nothing, if it cannot be unwrapped by the private key of this node.
             return None
-
-    async def __process_sphinx_payload(self, payload: Payload) -> bytes | None:
-        """
-        Process the Sphinx payload if possible
-        """
-        msg_with_flag = self.reconstructor.add(
-            Fragment.from_bytes(payload.recover_plain_playload())
-        )
-        if msg_with_flag is not None:
-            flag, msg = PacketBuilder.parse_msg_and_flag(msg_with_flag)
-            if flag == MessageFlag.MESSAGE_FLAG_REAL:
-                return msg
-        return None
 
     def connect(self, peer: Node):
         """
@@ -117,9 +101,9 @@ class Node:
         """
         # Here, we handle the case in which a msg is split into multiple Sphinx packets.
         # But, in practice, we expect a message to be small enough to fit in a single Sphinx packet.
-        for packet, _ in PacketBuilder.build_real_packets(
+        sphinx_packet, _ = SphinxPacketBuilder.build(
             msg,
             self.global_config.membership,
             self.config.mix_path_length,
-        ):
-            await self.nomssip.gossip(packet.bytes())
+        )
+        await self.nomssip.gossip(sphinx_packet.bytes())
