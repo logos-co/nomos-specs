@@ -44,7 +44,7 @@ class GossipConfig:
 class MixMembership:
     """
     A list of public information of nodes in the network.
-    We assume that this list is eventually known to all nodes in the network (e.g. via p2p advertising).
+    We assume that this list is known to all nodes in the network.
     """
 
     nodes: List[NodeInfo]
