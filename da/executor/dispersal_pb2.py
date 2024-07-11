@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x64ispersal.proto\x12\tdispersal\"%\n\x04\x42lob\x12\x0f\n\x07\x62lob_id\x18\x01 \x01(\x0c\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"\x19\n\x06\x42lobId\x12\x0f\n\x07\x62lob_id\x18\x01 \x01(\x0c\"\x1c\n\x05\x45rror\x12\x13\n\x0b\x64\x65scription\x18\x01 \x01(\t\"x\n\x0c\x44ispersalErr\x12*\n\x0e\x63hunk_size_err\x18\x01 \x01(\x0b\x32\x10.dispersal.ErrorH\x00\x12,\n\x10verification_err\x18\x02 \x01(\x0b\x32\x10.dispersal.ErrorH\x00\x42\x0e\n\x0cmessage_type\"-\n\x0c\x44ispersalReq\x12\x1d\n\x04\x62lob\x18\x01 \x01(\x0b\x32\x0f.dispersal.Blob\"l\n\x0c\x44ispersalRes\x12$\n\x07\x62lob_id\x18\x01 \x01(\x0b\x32\x11.dispersal.BlobIdH\x00\x12&\n\x03\x65rr\x18\x02 \x01(\x0b\x32\x17.dispersal.DispersalErrH\x00\x42\x0e\n\x0cmessage_type\"B\n\tSampleErr\x12%\n\tnot_found\x18\x01 \x01(\x0b\x32\x10.dispersal.ErrorH\x00\x42\x0e\n\x0cmessage_type\"/\n\tSampleReq\x12\"\n\x07\x62lob_id\x18\x01 \x01(\x0b\x32\x11.dispersal.BlobId\"a\n\tSampleRes\x12\x1f\n\x04\x62lob\x18\x01 \x01(\x0b\x32\x0f.dispersal.BlobH\x00\x12#\n\x03\x65rr\x18\x02 \x01(\x0b\x32\x14.dispersal.SampleErrH\x00\x42\x0e\n\x0cmessage_type\"\xde\x01\n\x10\x44ispersalMessage\x12\x30\n\rdispersal_req\x18\x01 \x01(\x0b\x32\x17.dispersal.DispersalReqH\x00\x12\x30\n\rdispersal_res\x18\x02 \x01(\x0b\x32\x17.dispersal.DispersalResH\x00\x12*\n\nsample_req\x18\x03 \x01(\x0b\x32\x14.dispersal.SampleReqH\x00\x12*\n\nsample_res\x18\x04 \x01(\x0b\x32\x14.dispersal.SampleResH\x00\x42\x0e\n\x0cmessage_typeb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x64ispersal.proto\x12\tdispersal\"%\n\x04\x42lob\x12\x0f\n\x07\x62lob_id\x18\x01 \x01(\x0c\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\"\x1c\n\x05\x45rror\x12\x13\n\x0b\x64\x65scription\x18\x01 \x01(\t\"x\n\x0c\x44ispersalErr\x12*\n\x0e\x63hunk_size_err\x18\x01 \x01(\x0b\x32\x10.dispersal.ErrorH\x00\x12,\n\x10verification_err\x18\x02 \x01(\x0b\x32\x10.dispersal.ErrorH\x00\x42\x0e\n\x0cmessage_type\"-\n\x0c\x44ispersalReq\x12\x1d\n\x04\x62lob\x18\x01 \x01(\x0b\x32\x0f.dispersal.Blob\"Y\n\x0c\x44ispersalRes\x12\x11\n\x07\x62lob_id\x18\x01 \x01(\x0cH\x00\x12&\n\x03\x65rr\x18\x02 \x01(\x0b\x32\x17.dispersal.DispersalErrH\x00\x42\x0e\n\x0cmessage_type\"B\n\tSampleErr\x12%\n\tnot_found\x18\x01 \x01(\x0b\x32\x10.dispersal.ErrorH\x00\x42\x0e\n\x0cmessage_type\"\x1c\n\tSampleReq\x12\x0f\n\x07\x62lob_id\x18\x01 \x01(\x0c\"a\n\tSampleRes\x12\x1f\n\x04\x62lob\x18\x01 \x01(\x0b\x32\x0f.dispersal.BlobH\x00\x12#\n\x03\x65rr\x18\x02 \x01(\x0b\x32\x14.dispersal.SampleErrH\x00\x42\x0e\n\x0cmessage_type\"\xde\x01\n\x10\x44ispersalMessage\x12\x30\n\rdispersal_req\x18\x01 \x01(\x0b\x32\x17.dispersal.DispersalReqH\x00\x12\x30\n\rdispersal_res\x18\x02 \x01(\x0b\x32\x17.dispersal.DispersalResH\x00\x12*\n\nsample_req\x18\x03 \x01(\x0b\x32\x14.dispersal.SampleReqH\x00\x12*\n\nsample_res\x18\x04 \x01(\x0b\x32\x14.dispersal.SampleResH\x00\x42\x0e\n\x0cmessage_typeb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,22 +33,20 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_BLOB']._serialized_start=30
   _globals['_BLOB']._serialized_end=67
-  _globals['_BLOBID']._serialized_start=69
-  _globals['_BLOBID']._serialized_end=94
-  _globals['_ERROR']._serialized_start=96
-  _globals['_ERROR']._serialized_end=124
-  _globals['_DISPERSALERR']._serialized_start=126
-  _globals['_DISPERSALERR']._serialized_end=246
-  _globals['_DISPERSALREQ']._serialized_start=248
-  _globals['_DISPERSALREQ']._serialized_end=293
-  _globals['_DISPERSALRES']._serialized_start=295
-  _globals['_DISPERSALRES']._serialized_end=403
-  _globals['_SAMPLEERR']._serialized_start=405
-  _globals['_SAMPLEERR']._serialized_end=471
-  _globals['_SAMPLEREQ']._serialized_start=473
-  _globals['_SAMPLEREQ']._serialized_end=520
-  _globals['_SAMPLERES']._serialized_start=522
-  _globals['_SAMPLERES']._serialized_end=619
-  _globals['_DISPERSALMESSAGE']._serialized_start=622
-  _globals['_DISPERSALMESSAGE']._serialized_end=844
+  _globals['_ERROR']._serialized_start=69
+  _globals['_ERROR']._serialized_end=97
+  _globals['_DISPERSALERR']._serialized_start=99
+  _globals['_DISPERSALERR']._serialized_end=219
+  _globals['_DISPERSALREQ']._serialized_start=221
+  _globals['_DISPERSALREQ']._serialized_end=266
+  _globals['_DISPERSALRES']._serialized_start=268
+  _globals['_DISPERSALRES']._serialized_end=357
+  _globals['_SAMPLEERR']._serialized_start=359
+  _globals['_SAMPLEERR']._serialized_end=425
+  _globals['_SAMPLEREQ']._serialized_start=427
+  _globals['_SAMPLEREQ']._serialized_end=455
+  _globals['_SAMPLERES']._serialized_start=457
+  _globals['_SAMPLERES']._serialized_end=554
+  _globals['_DISPERSALMESSAGE']._serialized_start=557
+  _globals['_DISPERSALMESSAGE']._serialized_end=779
 # @@protoc_insertion_point(module_scope)

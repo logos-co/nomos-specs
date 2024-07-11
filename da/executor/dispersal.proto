@@ -7,10 +7,6 @@ message Blob {
     bytes data = 2;
 }
 
-message BlobId {
-    bytes blob_id = 1;
-}
-
 message Error {
     string description = 1;
 }
@@ -28,7 +24,7 @@ message DispersalReq {
 
 message DispersalRes {
     oneof message_type {
-        BlobId blob_id = 1;
+        bytes blob_id = 1;
         DispersalErr err = 2;
     }
 }
@@ -40,7 +36,7 @@ message SampleErr {
 }
 
 message SampleReq {
-    BlobId blob_id = 1;
+    bytes blob_id = 1;
 }
 
 message SampleRes {

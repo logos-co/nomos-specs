@@ -21,8 +21,7 @@ def new_dispersal_req_msg(blob_id, data):
     return pack_message(dispersal_message)
 
 def new_dispersal_res_success_msg(blob_id):
-    blob_id_msg = dispersal_pb2.BlobId(blob_id=blob_id)
-    dispersal_res = dispersal_pb2.DispersalRes(blob_id=blob_id_msg)
+    dispersal_res = dispersal_pb2.DispersalRes(blob_id=blob_id)
     dispersal_message = dispersal_pb2.DispersalMessage(dispersal_res=dispersal_res)
     return pack_message(dispersal_message)
 
@@ -41,8 +40,7 @@ def new_dispersal_res_verification_error_msg(description):
     return pack_message(dispersal_message)
 
 def new_sample_req_msg(blob_id):
-    blob_id_msg = dispersal_pb2.BlobId(blob_id=blob_id)
-    sample_req = dispersal_pb2.SampleReq(blob_id=blob_id_msg)
+    sample_req = dispersal_pb2.SampleReq(blob_id=blob_id)
     dispersal_message = dispersal_pb2.DispersalMessage(sample_req=sample_req)
     return pack_message(dispersal_message)
 
