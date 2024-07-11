@@ -65,6 +65,5 @@ class NodeInfo:
     public_key: X25519PublicKey
 
     def sphinx_node(self) -> SphinxNode:
-        # TODO: Use a pre-signed incentive tx, instead of NodeAddress
         dummy_node_addr = bytes(32)
         return SphinxNode(self.public_key, dummy_node_addr)
