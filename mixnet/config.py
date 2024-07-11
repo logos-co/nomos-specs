@@ -51,9 +51,9 @@ class MixMembership:
 
     def generate_route(self, length: int) -> list[NodeInfo]:
         """
-        Generate a mix route for a Sphinx packet.
+        Choose `length` nodes with replacement as a mix route.
         """
-        return [random.choice(self.nodes) for _ in range(length)]
+        return random.choices(self.nodes, k=length)
 
 
 @dataclass
