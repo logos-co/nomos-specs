@@ -14,7 +14,7 @@ pub struct Output {
     pub balance: Balance,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutputWitness {
     pub note: NoteWitness,
     pub nf_pk: NullifierCommitment,
