@@ -204,7 +204,7 @@ mod test {
             PathNode::Right(node(leaf(b"feels"), leaf(b"warm"))),
         ];
         assert_eq!(p0, expected0);
-        assert!(path_root(leaf(b"desert"), &p0), r);
+        assert_eq!(path_root(leaf(b"desert"), &p0), r);
 
         // --- proof for element at idx 1
 

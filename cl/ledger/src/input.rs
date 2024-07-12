@@ -122,4 +122,71 @@ mod test {
 
         assert!(!proof.verify(wrong_public_inputs));
     }
+
+    #[test]
+    fn test_input_proof() {
+        let mut rng = rand::thread_rng();
+
+        let ptx_root = PtxRoot::default();
+
+        let note = NoteWitness::new(10, "NMO", [0u8; 32], &mut rng);
+        let nf_sk = NullifierSecret::random(&mut rng);
+        let nonce = NullifierNonce::random(&mut rng);
+
+        let input_witness = InputWitness { note, nf_sk, nonce };
+
+        let input = input_witness.commit();
+        let proof = input.prove(&input_witness, ptx_root, vec![]).unwrap();
+
+        assert!(input.verify(ptx_root, &proof));
+
+        let wrong_witnesses = [
+            InputWitness {
+                note: NoteWitness::new(11, "NMO", [0u8; 32], &mut rng),
+                ..input_witness.clone()
+            },
+            InputWitness {
+                note: NoteWitness::new(10, "ETH", [0u8; 32], &mut rng),
+                ..input_witness.clone()
+            },
+            InputWitness {
+                nf_sk: NullifierSecret::random(&mut rng),
+                ..input_witness.clone()
+            },
+            InputWitness {
+                nonce: NullifierNonce::random(&mut rng),
+                ..input_witness.clone()
+            },
+        ];
+
+        for wrong_witness in wrong_witnesses {
+            assert!(input.prove(&wrong_witness, ptx_root, vec![]).is_err());
+
+            let wrong_input = wrong_witness.commit();
+            let wrong_proof = wrong_input.prove(&wrong_witness, ptx_root, vec![]).unwrap();
+            assert!(!input.verify(ptx_root, &wrong_proof));
+        }
+    }
+
+    #[test]
+    fn test_input_ptx_coupling() {
+        let mut rng = seed_rng(0);
+
+        let note = NoteWitness::new(10, "NMO", [0u8; 32], &mut rng);
+        let nf_sk = NullifierSecret::random(&mut rng);
+        let nonce = NullifierNonce::random(&mut rng);
+
+        let witness = InputWitness { note, nf_sk, nonce };
+
+        let input = witness.commit();
+
+        let ptx_root = PtxRoot::random(&mut rng);
+        let proof = input.prove(&witness, ptx_root, vec![]).unwrap();
+
+        assert!(input.verify(ptx_root, &proof));
+
+        // The same input proof can not be used in another partial transaction.
+        let another_ptx_root = PtxRoot::random(&mut rng);
+        assert!(!input.verify(another_ptx_root, &proof));
+    }
 }

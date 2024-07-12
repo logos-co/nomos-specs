@@ -76,11 +76,11 @@ impl Output {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{nullifier::NullifierSecret, test_util::seed_rng};
+    use crate::nullifier::NullifierSecret;
 
     #[test]
     fn test_output_proof() {
-        let mut rng = seed_rng(0);
+        let mut rng = rand::thread_rng();
 
         let note = NoteWitness::new(10, "NMO", [0u8; 32], &mut rng);
         let nf_pk = NullifierSecret::random(&mut rng).commit();

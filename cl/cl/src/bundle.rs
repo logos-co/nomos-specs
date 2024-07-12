@@ -87,14 +87,14 @@ impl Bundle {
 mod test {
     use crate::{
         crypto::hash_to_curve, input::InputWitness, note::NoteWitness, nullifier::NullifierSecret,
-        output::OutputWitness, partial_tx::PartialTxWitness, test_util::seed_rng,
+        output::OutputWitness, partial_tx::PartialTxWitness,
     };
 
     use super::*;
 
     #[test]
     fn test_bundle_balance() {
-        let mut rng = seed_rng(0);
+        let mut rng = rand::thread_rng();
 
         let nmo_10_in =
             InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
@@ -169,7 +169,11 @@ mod test {
 
         assert_eq!(
             bundle.balance(),
-            crate::balance::balance(0, RistrettoPoint::GENERATOR, witness.balance_blinding)
+            crate::balance::balance(
+                0,
+                curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT,
+                witness.balance_blinding
+            )
         );
 
         assert!(bundle.is_balanced(witness.balance_blinding));

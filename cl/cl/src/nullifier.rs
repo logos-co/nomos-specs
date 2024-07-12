@@ -94,7 +94,6 @@ impl Nullifier {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::seed_rng;
 
     #[test]
     fn test_nullifier_commitment_vectors() {
@@ -114,9 +113,10 @@ mod test {
 
     #[test]
     fn test_nullifier_same_sk_different_nonce() {
-        let sk = NullifierSecret::random(seed_rng(0));
-        let nonce_1 = NullifierNonce::random(seed_rng(1));
-        let nonce_2 = NullifierNonce::random(seed_rng(2));
+        let mut rng = rand::thread_rng();
+        let sk = NullifierSecret::random(&mut rng);
+        let nonce_1 = NullifierNonce::random(&mut rng);
+        let nonce_2 = NullifierNonce::random(&mut rng);
         let nf_1 = Nullifier::new(sk, nonce_1);
         let nf_2 = Nullifier::new(sk, nonce_2);
 

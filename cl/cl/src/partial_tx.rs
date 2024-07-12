@@ -96,64 +96,6 @@ impl PartialTx {
         PtxRoot(root)
     }
 
-    // pub fn prove(
-    //     &self,
-    //     w: PartialTxWitness,
-    //     death_proofs: Vec<Vec<u8>>,
-    // ) -> Result<PartialTxProof, Error> {
-    //     if bincode::serialize(&Self::from_witness(w.clone())).unwrap()
-    //         != bincode::serialize(&self).unwrap()
-    //     {
-    //         return Err(Error::ProofFailed);
-    //     }
-    //     let input_note_comms = BTreeSet::from_iter(self.inputs.iter().map(|i| i.note_comm));
-    //     let output_note_comms = BTreeSet::from_iter(self.outputs.iter().map(|o| o.note_comm));
-
-    //     if input_note_comms.len() != self.inputs.len()
-    //         || output_note_comms.len() != self.outputs.len()
-    //     {
-    //         return Err(Error::ProofFailed);
-    //     }
-
-    //     let ptx_root = self.root();
-
-    //     let input_proofs: Vec<InputProof> = Result::from_iter(
-    //         self.inputs
-    //             .iter()
-    //             .zip(&w.inputs)
-    //             .zip(death_proofs.into_iter())
-    //             .map(|((i, i_w), death_p)| i.prove(i_w, ptx_root, death_p)),
-    //     )?;
-
-    //     let output_proofs: Vec<OutputProof> = Result::from_iter(
-    //         self.outputs
-    //             .iter()
-    //             .zip(&w.outputs)
-    //             .map(|(o, o_w)| o.prove(o_w)),
-    //     )?;
-
-    //     Ok(PartialTxProof {
-    //         inputs: input_proofs,
-    //         outputs: output_proofs,
-    //     })
-    // }
-
-    // pub fn verify(&self, proof: &PartialTxProof) -> bool {
-    //     let ptx_root = self.root();
-    //     self.inputs.len() == proof.inputs.len()
-    //         && self.outputs.len() == proof.outputs.len()
-    //         && self
-    //             .inputs
-    //             .iter()
-    //             .zip(&proof.inputs)
-    //             .all(|(i, p)| i.verify(ptx_root, p))
-    //         && self
-    //             .outputs
-    //             .iter()
-    //             .zip(&proof.outputs)
-    //             .all(|(o, p)| o.verify(p))
-    // }
-
     pub fn balance(&self) -> RistrettoPoint {
         let in_sum: RistrettoPoint = self.inputs.iter().map(|i| i.balance.0).sum();
         let out_sum: RistrettoPoint = self.outputs.iter().map(|o| o.balance.0).sum();
@@ -165,41 +107,39 @@ impl PartialTx {
 #[cfg(test)]
 mod test {
 
-    use crate::{
-        crypto::hash_to_curve, note::NoteWitness, nullifier::NullifierSecret, test_util::seed_rng,
-    };
+    use crate::{crypto::hash_to_curve, note::NoteWitness, nullifier::NullifierSecret};
 
     use super::*;
 
-    #[test]
-    fn test_partial_tx_proof() {
-        let mut rng = seed_rng(0);
+    // #[test]
+    // fn test_partial_tx_proof() {
+    //     let mut rng = rand::thread_rng();
 
-        let nmo_10 =
-            InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
-        let eth_23 =
-            InputWitness::random(NoteWitness::new(23, "ETH", [0u8; 32], &mut rng), &mut rng);
-        let crv_4840 = OutputWitness::random(
-            NoteWitness::new(4840, "CRV", [0u8; 32], &mut rng),
-            NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
-            &mut rng,
-        );
+    //     let nmo_10 =
+    //         InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
+    //     let eth_23 =
+    //         InputWitness::random(NoteWitness::new(23, "ETH", [0u8; 32], &mut rng), &mut rng);
+    //     let crv_4840 = OutputWitness::random(
+    //         NoteWitness::new(4840, "CRV", [0u8; 32], &mut rng),
+    //         NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
+    //         &mut rng,
+    //     );
 
-        let ptx_witness = PartialTxWitness {
-            inputs: vec![nmo_10, eth_23],
-            outputs: vec![crv_4840],
-        };
+    //     let ptx_witness = PartialTxWitness {
+    //         inputs: vec![nmo_10, eth_23],
+    //         outputs: vec![crv_4840],
+    //     };
 
-        let ptx = PartialTx::from_witness(ptx_witness.clone());
+    //     let ptx = PartialTx::from_witness(ptx_witness.clone());
 
-        let ptx_proof = ptx.prove(ptx_witness, vec![vec![], vec![]]).unwrap();
+    //     let ptx_proof = ptx.prove(ptx_witness, vec![vec![], vec![]]).unwrap();
 
-        assert!(ptx.verify(&ptx_proof));
-    }
+    //     assert!(ptx.verify(&ptx_proof));
+    // }
 
     #[test]
     fn test_partial_tx_balance() {
-        let mut rng = seed_rng(0);
+        let mut rng = rand::thread_rng();
 
         let nmo_10 =
             InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
