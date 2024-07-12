@@ -49,7 +49,7 @@ pub enum PathNode {
     Right([u8; 32]),
 }
 
-pub fn verify_path(leaf: [u8; 32], path: &[PathNode], root: [u8; 32]) -> bool {
+pub fn path_root(leaf: [u8; 32], path: &[PathNode]) -> [u8; 32] {
     let mut computed_hash = leaf;
 
     for path_node in path {
@@ -63,7 +63,7 @@ pub fn verify_path(leaf: [u8; 32], path: &[PathNode], root: [u8; 32]) -> bool {
         }
     }
 
-    computed_hash == root
+    computed_hash
 }
 
 pub fn path<const N: usize>(leaves: [[u8; 32]; N], idx: usize) -> Vec<PathNode> {
@@ -163,7 +163,7 @@ mod test {
         let p = path::<1>(leaves, 0);
         let expected = vec![];
         assert_eq!(p, expected);
-        assert!(verify_path(leaf(b"desert"), &p, r));
+        assert_eq!(path_root(leaf(b"desert"), &p), r);
     }
 
     #[test]
@@ -176,14 +176,14 @@ mod test {
         let p0 = path(leaves, 0);
         let expected0 = vec![PathNode::Right(leaf(b"sand"))];
         assert_eq!(p0, expected0);
-        assert!(verify_path(leaf(b"desert"), &p0, r));
+        assert_eq!(path_root(leaf(b"desert"), &p0), r);
 
         // --- proof for element at idx 1
 
         let p1 = path(leaves, 1);
         let expected1 = vec![PathNode::Left(leaf(b"desert"))];
         assert_eq!(p1, expected1);
-        assert!(verify_path(leaf(b"sand"), &p1, r));
+        assert_eq!(path_root(leaf(b"sand"), &p1), r);
     }
 
     #[test]
@@ -204,7 +204,7 @@ mod test {
             PathNode::Right(node(leaf(b"feels"), leaf(b"warm"))),
         ];
         assert_eq!(p0, expected0);
-        assert!(verify_path(leaf(b"desert"), &p0, r));
+        assert!(path_root(leaf(b"desert"), &p0), r);
 
         // --- proof for element at idx 1
 
@@ -214,7 +214,7 @@ mod test {
             PathNode::Right(node(leaf(b"feels"), leaf(b"warm"))),
         ];
         assert_eq!(p1, expected1);
-        assert!(verify_path(leaf(b"sand"), &p1, r));
+        assert_eq!(path_root(leaf(b"sand"), &p1), r);
 
         // --- proof for element at idx 2
 
@@ -224,7 +224,7 @@ mod test {
             PathNode::Left(node(leaf(b"desert"), leaf(b"sand"))),
         ];
         assert_eq!(p2, expected2);
-        assert!(verify_path(leaf(b"feels"), &p2, r));
+        assert_eq!(path_root(leaf(b"feels"), &p2), r);
 
         // --- proof for element at idx 3
 
@@ -234,6 +234,6 @@ mod test {
             PathNode::Left(node(leaf(b"desert"), leaf(b"sand"))),
         ];
         assert_eq!(p3, expected3);
-        assert!(verify_path(leaf(b"warm"), &p3, r));
+        assert_eq!(path_root(leaf(b"warm"), &p3), r);
     }
 }

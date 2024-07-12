@@ -1,9 +1,9 @@
 use blake2::{Blake2s256, Digest};
-use risc0_zkvm::guest::env;
-use common::*;
-use cl::merkle;
 use cl::input::InputWitness;
+use cl::merkle;
 use cl::output::OutputWitness;
+use common::*;
+use risc0_zkvm::guest::env;
 
 /// Public Inputs:
 /// * ptx_root: the root of the partial tx merkle tree of inputs/outputs
@@ -31,8 +31,11 @@ fn execute(
     // a transfer is included as part of the same transaction in the cl
     let in_comm = in_note.commit().to_bytes();
     eprintln!("input comm: {}", env::cycle_count());
-    
-    assert!(merkle::verify_path(merkle::leaf(&in_comm), &in_ptx_path, input_root));
+
+    assert_eq!(
+        merkle::path_root(merkle::leaf(&in_comm), &in_ptx_path),
+        input_root
+    );
     eprintln!("input merkle path: {}", env::cycle_count());
 
     // check the commitments match the actual data
@@ -61,8 +64,11 @@ fn execute(
     // (this is done in the death condition to disallow burning)
     let out_comm = out_note.commit().to_bytes();
     eprintln!("output comm: {}", env::cycle_count());
-    
-    assert!(merkle::verify_path(merkle::leaf(&out_comm), &out_ptx_path, output_root));
+
+    assert_eq!(
+        merkle::path_root(merkle::leaf(&out_comm), &out_ptx_path),
+        output_root
+    );
     eprintln!("out merkle proof: {}", env::cycle_count());
 }
 
@@ -81,8 +87,19 @@ fn main() {
     let state: State = env::read();
     let journal: Journal = env::read();
 
-    eprintln!("parse input: {}", env::cycle_count()); 
-    execute(ptx_root, input_root, output_root, in_ptx_path, out_ptx_path, in_note, out_note, input, state, journal);
+    eprintln!("parse input: {}", env::cycle_count());
+    execute(
+        ptx_root,
+        input_root,
+        output_root,
+        in_ptx_path,
+        out_ptx_path,
+        in_note,
+        out_note,
+        input,
+        state,
+        journal,
+    );
 }
 
 fn calculate_state_hash(state: &State) -> [u8; 32] {
