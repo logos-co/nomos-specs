@@ -27,5 +27,7 @@ class SphinxPacketBuilder:
             message,
             route=[mixnode.sphinx_node() for mixnode in route],
             destination=dummy_destination.sphinx_node(),
+            max_route_length=global_config.max_mix_path_length,
+            max_plain_payload_size=global_config.max_message_size,
         )
         return (packet, route)

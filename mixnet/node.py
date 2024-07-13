@@ -53,7 +53,9 @@ class Node:
         """
         A handler to process messages received via gossip channel
         """
-        sphinx_packet = SphinxPacket.from_bytes(msg)
+        sphinx_packet = SphinxPacket.from_bytes(
+            msg, self.global_config.max_mix_path_length
+        )
         result = await self.__process_sphinx_packet(sphinx_packet)
         match result:
             case SphinxPacket():
