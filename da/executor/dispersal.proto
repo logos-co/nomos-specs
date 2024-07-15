@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package dispersal;
+package nomos.da.dispersal;
 
 message Blob {
     bytes blob_id = 1;
