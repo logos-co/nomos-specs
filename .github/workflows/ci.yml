@@ -19,10 +19,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           # Semantic version range syntax or exact version of a Python version
-          python-version: '3.x'
+          python-version: "3.x"
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Build and install eth-specs
         run: ./install-eth-specs.sh
       - name: Run tests
         run: python -m unittest
+      - name: Run a short mixnet simulation
+        run: python -m mixnet.sim.main --config mixnet/sim/config.ci.yaml

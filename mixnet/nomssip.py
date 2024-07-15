@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 from dataclasses import dataclass
 from enum import Enum
 from typing import Awaitable, Callable, Self
 
 from mixnet.connection import DuplexConnection, MixSimplexConnection, SimplexConnection
+from mixnet.error import PeeringDegreeReached
+from mixnet.framework import Framework
 
 
 class Nomssip:
@@ -23,9 +24,11 @@ class Nomssip:
 
     def __init__(
         self,
+        framework: Framework,
         config: Config,
         handler: Callable[[bytes], Awaitable[None]],
     ):
+        self.framework = framework
         self.config = config
         self.conns: list[DuplexConnection] = []
         # A handler to process inbound messages.
@@ -33,12 +36,15 @@ class Nomssip:
         self.packet_cache: set[bytes] = set()
         # A set just for gathering a reference of tasks to prevent them from being garbage collected.
         # https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
-        self.tasks: set[asyncio.Task] = set()
+        self.tasks: set[Awaitable] = set()
+
+    def can_accept_conn(self) -> bool:
+        return len(self.conns) < self.config.peering_degree
 
     def add_conn(self, inbound: SimplexConnection, outbound: SimplexConnection):
-        if len(self.conns) >= self.config.peering_degree:
+        if not self.can_accept_conn():
             # For simplicity of the spec, reject the connection if the peering degree is reached.
-            raise ValueError("The peering degree is reached.")
+            raise PeeringDegreeReached()
 
         noise_packet = FlaggedPacket(
             FlaggedPacket.Flag.NOISE, bytes(self.config.msg_size)
@@ -46,6 +52,7 @@ class Nomssip:
         conn = DuplexConnection(
             inbound,
             MixSimplexConnection(
+                self.framework,
                 outbound,
                 self.config.transmission_rate_per_sec,
                 noise_packet,
@@ -53,10 +60,8 @@ class Nomssip:
         )
 
         self.conns.append(conn)
-        task = asyncio.create_task(self.__process_inbound_conn(conn))
+        task = self.framework.spawn(self.__process_inbound_conn(conn))
         self.tasks.add(task)
-        # To discard the task from the set automatically when it is done.
-        task.add_done_callback(self.tasks.discard)
 
     async def __process_inbound_conn(self, conn: DuplexConnection):
         while True:

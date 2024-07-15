@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import TypeAlias
 
 from pysphinx.sphinx import (
@@ -10,10 +9,13 @@ from pysphinx.sphinx import (
 )
 
 from mixnet.config import GlobalConfig, NodeConfig
+from mixnet.connection import SimplexConnection
+from mixnet.error import PeeringDegreeReached
+from mixnet.framework import Framework, Queue
 from mixnet.nomssip import Nomssip
 from mixnet.sphinx import SphinxPacketBuilder
 
-BroadcastChannel: TypeAlias = asyncio.Queue[bytes]
+BroadcastChannel = Queue
 
 
 class Node:
@@ -24,10 +26,14 @@ class Node:
     - generates noise
     """
 
-    def __init__(self, config: NodeConfig, global_config: GlobalConfig):
+    def __init__(
+        self, framework: Framework, config: NodeConfig, global_config: GlobalConfig
+    ):
+        self.framework = framework
         self.config = config
         self.global_config = global_config
         self.nomssip = Nomssip(
+            framework,
             Nomssip.Config(
                 global_config.transmission_rate_per_sec,
                 config.nomssip.peering_degree,
@@ -35,7 +41,7 @@ class Node:
             ),
             self.__process_msg,
         )
-        self.broadcast_channel = asyncio.Queue()
+        self.broadcast_channel = framework.queue()
 
     @staticmethod
     def __calculate_message_size(global_config: GlobalConfig) -> int:
@@ -84,11 +90,18 @@ class Node:
             # Return nothing, if it cannot be unwrapped by the private key of this node.
             return None
 
-    def connect(self, peer: Node):
+    def connect(
+        self,
+        peer: Node,
+        inbound_conn: SimplexConnection,
+        outbound_conn: SimplexConnection,
+    ):
         """
         Establish a duplex connection with a peer node.
         """
-        inbound_conn, outbound_conn = asyncio.Queue(), asyncio.Queue()
+        if not self.nomssip.can_accept_conn() or not peer.nomssip.can_accept_conn():
+            raise PeeringDegreeReached()
+
         # Register a duplex connection for its own use
         self.nomssip.add_conn(inbound_conn, outbound_conn)
         # Register a duplex connection for the peer

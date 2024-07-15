@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
@@ -19,7 +19,6 @@ class GlobalConfig:
 
     membership: MixMembership
     transmission_rate_per_sec: int  # Global Transmission Rate
-    # TODO: use these two to make the size of Sphinx packet constant
     max_message_size: int
     max_mix_path_length: int
 
@@ -49,12 +48,13 @@ class MixMembership:
     """
 
     nodes: List[NodeInfo]
+    rng: random.Random = field(default_factory=random.Random)
 
     def generate_route(self, length: int) -> list[NodeInfo]:
         """
         Choose `length` nodes with replacement as a mix route.
         """
-        return random.choices(self.nodes, k=length)
+        return self.rng.choices(self.nodes, k=length)
 
 
 @dataclass

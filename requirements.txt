@@ -13,3 +13,8 @@ portalocker==2.8.2 # portable file locking
 keum==0.2.0 # for CL's use of more obscure curves
 poseidon-hash==0.1.4 # used as the algebraic hash in CL
 hypothesis==6.103.0
+dacite==1.8.1
+pandas==2.2.2
+matplotlib==3.9.1
+PyYAML==6.0.1
+usim==0.4.4
