@@ -1,6 +1,6 @@
-use sha2::{Digest, Sha256};
 use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::{
     balance::{Balance, BalanceWitness},
@@ -69,13 +69,13 @@ impl NoteWitness {
 
 #[cfg(test)]
 mod test {
-    use crate::{nullifier::NullifierSecret, test_util::seed_rng};
+    use crate::nullifier::NullifierSecret;
 
     use super::*;
 
     #[test]
     fn test_note_commitments_dont_commit_to_balance_blinding() {
-        let mut rng = seed_rng(0);
+        let mut rng = rand::thread_rng();
         let n1 = NoteWitness::new(12, "NMO", [0u8; 32], &mut rng);
         let n2 = NoteWitness::new(12, "NMO", [0u8; 32], &mut rng);
 

@@ -16,6 +16,3 @@ pub use note::{NoteCommitment, NoteWitness};
 pub use nullifier::{Nullifier, NullifierCommitment, NullifierNonce, NullifierSecret};
 pub use output::{Output, OutputWitness};
 pub use partial_tx::{PartialTx, PartialTxWitness, PtxRoot};
-
-#[cfg(test)]
-mod test_util;

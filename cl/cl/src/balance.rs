@@ -149,8 +149,6 @@ pub fn balance(value: u64, unit: RistrettoPoint, blinding: Scalar) -> RistrettoP
 mod test {
 
     use super::*;
-    use crate::test_util::seed_rng;
-    use k256::elliptic_curve::group::prime::PrimeCurveAffine;
 
     #[test]
     fn test_pederson_blinding_point_pre_compute() {
@@ -166,8 +164,8 @@ mod test {
     #[test]
     fn test_balance_zero_unitless() {
         // Zero is the same across all units
-        let rng = seed_rng(0);
-        let r = Scalar::random(rng);
+        let mut rng = rand::thread_rng();
+        let r = Scalar::random(&mut rng);
         assert_eq!(
             BalanceWitness::new(0, "NMO", r).commit(),
             BalanceWitness::new(0, "ETH", r).commit(),
@@ -184,10 +182,7 @@ mod test {
         let a = a_w.commit();
         let b = b_w.commit();
         assert_ne!(a, b);
-        assert_eq!(
-            a.0.to_curve() - b.0.to_curve(),
-            BalanceWitness::new(0, "NMO", r1 - r2).commit().0.to_curve()
-        );
+        assert_eq!(a.0 - b.0, BalanceWitness::new(0, "NMO", r1 - r2).commit().0);
     }
 
     #[test]
@@ -201,7 +196,7 @@ mod test {
 
     #[test]
     fn test_balance_homomorphism() {
-        let mut rng = seed_rng(0);
+        let mut rng = rand::thread_rng();
         let r1 = Scalar::random(&mut rng);
         let r2 = Scalar::random(&mut rng);
         let ten = BalanceWitness::new(10, "NMO", 0u32.into());
@@ -209,16 +204,13 @@ mod test {
         let two = BalanceWitness::new(2, "NMO", 0u32.into());
 
         // Values of same unit are homomorphic
-        assert_eq!(
-            ten.commit().0.to_curve() - eight.commit().0.to_curve(),
-            two.commit().0.to_curve()
-        );
+        assert_eq!(ten.commit().0 - eight.commit().0, two.commit().0);
 
         // Blinding factors are also homomorphic.
         assert_eq!(
-            BalanceWitness::new(10, "NMO", r1).commit().0.to_curve()
-                - BalanceWitness::new(10, "NMO", r2).commit().0.to_curve(),
-            BalanceWitness::new(0, "NMO", r1 - r2).commit().0.to_curve()
+            BalanceWitness::new(10, "NMO", r1).commit().0
+                - BalanceWitness::new(10, "NMO", r2).commit().0,
+            BalanceWitness::new(0, "NMO", r1 - r2).commit().0
         );
     }
 }
