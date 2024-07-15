@@ -10,8 +10,6 @@ use clap::Parser;
 #[command(version, about, long_about = None)]
 enum Action {
     Stf,
-    // Nullifier,
-    Transfer,
 }
 
 fn stf_prove_stark() {
@@ -102,67 +100,6 @@ fn stf_prove_stark() {
     receipt.verify(methods::METHOD_ID).unwrap();
 }
 
-// fn nf_prove_stark() {
-//     let mut rng = rand::thread_rng();
-
-//     let nf_sk = cl::NullifierSecret::random(&mut rng);
-
-//     let output = cl::OutputWitness {
-//         note: cl::NoteWitness {
-//             balance: cl::BalanceWitness::random(10, "NMO", &mut rng),
-//             death_constraint: vec![],
-//             state: [0u8; 32],
-//         },
-//         nf_pk: nf_sk.commit(),
-//         nonce: cl::NullifierNonce::random(&mut rng),
-//     };
-//     let output_cm = output.commit_note().as_bytes().to_vec();
-//     let cm_set = cl::merkle::padded_leaves::<64>(&[output_cm]);
-//     let cm_root = cl::merkle::root(cm_set);
-//     let cm_path = cl::merkle::path(cm_set, 0);
-//     let nf = cl::Nullifier::new(nf_sk, output.nonce);
-
-//     let env = ExecutorEnv::builder()
-//         .write(&cm_root)
-//         .unwrap()
-//         .write(&nf)
-//         .unwrap()
-//         .write(&nf_sk)
-//         .unwrap()
-//         .write(&output)
-//         .unwrap()
-//         .write(&cm_path)
-//         .unwrap()
-//         .build()
-//         .unwrap();
-
-//     // Obtain the default prover.
-//     let prover = default_prover();
-
-//     use std::time::Instant;
-//     let start_t = Instant::now();
-
-//     // Proof information by proving the specified ELF binary.
-//     // This struct contains the receipt along with statistics about execution of the guest
-//     let opts = risc0_zkvm::ProverOpts::succinct();
-//     let prove_info = prover
-//         .prove_with_opts(env, methods::NULLIFIER_ELF, &opts)
-//         .unwrap();
-
-//     println!("STARK prover time: {:.2?}", start_t.elapsed());
-//     // extract the receipt.
-//     let receipt = prove_info.receipt;
-
-//     // TODO: Implement code for retrieving receipt journal here.
-
-//     std::fs::write("proof.stark", bincode::serialize(&receipt).unwrap()).unwrap();
-//     // The receipt was verified at the end of proving, but the below code is an
-//     // example of how someone else could verify this receipt.
-//     receipt.verify(methods::NULLIFIER_ID).unwrap();
-// }
-
-fn transfer_prove_stark() {}
-
 fn main() {
     // Initialize tracing. In order to view logs, run `RUST_LOG=info cargo run`
     tracing_subscriber::fmt()
@@ -173,8 +110,6 @@ fn main() {
 
     match action {
         Action::Stf => stf_prove_stark(),
-        // Action::Nullifier => nf_prove_stark(),
-        Action::Transfer => transfer_prove_stark(),
     }
 }
 

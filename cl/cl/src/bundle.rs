@@ -18,12 +18,6 @@ pub struct BundleWitness {
     pub balance_blinding: Scalar,
 }
 
-// #[derive(Debug)]
-// pub struct BundleProof {
-//     pub partials: Vec<PartialTxProof>,
-//     pub balance_blinding: Scalar,
-// }
-
 impl Bundle {
     pub fn balance(&self) -> RistrettoPoint {
         self.partials.iter().map(|ptx| ptx.balance()).sum()
@@ -33,54 +27,6 @@ impl Bundle {
         self.balance()
             == crate::balance::balance(0, RISTRETTO_BASEPOINT_POINT, balance_blinding_witness)
     }
-
-    // pub fn prove(
-    //     &self,
-    //     w: BundleWitness,
-    //     ptx_proofs: Vec<PartialTxProof>,
-    // ) -> Result<BundleProof, Error> {
-    //     if ptx_proofs.len() == self.partials.len() {
-    //         return Err(Error::ProofFailed);
-    //     }
-    //     let input_notes: Vec<NoteCommitment> = self
-    //         .partials
-    //         .iter()
-    //         .flat_map(|ptx| ptx.inputs.iter().map(|i| i.note_comm))
-    //         .collect();
-    //     if input_notes.len() != BTreeSet::from_iter(input_notes.iter()).len() {
-    //         return Err(Error::ProofFailed);
-    //     }
-
-    //     let output_notes: Vec<NoteCommitment> = self
-    //         .partials
-    //         .iter()
-    //         .flat_map(|ptx| ptx.outputs.iter().map(|o| o.note_comm))
-    //         .collect();
-    //     if output_notes.len() != BTreeSet::from_iter(output_notes.iter()).len() {
-    //         return Err(Error::ProofFailed);
-    //     }
-
-    //     if self.balance()
-    //         != crate::balance::balance(0, RISTRETTO_BASEPOINT_POINT, w.balance_blinding)
-    //     {
-    //         return Err(Error::ProofFailed);
-    //     }
-
-    //     Ok(BundleProof {
-    //         partials: ptx_proofs,
-    //         balance_blinding: w.balance_blinding,
-    //     })
-    // }
-
-    // pub fn verify(&self, proof: BundleProof) -> bool {
-    //     proof.partials.len() == self.partials.len()
-    //         && self.is_balanced(proof.balance_blinding)
-    //         && self
-    //             .partials
-    //             .iter()
-    //             .zip(&proof.partials)
-    //             .all(|(p, p_proof)| p.verify(p_proof))
-    // }
 }
 
 #[cfg(test)]

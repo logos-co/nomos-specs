@@ -39,12 +39,6 @@ pub struct PartialTxWitness {
     pub outputs: Vec<OutputWitness>,
 }
 
-// #[derive(Debug)]
-// pub struct PartialTxProof {
-//     pub inputs: Vec<InputProof>,
-//     pub outputs: Vec<OutputProof>,
-// }
-
 impl PartialTx {
     pub fn from_witness(w: PartialTxWitness) -> Self {
         Self {
@@ -110,32 +104,6 @@ mod test {
     use crate::{crypto::hash_to_curve, note::NoteWitness, nullifier::NullifierSecret};
 
     use super::*;
-
-    // #[test]
-    // fn test_partial_tx_proof() {
-    //     let mut rng = rand::thread_rng();
-
-    //     let nmo_10 =
-    //         InputWitness::random(NoteWitness::new(10, "NMO", [0u8; 32], &mut rng), &mut rng);
-    //     let eth_23 =
-    //         InputWitness::random(NoteWitness::new(23, "ETH", [0u8; 32], &mut rng), &mut rng);
-    //     let crv_4840 = OutputWitness::random(
-    //         NoteWitness::new(4840, "CRV", [0u8; 32], &mut rng),
-    //         NullifierSecret::random(&mut rng).commit(), // transferring to a random owner
-    //         &mut rng,
-    //     );
-
-    //     let ptx_witness = PartialTxWitness {
-    //         inputs: vec![nmo_10, eth_23],
-    //         outputs: vec![crv_4840],
-    //     };
-
-    //     let ptx = PartialTx::from_witness(ptx_witness.clone());
-
-    //     let ptx_proof = ptx.prove(ptx_witness, vec![vec![], vec![]]).unwrap();
-
-    //     assert!(ptx.verify(&ptx_proof));
-    // }
 
     #[test]
     fn test_partial_tx_balance() {
