@@ -43,7 +43,7 @@ class ConnectionStats:
         df = pandas.DataFrame.from_dict(sizes, orient="index").reset_index()
         df.columns = ["msg_size", "count"]
         print("==========================================")
-        print(" Message Size Distribution")
+        print("Message Size Distribution")
         print("==========================================")
         print(f"{df}\n")
 

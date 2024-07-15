@@ -1,5 +1,26 @@
 # NomMix Simulation
 
+* [Features](#features)
+* [Future Plans](#future-plans)
+* [Installation](#installation)
+* [Getting Started](#getting-started)
+
+## Features
+
+- Simulate the NomMix protocol with the given parameters.
+- Measure the performance of the NomMix protocol.
+  - Bandwidth usages
+- Analyze the privacy properties that the NomMix protocol provides.
+  - Message sizes
+  - Node states and hamming distances
+
+## Future Plans
+
+- Simulate more features of the NomMix protocol.
+  - Temporal mixing
+  - Level-1 noise
+- Simulate possible adversarial attacks and measure the robustness of the NomMix protocol.
+
 ## Installation
 
 Clone the repository and install the dependencies:
@@ -11,7 +32,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Getting started
+## Getting Started
 
 Copy the [`mixnet/sim/config.ci.yaml`](./config.ci.yaml) file and adjust the parameters to your needs.
 Each parameter is explained in the config file.
@@ -26,13 +47,14 @@ All results are printed in the console as below.
 And, all plots are shown once all analysis is done.
 ```
 ==========================================
- Message Size Distribution
+Message Size Distribution
 ==========================================
    msg_size  count
 0      1405  99990
 
 ==========================================
- Node States of All Nodes over Time
+Node States of All Nodes over Time
+SENDING:-1, IDLE:0, RECEIVING:1
 ==========================================
         Node-0  Node-1  Node-2  Node-3  Node-4
 0            0       0       0       0       0

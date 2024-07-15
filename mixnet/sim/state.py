@@ -32,7 +32,8 @@ class NodeStateTable:
         # Convert NodeState enum to their integer values
         df = df.map(lambda state: state.value)
         print("==========================================")
-        print(" Node States of All Nodes over Time")
+        print("Node States of All Nodes over Time")
+        print(", ".join(f"{state.name}:{state.value}" for state in NodeState))
         print("==========================================")
         print(f"{df}\n")
 
