@@ -1,1 +1,1 @@
-pub mod nullifier;
+pub mod input;

@@ -8,6 +8,17 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct DeathCommitment([u8; 32]);
+pub fn death_commitment(death_constraint: &[u8]) -> DeathCommitment {
+    let mut hasher = Sha256::new();
+    hasher.update(b"NOMOS_CL_DEATH_COMMIT");
+    hasher.update(death_constraint);
+    let death_cm: [u8; 32] = hasher.finalize().into();
+
+    DeathCommitment(death_cm)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NoteCommitment([u8; 32]);
 
 impl NoteCommitment {
@@ -64,6 +75,10 @@ impl NoteWitness {
 
     pub fn balance(&self) -> Balance {
         self.balance.commit()
+    }
+
+    pub fn death_commitment(&self) -> DeathCommitment {
+        death_commitment(&self.death_constraint)
     }
 }
 

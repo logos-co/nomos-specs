@@ -1,36 +1,33 @@
-use proof_statements::nullifier::{NullifierPrivate, NullifierPublic};
+use proof_statements::input::{InputPrivate, InputPublic};
 
 use crate::error::Result;
 
 const MAX_NOTE_COMMS: usize = 2usize.pow(8);
 
 #[derive(Debug, Clone)]
-pub struct InputNullifierProof {
+pub struct InputProof {
     receipt: risc0_zkvm::Receipt,
 }
 
-impl InputNullifierProof {
-    pub fn public(&self) -> Result<NullifierPublic> {
+impl InputProof {
+    pub fn public(&self) -> Result<InputPublic> {
         Ok(self.receipt.journal.decode()?)
     }
 
-    pub fn verify(&self, expected_public_inputs: NullifierPublic) -> bool {
+    pub fn verify(&self, expected_public_inputs: &InputPublic) -> bool {
         let Ok(public_inputs) = self.public() else {
             return false;
         };
 
-        public_inputs == expected_public_inputs
-            && self
-                .receipt
-                .verify(nomos_cl_risc0_proofs::NULLIFIER_ID)
-                .is_ok()
+        &public_inputs == expected_public_inputs
+            && self.receipt.verify(nomos_cl_risc0_proofs::INPUT_ID).is_ok()
     }
 }
 
 pub fn prove_input_nullifier(
     input: &cl::InputWitness,
     note_commitments: &[cl::NoteCommitment],
-) -> InputNullifierProof {
+) -> InputProof {
     let output = input.to_output_witness();
     let cm_leaves = note_commitment_leaves(note_commitments);
     let output_cm = output.commit_note();
@@ -40,7 +37,7 @@ pub fn prove_input_nullifier(
         .unwrap();
     let cm_path = cl::merkle::path(cm_leaves, cm_idx);
 
-    let secrets = NullifierPrivate {
+    let secrets = InputPrivate {
         nf_sk: input.nf_sk,
         output,
         cm_path,
@@ -62,7 +59,7 @@ pub fn prove_input_nullifier(
     // This struct contains the receipt along with statistics about execution of the guest
     let opts = risc0_zkvm::ProverOpts::succinct();
     let prove_info = prover
-        .prove_with_opts(env, nomos_cl_risc0_proofs::NULLIFIER_ELF, &opts)
+        .prove_with_opts(env, nomos_cl_risc0_proofs::INPUT_ELF, &opts)
         .unwrap();
 
     println!(
@@ -72,7 +69,7 @@ pub fn prove_input_nullifier(
     );
     // extract the receipt.
     let receipt = prove_info.receipt;
-    InputNullifierProof { receipt }
+    InputProof { receipt }
 }
 
 fn note_commitment_leaves(note_commitments: &[cl::NoteCommitment]) -> [[u8; 32]; MAX_NOTE_COMMS] {
@@ -83,10 +80,9 @@ fn note_commitment_leaves(note_commitments: &[cl::NoteCommitment]) -> [[u8; 32];
 
 #[cfg(test)]
 mod test {
-    use proof_statements::nullifier::NullifierPublic;
     use rand::thread_rng;
 
-    use super::{note_commitment_leaves, prove_input_nullifier};
+    use super::*;
 
     #[test]
     fn test_input_nullifier_prover() {
@@ -105,22 +101,35 @@ mod test {
 
         let proof = prove_input_nullifier(&input, &notes);
 
-        let expected_public_inputs = NullifierPublic {
+        let expected_public_inputs = InputPublic {
             cm_root: cl::merkle::root(note_commitment_leaves(&notes)),
             nf: input.commit().nullifier,
+            death_cm: cl::note::death_commitment(&[]),
         };
 
-        assert!(proof.verify(expected_public_inputs));
+        assert!(proof.verify(&expected_public_inputs));
 
-        let wrong_public_inputs = NullifierPublic {
-            cm_root: cl::merkle::root(note_commitment_leaves(&notes)),
-            nf: cl::Nullifier::new(
-                cl::NullifierSecret::random(&mut rng),
-                cl::NullifierNonce::random(&mut rng),
-            ),
-        };
+        let wrong_public_inputs = [
+            InputPublic {
+                cm_root: cl::merkle::root([cl::merkle::leaf(b"bad_root")]),
+                ..expected_public_inputs.clone()
+            },
+            InputPublic {
+                nf: cl::Nullifier::new(
+                    cl::NullifierSecret::random(&mut rng),
+                    cl::NullifierNonce::random(&mut rng),
+                ),
+                ..expected_public_inputs.clone()
+            },
+            InputPublic {
+                death_cm: cl::note::death_commitment(b"wrong death vk"),
+                ..expected_public_inputs
+            },
+        ];
 
-        assert!(!proof.verify(wrong_public_inputs));
+        for wrong_input in wrong_public_inputs {
+            assert!(!proof.verify(&wrong_input));
+        }
     }
 
     // ----- The following tests still need to be built. -----
