@@ -4,21 +4,20 @@
 /// which on their own may not balance (i.e. \sum inputs != \sum outputs)
 use crate::{
     balance::Balance,
-    note::{NoteCommitment, NoteWitness},
+    note::{DeathCommitment, NoteWitness},
     nullifier::{Nullifier, NullifierNonce, NullifierSecret},
 };
 use rand_core::RngCore;
-// use risc0_groth16::{PublicInputsJson, Verifier};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Input {
-    pub note_comm: NoteCommitment,
     pub nullifier: Nullifier,
     pub balance: Balance,
+    pub death_cm: DeathCommitment,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputWitness {
     pub note: NoteWitness,
     pub nf_sk: NullifierSecret,
@@ -36,9 +35,9 @@ impl InputWitness {
 
     pub fn commit(&self) -> Input {
         Input {
-            note_comm: self.note.commit(self.nf_sk.commit(), self.nonce),
             nullifier: Nullifier::new(self.nf_sk, self.nonce),
             balance: self.note.balance(),
+            death_cm: self.note.death_commitment(),
         }
     }
 
@@ -52,11 +51,11 @@ impl InputWitness {
 }
 
 impl Input {
-    pub fn to_bytes(&self) -> [u8; 96] {
-        let mut bytes = [0u8; 96];
-        bytes[..32].copy_from_slice(self.note_comm.as_bytes());
-        bytes[32..64].copy_from_slice(self.nullifier.as_bytes());
-        bytes[64..96].copy_from_slice(&self.balance.to_bytes());
+    pub fn to_bytes(&self) -> [u8; 64] {
+        let mut bytes = [0u8; 64];
+        bytes[..32].copy_from_slice(self.nullifier.as_bytes());
+        bytes[32..64].copy_from_slice(&self.balance.to_bytes());
+        bytes[64..96].copy_from_slice(&self.death_cm.0);
         bytes
     }
 }

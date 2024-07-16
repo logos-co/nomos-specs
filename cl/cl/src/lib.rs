@@ -12,7 +12,7 @@ pub mod partial_tx;
 pub use balance::{Balance, BalanceWitness};
 pub use bundle::{Bundle, BundleWitness};
 pub use input::{Input, InputWitness};
-pub use note::{NoteCommitment, NoteWitness};
+pub use note::{DeathCommitment, NoteCommitment, NoteWitness};
 pub use nullifier::{Nullifier, NullifierCommitment, NullifierNonce, NullifierSecret};
 pub use output::{Output, OutputWitness};
 pub use partial_tx::{PartialTx, PartialTxWitness, PtxRoot};

@@ -7,10 +7,10 @@ lazy_static! {
     static ref PEDERSON_COMMITMENT_BLINDING_POINT: RistrettoPoint = crate::crypto::hash_to_curve(b"NOMOS_CL_PEDERSON_COMMITMENT_BLINDING");
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct Balance(pub RistrettoPoint);
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct BalanceWitness {
     pub value: u64,
     pub unit: RistrettoPoint,
@@ -27,7 +27,7 @@ impl BalanceWitness {
     pub fn new(value: u64, unit: impl Into<String>, blinding: Scalar) -> Self {
         Self {
             value,
-            unit: unit_point(&unit.into()).into(),
+            unit: unit_point(&unit.into()),
             blinding,
         }
     }
@@ -37,7 +37,7 @@ impl BalanceWitness {
     }
 
     pub fn commit(&self) -> Balance {
-        Balance(balance(self.value, self.unit.into(), self.blinding).into())
+        Balance(balance(self.value, self.unit, self.blinding))
     }
 }
 
