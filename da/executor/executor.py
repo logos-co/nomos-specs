@@ -44,4 +44,3 @@ class Executor:
     async def run(self):
         await asyncio.gather(*(self.connect() for _ in range(self.col_num)))
         await self.execute()
-

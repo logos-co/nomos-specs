@@ -3,6 +3,12 @@ from itertools import count
 
 MAX_MSG_LEN_BYTES = 2
 
+async def parse_from_reader(reader):
+    length_prefix = await reader.readexactly(MAX_MSG_LEN_BYTES)
+    data_length = int.from_bytes(length_prefix, byteorder='big')
+    data = await reader.readexactly(data_length)
+    return unpack_message(data)
+
 def pack_message(message):
     # SerializeToString method returns an instance of bytes.
     data = message.SerializeToString()
@@ -56,4 +62,3 @@ def new_sample_res_not_found_error_msg(description):
     sample_res = dispersal_pb2.SampleRes(err=sample_err)
     dispersal_message = dispersal_pb2.DispersalMessage(sample_res=sample_res)
     return pack_message(dispersal_message)
-

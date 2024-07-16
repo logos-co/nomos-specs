@@ -11,12 +11,7 @@ class Transport:
     async def read_and_process(self):
         try:
             while True:
-                length_prefix = await self.reader.readexactly(proto.MAX_MSG_LEN_BYTES)
-                data_length = int.from_bytes(length_prefix, byteorder='big')
-                
-                data = await self.reader.readexactly(data_length)
-                message = proto.unpack_message(data)
-                
+                message = await proto.parse_from_reader(self.reader)
                 await self.handler(self.conn_id, self.writer, message)
         except asyncio.IncompleteReadError:
             print("Transport: Connection closed by the peer.")
@@ -29,5 +24,3 @@ class Transport:
     async def write(self, message):
         self.writer.write(message)
         await self.writer.drain()
-
-
