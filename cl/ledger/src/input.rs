@@ -25,23 +25,19 @@ impl InputProof {
 }
 
 pub fn prove_input_nullifier(
-    input: &cl::InputWitness,
+    input: cl::InputWitness,
     note_commitments: &[cl::NoteCommitment],
 ) -> InputProof {
-    let output = input.to_output_witness();
+    let output_cm = input.to_output_witness().commit_note();
+
     let cm_leaves = note_commitment_leaves(note_commitments);
-    let output_cm = output.commit_note();
     let cm_idx = note_commitments
         .iter()
         .position(|c| c == &output_cm)
         .unwrap();
     let cm_path = cl::merkle::path(cm_leaves, cm_idx);
 
-    let secrets = InputPrivate {
-        nf_sk: input.nf_sk,
-        output,
-        cm_path,
-    };
+    let secrets = InputPrivate { input, cm_path };
 
     let env = risc0_zkvm::ExecutorEnv::builder()
         .write(&secrets)
@@ -90,7 +86,7 @@ mod test {
         let input = cl::InputWitness {
             note: cl::NoteWitness {
                 balance: cl::BalanceWitness::random(32, "NMO", &mut rng),
-                death_constraint: vec![],
+                death_constraint: [0u8; 32],
                 state: [0u8; 32],
             },
             nf_sk: cl::NullifierSecret::random(&mut rng),
@@ -99,12 +95,11 @@ mod test {
 
         let notes = vec![input.to_output_witness().commit_note()];
 
-        let proof = prove_input_nullifier(&input, &notes);
+        let proof = prove_input_nullifier(input, &notes);
 
         let expected_public_inputs = InputPublic {
             cm_root: cl::merkle::root(note_commitment_leaves(&notes)),
-            nf: input.commit().nullifier,
-            death_cm: cl::note::death_commitment(&[]),
+            input: input.commit(),
         };
 
         assert!(proof.verify(&expected_public_inputs));
@@ -112,17 +107,30 @@ mod test {
         let wrong_public_inputs = [
             InputPublic {
                 cm_root: cl::merkle::root([cl::merkle::leaf(b"bad_root")]),
-                ..expected_public_inputs.clone()
+                ..expected_public_inputs
             },
             InputPublic {
-                nf: cl::Nullifier::new(
-                    cl::NullifierSecret::random(&mut rng),
-                    cl::NullifierNonce::random(&mut rng),
-                ),
-                ..expected_public_inputs.clone()
+                input: cl::Input {
+                    nullifier: cl::Nullifier::new(
+                        cl::NullifierSecret::random(&mut rng),
+                        cl::NullifierNonce::random(&mut rng),
+                    ),
+                    ..expected_public_inputs.input
+                },
+                ..expected_public_inputs
             },
             InputPublic {
-                death_cm: cl::note::death_commitment(b"wrong death vk"),
+                input: cl::Input {
+                    death_cm: cl::note::death_commitment(b"wrong death vk"),
+                    ..expected_public_inputs.input
+                },
+                ..expected_public_inputs
+            },
+            InputPublic {
+                input: cl::Input {
+                    balance: cl::BalanceWitness::random(32, "NMO", &mut rng).commit(),
+                    ..expected_public_inputs.input
+                },
                 ..expected_public_inputs
             },
         ];

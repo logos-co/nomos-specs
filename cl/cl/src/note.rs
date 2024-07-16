@@ -8,7 +8,8 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct DeathCommitment([u8; 32]);
+pub struct DeathCommitment(pub [u8; 32]);
+
 pub fn death_commitment(death_constraint: &[u8]) -> DeathCommitment {
     let mut hasher = Sha256::new();
     hasher.update(b"NOMOS_CL_DEATH_COMMIT");
@@ -29,10 +30,10 @@ impl NoteCommitment {
 
 // TODO: Rename Note to NoteWitness and NoteCommitment to Note
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub struct NoteWitness {
     pub balance: BalanceWitness,
-    pub death_constraint: Vec<u8>, // serialized verification key of death constraint
+    pub death_constraint: [u8; 32], // death constraint verification key
     pub state: [u8; 32],
 }
 
@@ -45,7 +46,7 @@ impl NoteWitness {
     ) -> Self {
         Self {
             balance: BalanceWitness::random(value, unit, rng),
-            death_constraint: vec![],
+            death_constraint: [0u8; 32],
             state,
         }
     }
@@ -63,7 +64,7 @@ impl NoteWitness {
         hasher.update(self.state);
 
         // COMMIT TO DEATH CONSTRAINT
-        hasher.update(&self.death_constraint);
+        hasher.update(self.death_constraint);
 
         // COMMIT TO NULLIFIER
         hasher.update(nf_pk.as_bytes());

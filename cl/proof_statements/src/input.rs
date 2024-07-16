@@ -8,16 +8,14 @@ use serde::{Deserialize, Serialize};
 /// 3. verify_merkle_path(note_cm, root, path)
 /// 4. death_cm = death_commitment(note.death_constraint)
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputPublic {
     pub cm_root: [u8; 32],
-    pub nf: cl::Nullifier,
-    pub death_cm: cl::DeathCommitment,
+    pub input: cl::Input,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputPrivate {
-    pub nf_sk: cl::NullifierSecret,
-    pub output: cl::OutputWitness,
+    pub input: cl::InputWitness,
     pub cm_path: Vec<cl::merkle::PathNode>,
 }
