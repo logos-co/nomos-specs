@@ -24,10 +24,7 @@ impl InputProof {
     }
 }
 
-pub fn prove_input_nullifier(
-    input: cl::InputWitness,
-    note_commitments: &[cl::NoteCommitment],
-) -> InputProof {
+pub fn prove_input(input: cl::InputWitness, note_commitments: &[cl::NoteCommitment]) -> InputProof {
     let output_cm = input.to_output_witness().commit_note();
 
     let cm_leaves = note_commitment_leaves(note_commitments);
@@ -95,7 +92,7 @@ mod test {
 
         let notes = vec![input.to_output_witness().commit_note()];
 
-        let proof = prove_input_nullifier(input, &notes);
+        let proof = prove_input(input, &notes);
 
         let expected_public_inputs = InputPublic {
             cm_root: cl::merkle::root(note_commitment_leaves(&notes)),
