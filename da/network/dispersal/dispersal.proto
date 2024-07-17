@@ -1,21 +1,24 @@
 syntax = "proto3";
 
-package nomos.da.dispersal;
+package nomos.da.dispersal.v1;
 
 message Blob {
     bytes blob_id = 1;
     bytes data = 2;
 }
 
-message Error {
-    string description = 1;
-}
+// DISPERSAL
 
 message DispersalErr {
-    oneof message_type {
-        Error chunk_size_err = 1;
-        Error verification_err = 2;
+    bytes blob_id = 1;
+
+    enum DispersalErrType {
+        CHUNK_SIZE = 0;
+        VERIFICATION = 1;
     }
+
+    DispersalErrType err_type = 2;
+    string err_description = 3;
 }
 
 message DispersalReq {
@@ -29,10 +32,17 @@ message DispersalRes {
     }
 }
 
+// SAMPLING
+
 message SampleErr {
-    oneof message_type {
-        Error not_found = 1;
+    bytes blob_id = 1;
+
+    enum SampleErrType {
+        NOT_FOUND = 0;
     }
+
+    SampleErrType err_type = 2;
+    string err_description = 3;
 }
 
 message SampleReq {
@@ -45,6 +55,26 @@ message SampleRes {
         SampleErr err = 2;
     }
 }
+
+// SESSION CONTROL
+
+message CloseMsg {
+    enum CloseReason {
+        GRACEFUL_SHUTDOWN = 0;
+        SUBNET_CHANGE = 1;
+        SUBNET_SAMPLE_FAIL = 2;
+    }
+
+    CloseReason reason = 1;
+}
+
+message SessionReq {
+    oneof message_type {
+        CloseMsg close_msg = 1;
+    }
+}
+
+// WRAPPER MESSAGE
 
 message DispersalMessage {
     oneof message_type {

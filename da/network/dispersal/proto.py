@@ -20,6 +20,9 @@ def unpack_message(data):
     message.ParseFromString(data)
     return message
 
+
+# DISPERSAL
+
 def new_dispersal_req_msg(blob_id, data):
     blob = dispersal_pb2.Blob(blob_id=blob_id, data=data)
     dispersal_req = dispersal_pb2.DispersalReq(blob=blob)
@@ -31,19 +34,26 @@ def new_dispersal_res_success_msg(blob_id):
     dispersal_message = dispersal_pb2.DispersalMessage(dispersal_res=dispersal_res)
     return pack_message(dispersal_message)
 
-def new_dispersal_res_chunk_size_error_msg(description):
-    error = dispersal_pb2.Error(description=description)
-    dispersal_err = dispersal_pb2.DispersalErr(chunk_size_err=error)
+def new_dispersal_res_chunk_size_error_msg(blob_id, description):
+    dispersal_err = dispersal_pb2.DispersalErr(
+        blob_id=blob_id, err_type=dispersal_pb2.DispersalErr.CHUNK_SIZE,
+        err_description=description
+    )
     dispersal_res = dispersal_pb2.DispersalRes(err=dispersal_err)
     dispersal_message = dispersal_pb2.DispersalMessage(dispersal_res=dispersal_res)
     return pack_message(dispersal_message)
 
-def new_dispersal_res_verification_error_msg(description):
-    error = dispersal_pb2.Error(description=description)
-    dispersal_err = dispersal_pb2.DispersalErr(verification_err=error)
+def new_dispersal_res_verification_error_msg(blob_id, description):
+    dispersal_err = dispersal_pb2.DispersalErr(
+        blob_id=blob_id, err_type=dispersal_pb2.DispersalErr.VERIFICATION,
+        err_description=description
+    )
     dispersal_res = dispersal_pb2.DispersalRes(err=dispersal_err)
     dispersal_message = dispersal_pb2.DispersalMessage(dispersal_res=dispersal_res)
     return pack_message(dispersal_message)
+
+
+# SAMPLING
 
 def new_sample_req_msg(blob_id):
     sample_req = dispersal_pb2.SampleReq(blob_id=blob_id)
@@ -56,9 +66,33 @@ def new_sample_res_success_msg(blob_id, data):
     dispersal_message = dispersal_pb2.DispersalMessage(sample_res=sample_res)
     return pack_message(dispersal_message)
 
-def new_sample_res_not_found_error_msg(description):
-    error = dispersal_pb2.Error(description=description)
-    sample_err = dispersal_pb2.SampleErr(not_found=error)
+def new_sample_res_not_found_error_msg(blob_id, description):
+    sample_err = dispersal_pb2.SampleErr(
+        blob_id=blob_id, err_type=dispersal_pb2.SampleErr.NOT_FOUND,
+        err_description=description
+    )
     sample_res = dispersal_pb2.SampleRes(err=sample_err)
     dispersal_message = dispersal_pb2.DispersalMessage(sample_res=sample_res)
     return pack_message(dispersal_message)
+
+
+# SESSION CONTROL
+
+def new_close_msg(reason):
+    close_msg = dispersal_pb2.CloseMsg(reason=reason)
+    return close_msg
+
+def new_session_req_close_msg(reason):
+    close_msg = new_close_msg(reason)
+    session_req = dispersal_pb2.SessionReq(close_msg=close_msg)
+    dispersal_message = dispersal_pb2.DispersalMessage(session_req=session_req)
+    return pack_message(dispersal_message)
+
+def new_session_req_graceful_shutdown_msg():
+    new_session_req_close_msg(dispersal_pb2.CloseMsg.GRACEFUL_SHUTDOWN)
+
+def new_session_req_subnet_change_msg():
+    new_session_req_close_msg(dispersal_pb2.CloseMsg.SUBNET_CHANGE)
+
+def new_session_req_subnet_sample_fail_msg():
+    new_session_req_close_msg(dispersal_pb2.CloseMsg.SUBNET_SAMPLE_FAIL)
