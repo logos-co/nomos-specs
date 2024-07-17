@@ -9,6 +9,7 @@ from constants import HASH_LENGTH, PROTOCOL_ID
 from libp2p import host, new_host
 from libp2p.network.stream.net_stream_interface import INetStream
 from libp2p.peer.peerinfo import info_from_p2p_addr
+from da.network.dispersal import proto
 
 
 class Executor:
@@ -94,4 +95,9 @@ class Executor:
         Send data to peer (async)
         The index is the subnet number
         """
-        await stream.write(self.data[index])
+
+        blob_id = sha256(self.data)
+        blob_data = self.data[index]
+
+        message = proto.new_dispersal_req_msg(blob_id, blob_data)
+        await stream.write(message)
