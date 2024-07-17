@@ -15,7 +15,7 @@ class MockTransport:
     async def read_and_process(self):
         try:
             while True:
-                message = await proto.parse_from_reader(self.reader)
+                message = await proto.unpack_from_reader(self.reader)
                 await self.handler(self.conn_id, self.writer, message)
         except Exception as e:
             print(f"MockTransport: An error occurred: {e}")
@@ -102,7 +102,7 @@ class MockExecutor:
 
     async def run(self):
         await asyncio.gather(*(self._connect() for _ in range(self.col_num)))
-        await self._execute()
+        await self.executor()
 
 
 class MockSystem:

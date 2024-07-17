@@ -3,19 +3,24 @@ from itertools import count
 
 MAX_MSG_LEN_BYTES = 2
 
-async def parse_from_reader(reader):
-    length_prefix = await reader.readexactly(MAX_MSG_LEN_BYTES)
-    data_length = int.from_bytes(length_prefix, byteorder='big')
-    data = await reader.readexactly(data_length)
-    return unpack_message(data)
-
 def pack_message(message):
     # SerializeToString method returns an instance of bytes.
     data = message.SerializeToString()
     length_prefix = len(data).to_bytes(MAX_MSG_LEN_BYTES, byteorder='big')
     return length_prefix + data
 
-def unpack_message(data):
+async def unpack_from_reader(reader):
+    length_prefix = await reader.readexactly(MAX_MSG_LEN_BYTES)
+    data_length = int.from_bytes(length_prefix, byteorder='big')
+    data = await reader.readexactly(data_length)
+    return parse(data)
+
+def unpack_from_bytes(data):
+    length_prefix = data[:MAX_MSG_LEN_BYTES]
+    data_length = int.from_bytes(length_prefix, byteorder='big')
+    return parse(data[MAX_MSG_LEN_BYTES:MAX_MSG_LEN_BYTES + data_length])
+
+def parse(data):
     message = dispersal_pb2.DispersalMessage()
     message.ParseFromString(data)
     return message
@@ -86,13 +91,16 @@ def new_session_req_close_msg(reason):
     close_msg = new_close_msg(reason)
     session_req = dispersal_pb2.SessionReq(close_msg=close_msg)
     dispersal_message = dispersal_pb2.DispersalMessage(session_req=session_req)
-    return pack_message(dispersal_message)
+    return dispersal_message
 
 def new_session_req_graceful_shutdown_msg():
-    new_session_req_close_msg(dispersal_pb2.CloseMsg.GRACEFUL_SHUTDOWN)
+    message = new_session_req_close_msg(dispersal_pb2.CloseMsg.GRACEFUL_SHUTDOWN)
+    return pack_message(message)
 
 def new_session_req_subnet_change_msg():
-    new_session_req_close_msg(dispersal_pb2.CloseMsg.SUBNET_CHANGE)
+    message = new_session_req_close_msg(dispersal_pb2.CloseMsg.SUBNET_CHANGE)
+    return pack_message(message)
 
 def new_session_req_subnet_sample_fail_msg():
-    new_session_req_close_msg(dispersal_pb2.CloseMsg.SUBNET_SAMPLE_FAIL)
+    message = new_session_req_close_msg(dispersal_pb2.CloseMsg.SUBNET_SAMPLE_FAIL)
+    return pack_message(message)

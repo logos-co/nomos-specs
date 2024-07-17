@@ -82,5 +82,6 @@ message DispersalMessage {
         DispersalRes dispersal_res = 2;
         SampleReq sample_req = 3;
         SampleRes sample_res = 4;
+        SessionReq session_req = 5;
     }
 }
