@@ -1,0 +1,34 @@
+[project]
+name = "nomos-specs"
+version = "0.0.1"
+description = "Nomos executable specifications"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: OS Independent",
+]
+dynamic = ["dependencies"]
+
+[project.urls]
+Homepage = "https://github.com/logos-co/nomos-specs"
+Issues = "https://github.com/logos-co/nomos-specs/issues"
+
+[build-system]
+requires = ["hatchling", "hatch-requirements-txt"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+# Include only Python packages from this repository
+include = ["mixnet", "cryptarchia", "da"]
+
+[tool.hatch.build.targets.wheel]
+# Include only Python packages from this repository
+packages = ["mixnet", "cryptarchia", "da"]
+
+[tool.hatch.metadata.hooks.requirements_txt]
+files = ["requirements.txt"]
