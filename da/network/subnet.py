@@ -2,11 +2,8 @@ from random import randint
 
 from constants import *
 
-# how many nodes per subnet minimum
-REPLICATION_FACTOR = 4
 
-
-def calculate_subnets(node_list, num_subnets):
+def calculate_subnets(node_list, num_subnets, replication_factor):
     """
     Calculate in which subnet(s) to place each node.
     This PoC does NOT require this to be analyzed,
@@ -45,7 +42,7 @@ def calculate_subnets(node_list, num_subnets):
         i += 1
 
     # if not each subnet has at least factor number of nodes, fill up
-    if listlen < REPLICATION_FACTOR * num_subnets:
+    if listlen < replication_factor * num_subnets:
         for subnet in subnets:
             last = subnets[subnet][len(subnets[subnet]) - 1].get_id()
             idx = -1
@@ -54,7 +51,7 @@ def calculate_subnets(node_list, num_subnets):
                 if n.get_id() == last:
                     idx = j + 1
             # fill up until factor
-            while len(subnets[subnet]) < REPLICATION_FACTOR:
+            while len(subnets[subnet]) < replication_factor:
                 # wrap index if at end
                 if idx > len(node_list) - 1:
                     idx = 0
