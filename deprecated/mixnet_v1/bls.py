@@ -2,7 +2,7 @@ from typing import TypeAlias
 
 import blspy
 
-from deprecated.mixnet_v1.utils import random_bytes
+from .utils import random_bytes
 
 BlsPrivateKey: TypeAlias = blspy.PrivateKey
 BlsPublicKey: TypeAlias = blspy.G1Element

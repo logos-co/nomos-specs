@@ -3,15 +3,15 @@ from unittest import TestCase
 
 from pysphinx.sphinx import ProcessedFinalHopPacket, SphinxPacket
 
-from deprecated.mixnet_v1.config import MixNodeInfo
-from deprecated.mixnet_v1.packet import (
+from .config import MixNodeInfo
+from .packet import (
     Fragment,
     MessageFlag,
     MessageReconstructor,
     PacketBuilder,
 )
-from deprecated.mixnet_v1.test_utils import init_mixnet_config
-from deprecated.mixnet_v1.utils import random_bytes
+from .test_utils import init_mixnet_config
+from .utils import random_bytes
 
 
 class TestPacket(TestCase):
