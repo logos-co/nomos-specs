@@ -10,8 +10,8 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
 )
 from pysphinx.node import Node
 
-from .bls import BlsPrivateKey, BlsPublicKey
-from .fisheryates import FisherYates
+from mixnet.bls import BlsPrivateKey, BlsPublicKey
+from mixnet.fisheryates import FisherYates
 
 
 @dataclass

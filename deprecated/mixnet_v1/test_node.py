@@ -5,10 +5,10 @@ from unittest import IsolatedAsyncioTestCase
 import numpy
 from pysphinx.sphinx import SphinxPacket
 
-from .node import MixNode, NodeAddress, PacketQueue
-from .packet import PacketBuilder
-from .poisson import poisson_interval_sec, poisson_mean_interval_sec
-from .test_utils import (
+from mixnet.node import MixNode, NodeAddress, PacketQueue
+from mixnet.packet import PacketBuilder
+from mixnet.poisson import poisson_interval_sec, poisson_mean_interval_sec
+from mixnet.test_utils import (
     init_mixnet_config,
     with_test_timeout,
 )

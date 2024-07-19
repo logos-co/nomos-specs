@@ -4,10 +4,10 @@ import asyncio
 from contextlib import suppress
 from typing import Self
 
-from .config import MixClientConfig, MixnetTopology
-from .node import PacketQueue
-from .packet import PacketBuilder
-from .poisson import poisson_interval_sec
+from mixnet.config import MixClientConfig, MixnetTopology
+from mixnet.node import PacketQueue
+from mixnet.packet import PacketBuilder
+from mixnet.poisson import poisson_interval_sec
 
 
 class MixClient:

@@ -15,8 +15,8 @@ from pysphinx.sphinx import (
     UnknownHeaderTypeError,
 )
 
-from .config import MixNodeConfig, NodeAddress
-from .poisson import poisson_interval_sec
+from mixnet.config import MixNodeConfig, NodeAddress
+from mixnet.poisson import poisson_interval_sec
 
 PacketQueue: TypeAlias = "asyncio.Queue[Tuple[NodeAddress, SphinxPacket]]"
 PacketPayloadQueue: TypeAlias = (

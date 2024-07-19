@@ -3,13 +3,13 @@ from unittest import IsolatedAsyncioTestCase
 
 import numpy
 
-from .client import MixClient
-from .poisson import poisson_mean_interval_sec
-from .test_utils import (
+from mixnet.client import MixClient
+from mixnet.poisson import poisson_mean_interval_sec
+from mixnet.test_utils import (
     init_mixnet_config,
     with_test_timeout,
 )
-from .utils import random_bytes
+from mixnet.utils import random_bytes
 
 
 class TestMixClient(IsolatedAsyncioTestCase):
