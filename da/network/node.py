@@ -2,6 +2,7 @@ import sys
 from hashlib import sha256
 from random import randint
 
+import dispersal.proto as proto
 import multiaddr
 import trio
 from blspy import BasicSchemeMPL, G1Element, PrivateKey
@@ -94,7 +95,8 @@ class DANode:
             while True:
                 read_bytes = await stream.read(MAX_READ_LEN)
                 if read_bytes is not None:
-                    hashstr = sha256(read_bytes).hexdigest()
+                    message = proto.unpack_from_bytes(read_bytes)
+                    hashstr = sha256(message.dispersal_req.blob.data).hexdigest()
                     if hashstr not in self.hashes:
                         # "store" the received packet
                         self.hashes.add(hashstr)

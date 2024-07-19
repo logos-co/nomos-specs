@@ -1,15 +1,14 @@
-import sys
 from hashlib import sha256
 from random import randbytes
 from typing import Self
 
+import dispersal.proto as proto
 import multiaddr
 import trio
 from constants import HASH_LENGTH, PROTOCOL_ID
 from libp2p import host, new_host
 from libp2p.network.stream.net_stream_interface import INetStream
 from libp2p.peer.peerinfo import info_from_p2p_addr
-from da.network.dispersal import proto
 
 
 class Executor:
@@ -34,6 +33,7 @@ class Executor:
     data: []
     # stores hashes of the data for later verification
     data_hashes: []
+    blob_id: int
 
     @classmethod
     def new(cls, port, node_list, num_subnets, data_size) -> Self:
@@ -69,9 +69,12 @@ class Executor:
         Create random data for dispersal
         One packet of self.data_size length per subnet
         """
+        id = sha256()
         for i in range(self.num_subnets):
             self.data[i] = randbytes(self.data_size)
             self.data_hashes[i] = sha256(self.data[i]).hexdigest()
+            id.update(self.data[i])
+        self.blob_id = id.digest()
 
     async def disperse(self, nursery):
         """
@@ -96,7 +99,7 @@ class Executor:
         The index is the subnet number
         """
 
-        blob_id = sha256(self.data)
+        blob_id = self.blob_id
         blob_data = self.data[index]
 
         message = proto.new_dispersal_req_msg(blob_id, blob_data)

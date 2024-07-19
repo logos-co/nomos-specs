@@ -1,5 +1,6 @@
 import argparse
 import sys
+import time
 from random import randint
 
 import multiaddr
@@ -31,10 +32,12 @@ async def run_network(params):
     disperse_send, disperse_recv = trio.open_memory_channel(0)
     async with trio.open_nursery() as nursery:
         nursery.start_soon(net.build, nursery, shutdown, disperse_send)
-        nursery.start_soon(run_subnets, net, params, nursery, shutdown, disperse_recv)
+        nursery.start_soon(
+            run_subnets, net, params, nursery, shutdown, disperse_send, disperse_recv
+        )
 
 
-async def run_subnets(net, params, nursery, shutdown, disperse_recv):
+async def run_subnets(net, params, nursery, shutdown, disperse_send, disperse_recv):
     """
     Run the actual PoC logic.
     Calculate the subnets.
@@ -48,28 +51,34 @@ async def run_subnets(net, params, nursery, shutdown, disperse_recv):
     num_subnets = int(params.subnets)
     data_size = int(params.data_size)
     sample_threshold = int(params.sample_threshold)
+    fault_rate = int(params.fault_rate)
+    replication_factor = int(params.replication_factor)
+
     while len(net.get_nodes()) != num_nodes:
         print("nodes not ready yet")
         await trio.sleep(0.1)
 
     print("Nodes ready")
     nodes = net.get_nodes()
-    subnets = calculate_subnets(nodes, num_subnets)
+    subnets = calculate_subnets(nodes, num_subnets, replication_factor)
     await print_subnet_info(subnets)
 
     print("Establishing connections...")
     node_list = {}
     all_node_instances = set()
-    await establish_connections(subnets, node_list, all_node_instances)
+    await establish_connections(subnets, node_list, all_node_instances, fault_rate)
 
     print("Starting executor...")
     exe = Executor.new(EXECUTOR_PORT, node_list, num_subnets, data_size)
 
     print("Start dispersal and wait to complete...")
     print("depending on network and subnet size this may take a while...")
+    global TIMESTAMP
+    TIMESTAMP = time.time()
     async with trio.open_nursery() as subnursery:
         subnursery.start_soon(wait_disperse_finished, disperse_recv, num_subnets)
         subnursery.start_soon(exe.disperse, nursery)
+        subnursery.start_soon(disperse_watcher, disperse_send.clone())
 
     print()
     print()
@@ -82,24 +91,43 @@ async def run_subnets(net, params, nursery, shutdown, disperse_recv):
     print("Waiting for sampling to finish...")
     await check_complete(checked, sample_threshold)
 
+    print_connections(all_node_instances)
+
     print("Test completed")
     shutdown.set()
 
 
+TIMESTAMP = time.time()
+
+
+def print_connections(node_list):
+    for n in node_list:
+        for p in n.net_iface().get_peerstore().peer_ids():
+            if p == n.net_iface().get_id():
+                continue
+            print("node {} is connected to {}".format(n.get_id(), p))
+        print()
+
+
+async def disperse_watcher(disperse_send):
+    while time.time() - TIMESTAMP < 5:
+        await trio.sleep(1)
+
+    await disperse_send.send(9999)
+    print("canceled")
+
+
 async def wait_disperse_finished(disperse_recv, num_subnets):
-    # the executor will be sending a packet
-    # num_subnets times right away
-    sends = num_subnets
-    recvs = 0
+    # run until there are no changes detected
     async for value in disperse_recv:
-        print(".", end="")
-        if value < 0:
-            recvs += 1
-        else:
-            sends += 1
-        if sends == recvs:
-            disperse_recv.close()
+        if value == 9999:
+            print("dispersal finished")
             return
+
+        print(".", end="")
+
+        global TIMESTAMP
+        TIMESTAMP = time.time()
 
 
 async def print_subnet_info(subnets):
@@ -119,7 +147,7 @@ async def print_subnet_info(subnets):
     print()
 
 
-async def establish_connections(subnets, node_list, all_node_instances):
+async def establish_connections(subnets, node_list, all_node_instances, fault_rate=0):
     """
     Each node in a subnet connects to the other ones in that subnet.
     """
@@ -133,9 +161,14 @@ async def establish_connections(subnets, node_list, all_node_instances):
             # to later check if we are already connected with the next peer
             this_nodes_peers = n.net_iface().get_peerstore().peer_ids()
             all_node_instances.add(n)
-            for nn in subnets[subnet]:
+            faults = []
+            for i in range(fault_rate):
+                faults.append(randint(0, len(subnets[subnet])))
+            for i, nn in enumerate(subnets[subnet]):
                 # don't connect to self
                 if nn.get_id() == n.get_id():
+                    continue
+                if i in faults:
                     continue
                 remote_id = nn.get_id().pretty()
                 remote_port = nn.get_port()
@@ -206,6 +239,10 @@ if __name__ == "__main__":
         help="Threshold for sampling request attempts [default: 12]",
     )
     parser.add_argument("-d", "--data-size", help="Size of packages [default: 1024]")
+    parser.add_argument("-f", "--fault_rate", help="Fault rate [default: 0]")
+    parser.add_argument(
+        "-r", "--replication_factor", help="Replication factor [default: 4]"
+    )
     args = parser.parse_args()
 
     if not args.subnets:
@@ -216,11 +253,16 @@ if __name__ == "__main__":
         args.sample_threshold = DEFAULT_SAMPLE_THRESHOLD
     if not args.data_size:
         args.data_size = DEFAULT_DATA_SIZE
+    if not args.replication_factor:
+        args.replication_factor = DEFAULT_REPLICATION_FACTOR
+    if not args.fault_rate:
+        args.fault_rate = 0
 
     print("Number of subnets will be: {}".format(args.subnets))
     print("Number of nodes will be: {}".format(args.nodes))
     print("Size of data package will be: {}".format(args.data_size))
     print("Threshold for sampling attempts will be: {}".format(args.sample_threshold))
+    print("Fault rate will be: {}".format(args.fault_rate))
 
     print()
     print("*******************")
