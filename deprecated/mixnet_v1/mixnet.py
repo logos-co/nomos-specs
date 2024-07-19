@@ -4,9 +4,13 @@ import asyncio
 from contextlib import suppress
 from typing import Self, TypeAlias
 
-from mixnet.client import MixClient
-from mixnet.config import MixnetConfig, MixnetTopology, MixnetTopologyConfig
-from mixnet.node import MixNode
+from deprecated.mixnet_v1.client import MixClient
+from deprecated.mixnet_v1.config import (
+    MixnetConfig,
+    MixnetTopology,
+    MixnetTopologyConfig,
+)
+from deprecated.mixnet_v1.node import MixNode
 
 EntropyQueue: TypeAlias = "asyncio.Queue[bytes]"
 

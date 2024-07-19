@@ -4,10 +4,10 @@ import asyncio
 from contextlib import suppress
 from typing import Self
 
-from mixnet.config import MixClientConfig, MixnetTopology
-from mixnet.node import PacketQueue
-from mixnet.packet import PacketBuilder
-from mixnet.poisson import poisson_interval_sec
+from deprecated.mixnet_v1.config import MixClientConfig, MixnetTopology
+from deprecated.mixnet_v1.node import PacketQueue
+from deprecated.mixnet_v1.packet import PacketBuilder
+from deprecated.mixnet_v1.poisson import poisson_interval_sec
 
 
 class MixClient:

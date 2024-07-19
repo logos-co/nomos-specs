@@ -9,7 +9,7 @@ from typing import Dict, List, Self, Tuple, TypeAlias
 from pysphinx.payload import Payload
 from pysphinx.sphinx import SphinxPacket
 
-from mixnet.config import MixnetTopology, MixNodeInfo
+from deprecated.mixnet_v1.config import MixnetTopology, MixNodeInfo
 
 
 class MessageFlag(Enum):

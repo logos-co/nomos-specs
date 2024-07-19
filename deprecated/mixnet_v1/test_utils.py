@@ -2,17 +2,17 @@ import asyncio
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
-from mixnet.bls import generate_bls
-from mixnet.config import (
+from deprecated.mixnet_v1.bls import generate_bls
+from deprecated.mixnet_v1.config import (
     MixClientConfig,
-    MixNodeConfig,
     MixnetConfig,
-    MixNodeInfo,
     MixnetTopology,
     MixnetTopologyConfig,
     MixnetTopologySize,
+    MixNodeConfig,
+    MixNodeInfo,
 )
-from mixnet.utils import random_bytes
+from deprecated.mixnet_v1.utils import random_bytes
 
 
 def with_test_timeout(t):

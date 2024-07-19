@@ -1,8 +1,8 @@
 import asyncio
 from unittest import IsolatedAsyncioTestCase
 
-from mixnet.mixnet import Mixnet
-from mixnet.test_utils import init_mixnet_config
+from deprecated.mixnet_v1.mixnet import Mixnet
+from deprecated.mixnet_v1.test_utils import init_mixnet_config
 
 
 class TestMixnet(IsolatedAsyncioTestCase):
