@@ -224,9 +224,6 @@ class BlockHeader:
         assert len(self.parent) == 32
         h.update(self.parent)
 
-        # leader proof
-        assert len(self.leader_proof.commitment) == 32
-        h.update(self.leader_proof.commitment)
         assert len(self.leader_proof.nullifier) == 32
         h.update(self.leader_proof.nullifier)
         assert len(self.leader_proof.evolved_commitment) == 32
