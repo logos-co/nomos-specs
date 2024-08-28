@@ -193,6 +193,9 @@ class LeaderProof:
             ):
         evolved_coin = coin.evolve()
 
+        #These verifications are normally done in the risc0 zk-proof
+
+
         return LeaderProof( # TODO: generate the proof with risc0
             nullifier=coin.nullifier(),
             evolved_commitment=evolved_coin.commitment(),
@@ -461,8 +464,7 @@ class Follower:
         # This will change once we start putting merkle roots in headers
         current_state: LedgerState,
     ) -> bool:
-        threshold_0 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff)) / (epoch_state.total_active_stake()))
-        threshold_1 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff) ** 2) / (epoch_state.total_active_stake() ** 2))
+        threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch_state.total_active_stake())
         return (
             proof.verify(slot, epoch_state.nonce(), threshold_0, threshold_1, current_state.commitments_lead)  # verify slot leader proof
             # Membership verification is included in the proof verification along with the PoS lottery:
