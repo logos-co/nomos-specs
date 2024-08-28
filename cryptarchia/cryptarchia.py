@@ -686,6 +686,12 @@ class LEADER_VRF:
         raise NotImplemented()
 
 
+def lottery_threshold(active_slot_coeff: float, total_stake: int) -> (int,int):
+    threshold_0 = int(- (LEADER_VRF.ORDER * log(1 - active_slot_coeff)) / total_stake)
+    threshold_1 = int(- (LEADER_VRF.ORDER * log(1 - active_slot_coeff) ** 2) / (total_stake ** 2))
+    return threshold_0, threshold_1
+
+
 @dataclass
 class Leader:
     config: Config
@@ -695,8 +701,7 @@ class Leader:
         self, epoch: EpochState, slot: Slot, eligible_notes: set[Id]
     ) -> LeaderProof | None:
         if self._is_slot_leader(epoch, slot):
-            threshold_0 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff)) / (epoch.total_active_stake()))
-            threshold_1 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff) ** 2) / (epoch.total_active_stake() ** 2))
+            threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch.total_active_stake())
             return LeaderProof.new(slot, epoch.nonce(), threshold_0, threshold_1, eligible_notes, self.coin)
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
