@@ -1,6 +1,6 @@
 from typing import TypeAlias, List, Optional
 from hashlib import sha256, blake2b
-from math import floor
+from math import floor, log
 from copy import deepcopy
 from itertools import chain
 import functools
@@ -173,28 +173,38 @@ class Coin:
 
 
 @dataclass
-class MockLeaderProof:
-    commitment: Id
+class LeaderProof:
     nullifier: Id
     evolved_commitment: Id
     slot: Slot
-    parent: Id
+    # The produced proof
 
     @staticmethod
-    def new(coin: Coin, slot: Slot, parent: Id):
+    def new(#Public inputs
+            slot: Slot,
+            _epoch_nonce: Id,
+            _threshold_0: int,
+            _threshold_1: int,
+            _eligible_notes: set[Id],
+
+            #Secret inputs
+            coin: Coin,
+            #membership witness
+            ):
         evolved_coin = coin.evolve()
 
-        return MockLeaderProof(
-            commitment=coin.commitment(),
+        return LeaderProof( # TODO: generate the proof with risc0
             nullifier=coin.nullifier(),
             evolved_commitment=evolved_coin.commitment(),
             slot=slot,
-            parent=parent,
         )
 
-    def verify(self, slot: Slot, parent: Id):
-        # TODO: verification not implemented
-        return slot == self.slot and parent == self.parent
+    def verify(self, slot: Slot,
+               _epoch_nonce: Id,
+               _threshold_0: int,
+               _threshold_1: int,
+               _eligible_notes: set[Id],):
+        return slot == self.slot #TODO: and verification of the proof with risc0
 
 
 @dataclass
@@ -203,7 +213,7 @@ class BlockHeader:
     parent: Id
     content_size: int
     content_id: Id
-    leader_proof: MockLeaderProof
+    leader_proof: LeaderProof
     orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
 
     def update_header_hash(self, h):
@@ -225,8 +235,6 @@ class BlockHeader:
         h.update(self.parent)
 
         # leader proof
-        assert len(self.leader_proof.commitment) == 32
-        h.update(self.leader_proof.commitment)
         assert len(self.leader_proof.nullifier) == 32
         h.update(self.leader_proof.nullifier)
         assert len(self.leader_proof.evolved_commitment) == 32
@@ -337,7 +345,7 @@ class LedgerState:
         for proof in chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
 
-    def apply_leader_proof(self, proof: MockLeaderProof):
+    def apply_leader_proof(self, proof: LeaderProof):
         self.nullifiers.add(proof.nullifier)
         self.commitments_spend.add(proof.evolved_commitment)
         self.commitments_lead.add(proof.evolved_commitment)
@@ -445,7 +453,7 @@ class Follower:
         self,
         slot: Slot,
         parent: Id,
-        proof: MockLeaderProof,
+        proof: LeaderProof,
         # coins are old enough if their commitment is in the stake distribution snapshot
         epoch_state: EpochState,
         # nullifiers (and commitments) are checked against the current state.
@@ -453,12 +461,15 @@ class Follower:
         # This will change once we start putting merkle roots in headers
         current_state: LedgerState,
     ) -> bool:
+        threshold_0 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff)) / (epoch_state.total_active_stake()))
+        threshold_1 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff) ** 2) / (epoch_state.total_active_stake() ** 2))
         return (
-            proof.verify(slot, parent)  # verify slot leader proof
-            and (
-                current_state.verify_eligible_to_lead(proof.commitment)
-                or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
-            )
+            proof.verify(slot, epoch_state.nonce(), threshold_0, threshold_1, current_state.commitments_lead)  # verify slot leader proof
+            # Included in the proof circuit:
+            #and (
+            #    current_state.verify_eligible_to_lead(proof.commitment)
+            #    or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
+            #)
             and current_state.verify_unspent(proof.nullifier)
         )
 
@@ -651,13 +662,13 @@ def phi(f: float, alpha: float) -> float:
 
     returns: the probability that this validator should win the slot lottery
     """
-    return 1 - (1 - f) ** alpha
+    return alpha * (- log(1-f) - 0.5 * alpha * log(1-f) ** 2)
 
 
-class MOCK_LEADER_VRF:
+class LEADER_VRF:
     """NOT SECURE: A mock VRF function"""
 
-    ORDER = 2**256
+    ORDER = 2**253
 
     @classmethod
     def vrf(cls, coin: Coin, epoch_nonce: bytes, slot: Slot) -> int:
@@ -668,7 +679,7 @@ class MOCK_LEADER_VRF:
         h.update(coin.encode_sk())
         h.update(coin.nonce)
 
-        return int.from_bytes(h.digest())
+        return int(int.from_bytes(h.digest()) >> 3)
 
     @classmethod
     def verify(cls, r, pk, nonce, slot):
@@ -681,17 +692,19 @@ class Leader:
     coin: Coin
 
     def try_prove_slot_leader(
-        self, epoch: EpochState, slot: Slot, parent: Id
-    ) -> MockLeaderProof | None:
+        self, epoch: EpochState, slot: Slot, eligible_notes: set[Id]
+    ) -> LeaderProof | None:
         if self._is_slot_leader(epoch, slot):
-            return MockLeaderProof.new(self.coin, slot, parent)
+            threshold_0 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff)) / (epoch.total_active_stake()))
+            threshold_1 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff) ** 2) / (epoch.total_active_stake() ** 2))
+            return LeaderProof.new(slot, epoch.nonce(), threshold_0, threshold_1, eligible_notes, self.coin)
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
         relative_stake = self.coin.value / epoch.total_active_stake()
 
-        r = MOCK_LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
+        r = LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
 
-        return r < MOCK_LEADER_VRF.ORDER * phi(
+        return r < LEADER_VRF.ORDER * phi(
             self.config.active_slot_coeff, relative_stake
         )
 

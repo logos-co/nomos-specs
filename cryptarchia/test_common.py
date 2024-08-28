@@ -6,7 +6,7 @@ from .cryptarchia import (
     Coin,
     BlockHeader,
     LedgerState,
-    MockLeaderProof,
+    LeaderProof,
     Leader,
     Follower,
 )
@@ -72,7 +72,8 @@ def mk_block(
         parent=parent,
         content_size=len(content),
         content_id=sha256(content).digest(),
-        leader_proof=MockLeaderProof.new(coin, Slot(slot), parent=parent),
+        # TODO: replace with correct values if necessary
+        leader_proof=LeaderProof.new(Slot(slot), bytes(32), 0, 0, set(),coin),
         orphaned_proofs=orphaned_proofs,
     )
 

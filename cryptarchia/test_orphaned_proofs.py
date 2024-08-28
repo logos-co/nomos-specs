@@ -10,7 +10,7 @@ from cryptarchia.cryptarchia import (
     BlockHeader,
     Slot,
     Id,
-    MockLeaderProof,
+    LeaderProof,
     Coin,
     Follower,
 )

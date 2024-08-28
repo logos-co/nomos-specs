@@ -9,7 +9,7 @@ from .cryptarchia import (
     Config,
     Coin,
     LedgerState,
-    MockLeaderProof,
+    LeaderProof,
     Slot,
     Id,
 )
