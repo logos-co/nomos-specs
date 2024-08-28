@@ -465,7 +465,7 @@ class Follower:
         threshold_1 = int(- (LEADER_VRF.ORDER * log(1 - self.config.active_slot_coeff) ** 2) / (epoch_state.total_active_stake() ** 2))
         return (
             proof.verify(slot, epoch_state.nonce(), threshold_0, threshold_1, current_state.commitments_lead)  # verify slot leader proof
-            # Included in the proof circuit:
+            # Membership verification is included in the proof verification along with the PoS lottery:
             #and (
             #    current_state.verify_eligible_to_lead(proof.commitment)
             #    or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
