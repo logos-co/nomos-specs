@@ -668,7 +668,7 @@ def phi(f: float, alpha: float) -> float:
 class LEADER_VRF:
     """NOT SECURE: A mock VRF function"""
 
-    ORDER = 2**253
+    ORDER = 2**256
 
     @classmethod
     def vrf(cls, coin: Coin, epoch_nonce: bytes, slot: Slot) -> int:
@@ -679,7 +679,7 @@ class LEADER_VRF:
         h.update(coin.encode_sk())
         h.update(coin.nonce)
 
-        return int(int.from_bytes(h.digest()) >> 3)
+        return int.from_bytes(h.digest())
 
     @classmethod
     def verify(cls, r, pk, nonce, slot):
