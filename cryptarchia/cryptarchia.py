@@ -182,22 +182,28 @@ class LeaderProof:
     @staticmethod
     def new(#Public inputs
             slot: Slot,
-            _epoch_nonce: Id,
-            _threshold_0: int,
-            _threshold_1: int,
-            _eligible_notes: set[Id],
+            epoch_nonce: Id,
+            threshold_0: int,
+            threshold_1: int,
+            eligible_notes: set[Id],
 
             #Secret inputs
             coin: Coin,
-            #membership witness
+            #membership witness to check that coin.commitment() is in eligible_notes
             ):
+        #These verifications are normally done in the risc0 zk-proof:
+        lottery_ticket = LEADER_VRF.vrf(coin, epoch_nonce, slot)
+        winning_threshold = leader_winning_threshold(threshold_0, threshold_1, coin.value)
+        assert(lottery_ticket < winning_threshold)
+        coin_nullifier = coin.nullifier()
+        assert(coin.commitment() in eligible_notes)
         evolved_coin = coin.evolve()
 
-        #These verifications are normally done in the risc0 zk-proof
+
 
 
         return LeaderProof( # TODO: generate the proof with risc0
-            nullifier=coin.nullifier(),
+            nullifier=coin_nullifier,
             evolved_commitment=evolved_coin.commitment(),
             slot=slot,
         )
@@ -666,6 +672,9 @@ def phi(f: float, alpha: float) -> float:
     """
     return alpha * (- log(1-f) - 0.5 * alpha * log(1-f) ** 2)
 
+def leader_winning_threshold(threshold_0: int, threshold_1: int, stake: int) -> int:
+    return stake * (threshold_0 + threshold_1 * stake)
+
 
 class LEADER_VRF:
     """NOT SECURE: A mock VRF function"""
@@ -707,13 +716,9 @@ class Leader:
             return LeaderProof.new(slot, epoch.nonce(), threshold_0, threshold_1, eligible_notes, self.coin)
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
-        relative_stake = self.coin.value / epoch.total_active_stake()
-
+        threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch.total_active_stake())
         r = LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
-
-        return r < LEADER_VRF.ORDER * phi(
-            self.config.active_slot_coeff, relative_stake
-        )
+        return r < leader_winning_threshold(threshold_0, threshold_1, self.coin.value)
 
 
 def common_prefix_len(a: Chain, b: Chain) -> int:
