@@ -26,6 +26,7 @@ class TestNode:
     def on_slot(self, slot: Slot) -> BlockHeader | None:
         parent = self.follower.tip_id()
         epoch_state = self.epoch_state(slot)
+        # TODO: use the correct leader commitment set
         if leader_proof := self.leader.try_prove_slot_leader(epoch_state, slot, {self.leader.coin.commitment()}):
             orphans = self.follower.unimported_orphans(parent)
             self.leader.coin = self.leader.coin.evolve()
@@ -72,7 +73,7 @@ def mk_block(
         parent=parent,
         content_size=len(content),
         content_id=sha256(content).digest(),
-        # TODO: replace with correct values if necessary
+        # TODO: use the correct leader commitment set
         leader_proof=LeaderProof.new(Slot(slot), bytes(32), 2**256, 0, {coin.commitment()}, coin),
         orphaned_proofs=orphaned_proofs,
     )

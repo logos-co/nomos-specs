@@ -42,6 +42,7 @@ class TestLeader(TestCase):
         # interval `p +- margin_of_error` with high probabiltiy
         leader_rate = (
             sum(
+                # TODO: use the correct leader commitment set
                 l.try_prove_slot_leader(epoch, Slot(slot), {coin.commitment()}) is not None
                 for slot in range(N)
             )
