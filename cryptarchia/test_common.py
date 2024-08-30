@@ -27,7 +27,7 @@ class TestNode:
         parent = self.follower.tip_id()
         epoch_state = self.epoch_state(slot)
         # TODO: use the correct leader commitment set
-        if leader_proof := self.leader.try_prove_slot_leader(epoch_state, slot, {self.leader.coin.commitment()}):
+        if leader_proof := self.leader.try_prove_slot_leader(epoch_state.total_active_stake(), self.follower.tip_state().nonce, slot, {self.leader.coin.commitment()}, parent):
             orphans = self.follower.unimported_orphans(parent)
             self.leader.coin = self.leader.coin.evolve()
             return BlockHeader(
@@ -63,18 +63,20 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
 
 
 def mk_block(
-    parent: Id, slot: int, coin: Coin, content=bytes(32), orphaned_proofs=[]
+    parent: Id, slot: int, coin: Coin, leader_commitments=[], content=bytes(32), orphaned_proofs=[]
 ) -> BlockHeader:
     assert len(parent) == 32
     from hashlib import sha256
 
+    if len(leader_commitments) == 0:
+        leader_commitments = [coin.commitment()]
     return BlockHeader(
         slot=Slot(slot),
         parent=parent,
         content_size=len(content),
         content_id=sha256(content).digest(),
         # TODO: use the correct leader commitment set
-        leader_proof=LeaderProof.new(Slot(slot), bytes(32), 2**256, 0, {coin.commitment()}, coin),
+        leader_proof=LeaderProof.new(Slot(slot), bytes(32), 2**256, 0, set(leader_commitments), coin, parent),
         orphaned_proofs=orphaned_proofs,
     )
 

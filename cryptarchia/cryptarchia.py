@@ -177,6 +177,7 @@ class LeaderProof:
     nullifier: Id
     evolved_commitment: Id
     slot: Slot
+    parent: Id
     # The produced proof
 
     @staticmethod
@@ -190,6 +191,9 @@ class LeaderProof:
             #Secret inputs
             coin: Coin,
             #membership witness to check that coin.commitment() is in eligible_notes
+
+            #This is not verified in the proof but solved with cryptographic signatures and conflict resolution
+            parent: Id
             ):
         #These verifications are normally done in the risc0 zk-proof:
         lottery_ticket = LEADER_VRF.vrf(coin, epoch_nonce, slot)
@@ -199,21 +203,20 @@ class LeaderProof:
         assert(coin.commitment() in eligible_notes)
         evolved_coin = coin.evolve()
 
-
-
-
         return LeaderProof( # TODO: generate the proof with risc0
             nullifier=coin_nullifier,
             evolved_commitment=evolved_coin.commitment(),
             slot=slot,
+            parent=parent,
         )
 
     def verify(self, slot: Slot,
                _epoch_nonce: Id,
                _threshold_0: int,
                _threshold_1: int,
-               _eligible_notes: set[Id],):
-        return slot == self.slot #TODO: and verification of the proof with risc0
+               _eligible_notes: set[Id],
+               parent: Id):
+        return slot == self.slot and parent == self.parent #TODO: add verification of the proof with risc0
 
 
 @dataclass
@@ -299,9 +302,6 @@ class LedgerState:
     # This nonce is used to derive the seed for the slot leader lottery.
     # It's updated at every block by hashing the previous nonce with the
     # leader proof's nullifier.
-    #
-    # NOTE that this does not prevent nonce grinding at the last slot
-    # when the nonce snapshot is taken
     nonce: Id = None
 
     # set of commitments
@@ -472,7 +472,7 @@ class Follower:
     ) -> bool:
         threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch_state.total_active_stake())
         return (
-            proof.verify(slot, epoch_state.nonce(), threshold_0, threshold_1, current_state.commitments_lead)  # verify slot leader proof
+            proof.verify(slot, current_state.nonce, threshold_0, threshold_1, current_state.commitments_lead, parent)  # verify slot leader proof
             # Membership verification is included in the proof verification along with the PoS lottery:
             #and (
             #    current_state.verify_eligible_to_lead(proof.commitment)
@@ -709,15 +709,15 @@ class Leader:
     coin: Coin
 
     def try_prove_slot_leader(
-        self, epoch: EpochState, slot: Slot, eligible_notes: set[Id]
+        self, total_stake: int, nonce: Id, slot: Slot, eligible_notes: set[Id], parent: Id
     ) -> LeaderProof | None:
-        if self._is_slot_leader(epoch, slot):
-            threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch.total_active_stake())
-            return LeaderProof.new(slot, epoch.nonce(), threshold_0, threshold_1, eligible_notes, self.coin)
+        if self._is_slot_leader(total_stake, nonce, slot):
+            threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, total_stake)
+            return LeaderProof.new(slot, nonce, threshold_0, threshold_1, eligible_notes, self.coin, parent)
 
-    def _is_slot_leader(self, epoch: EpochState, slot: Slot):
-        threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch.total_active_stake())
-        r = LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
+    def _is_slot_leader(self, total_stake: int, nonce: Id, slot: Slot):
+        threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, total_stake)
+        r = LEADER_VRF.vrf(self.coin, nonce, slot)
         return r < leader_winning_threshold(threshold_0, threshold_1, self.coin.value)
 
 
