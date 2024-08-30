@@ -174,6 +174,8 @@ class Coin:
 
 @dataclass
 class LeaderProof:
+    # TODO: remove the useless commitment field
+    commitment: Id
     nullifier: Id
     evolved_commitment: Id
     slot: Slot
@@ -204,6 +206,7 @@ class LeaderProof:
         evolved_coin = coin.evolve()
 
         return LeaderProof( # TODO: generate the proof with risc0
+            commitment=coin.commitment(),
             nullifier=coin_nullifier,
             evolved_commitment=evolved_coin.commitment(),
             slot=slot,
@@ -247,6 +250,8 @@ class BlockHeader:
         h.update(self.parent)
 
         # leader proof
+        assert len(self.leader_proof.commitment) == 32
+        h.update(self.leader_proof.commitment)
         assert len(self.leader_proof.nullifier) == 32
         h.update(self.leader_proof.nullifier)
         assert len(self.leader_proof.evolved_commitment) == 32
@@ -473,11 +478,11 @@ class Follower:
         threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch_state.total_active_stake())
         return (
             proof.verify(slot, current_state.nonce, threshold_0, threshold_1, current_state.commitments_lead, parent)  # verify slot leader proof
-            # Membership verification is included in the proof verification along with the PoS lottery:
-            #and (
-            #    current_state.verify_eligible_to_lead(proof.commitment)
-            #    or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
-            #)
+            # TODO: remove it because membership verification is included in the proof verification along with the PoS lottery:
+            and (
+                current_state.verify_eligible_to_lead(proof.commitment)
+                or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
+            )
             and current_state.verify_unspent(proof.nullifier)
         )
 
