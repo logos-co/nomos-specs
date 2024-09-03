@@ -1,6 +1,6 @@
 from typing import TypeAlias, List, Optional
 from hashlib import sha256, blake2b
-from math import floor
+from math import floor, log
 from copy import deepcopy
 from itertools import chain
 import functools
@@ -173,28 +173,53 @@ class Coin:
 
 
 @dataclass
-class MockLeaderProof:
+class LeaderProof:
+    # TODO: remove the useless commitment field
     commitment: Id
     nullifier: Id
     evolved_commitment: Id
     slot: Slot
     parent: Id
+    # The produced proof
 
     @staticmethod
-    def new(coin: Coin, slot: Slot, parent: Id):
+    def new(#Public inputs
+            slot: Slot,
+            epoch_nonce: Id,
+            threshold_0: int,
+            threshold_1: int,
+            eligible_notes: set[Id],
+
+            #Secret inputs
+            coin: Coin,
+            #membership witness to check that coin.commitment() is in eligible_notes
+
+            #This is not verified in the proof but solved with cryptographic signatures and conflict resolution
+            parent: Id
+            ):
+        #These verifications are normally done in the risc0 zk-proof:
+        lottery_ticket = LEADER_VRF.vrf(coin, epoch_nonce, slot)
+        winning_threshold = leader_winning_threshold(threshold_0, threshold_1, coin.value)
+        assert(lottery_ticket < winning_threshold)
+        coin_nullifier = coin.nullifier()
+        assert(coin.commitment() in eligible_notes)
         evolved_coin = coin.evolve()
 
-        return MockLeaderProof(
+        return LeaderProof( # TODO: generate the proof with risc0
             commitment=coin.commitment(),
-            nullifier=coin.nullifier(),
+            nullifier=coin_nullifier,
             evolved_commitment=evolved_coin.commitment(),
             slot=slot,
             parent=parent,
         )
 
-    def verify(self, slot: Slot, parent: Id):
-        # TODO: verification not implemented
-        return slot == self.slot and parent == self.parent
+    def verify(self, slot: Slot,
+               _epoch_nonce: Id,
+               _threshold_0: int,
+               _threshold_1: int,
+               _eligible_notes: set[Id],
+               parent: Id):
+        return slot == self.slot and parent == self.parent #TODO: add verification of the proof with risc0
 
 
 @dataclass
@@ -203,7 +228,7 @@ class BlockHeader:
     parent: Id
     content_size: int
     content_id: Id
-    leader_proof: MockLeaderProof
+    leader_proof: LeaderProof
     orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
 
     def update_header_hash(self, h):
@@ -282,9 +307,6 @@ class LedgerState:
     # This nonce is used to derive the seed for the slot leader lottery.
     # It's updated at every block by hashing the previous nonce with the
     # leader proof's nullifier.
-    #
-    # NOTE that this does not prevent nonce grinding at the last slot
-    # when the nonce snapshot is taken
     nonce: Id = None
 
     # set of commitments
@@ -337,7 +359,7 @@ class LedgerState:
         for proof in chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
 
-    def apply_leader_proof(self, proof: MockLeaderProof):
+    def apply_leader_proof(self, proof: LeaderProof):
         self.nullifiers.add(proof.nullifier)
         self.commitments_spend.add(proof.evolved_commitment)
         self.commitments_lead.add(proof.evolved_commitment)
@@ -445,7 +467,7 @@ class Follower:
         self,
         slot: Slot,
         parent: Id,
-        proof: MockLeaderProof,
+        proof: LeaderProof,
         # coins are old enough if their commitment is in the stake distribution snapshot
         epoch_state: EpochState,
         # nullifiers (and commitments) are checked against the current state.
@@ -453,8 +475,10 @@ class Follower:
         # This will change once we start putting merkle roots in headers
         current_state: LedgerState,
     ) -> bool:
+        threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch_state.total_active_stake())
         return (
-            proof.verify(slot, parent)  # verify slot leader proof
+            proof.verify(slot, epoch_state.nonce() , threshold_0, threshold_1, current_state.commitments_lead, parent)  # verify slot leader proof
+            # TODO: remove it because membership verification is included in the proof verification along with the PoS lottery:
             and (
                 current_state.verify_eligible_to_lead(proof.commitment)
                 or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
@@ -651,10 +675,13 @@ def phi(f: float, alpha: float) -> float:
 
     returns: the probability that this validator should win the slot lottery
     """
-    return 1 - (1 - f) ** alpha
+    return alpha * (- log(1-f) - 0.5 * alpha * log(1-f) ** 2)
+
+def leader_winning_threshold(threshold_0: int, threshold_1: int, stake: int) -> int:
+    return stake * (threshold_0 + threshold_1 * stake)
 
 
-class MOCK_LEADER_VRF:
+class LEADER_VRF:
     """NOT SECURE: A mock VRF function"""
 
     ORDER = 2**256
@@ -675,25 +702,28 @@ class MOCK_LEADER_VRF:
         raise NotImplemented()
 
 
+def lottery_threshold(active_slot_coeff: float, total_stake: int) -> (int,int):
+    threshold_0 = int(- (LEADER_VRF.ORDER * log(1 - active_slot_coeff)) / total_stake)
+    threshold_1 = int(- (LEADER_VRF.ORDER * log(1 - active_slot_coeff) ** 2) / (total_stake ** 2))
+    return threshold_0, threshold_1
+
+
 @dataclass
 class Leader:
     config: Config
     coin: Coin
 
     def try_prove_slot_leader(
-        self, epoch: EpochState, slot: Slot, parent: Id
-    ) -> MockLeaderProof | None:
-        if self._is_slot_leader(epoch, slot):
-            return MockLeaderProof.new(self.coin, slot, parent)
+        self, total_stake: int, nonce: Id, slot: Slot, eligible_notes: set[Id], parent: Id
+    ) -> LeaderProof | None:
+        if self._is_slot_leader(total_stake, nonce, slot):
+            threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, total_stake)
+            return LeaderProof.new(slot, nonce, threshold_0, threshold_1, eligible_notes, self.coin, parent)
 
-    def _is_slot_leader(self, epoch: EpochState, slot: Slot):
-        relative_stake = self.coin.value / epoch.total_active_stake()
-
-        r = MOCK_LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
-
-        return r < MOCK_LEADER_VRF.ORDER * phi(
-            self.config.active_slot_coeff, relative_stake
-        )
+    def _is_slot_leader(self, total_stake: int, nonce: Id, slot: Slot):
+        threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, total_stake)
+        r = LEADER_VRF.vrf(self.coin, nonce, slot)
+        return r < leader_winning_threshold(threshold_0, threshold_1, self.coin.value)
 
 
 def common_prefix_len(a: Chain, b: Chain) -> int:
