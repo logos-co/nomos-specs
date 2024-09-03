@@ -27,7 +27,7 @@ class TestNode:
         parent = self.follower.tip_id()
         epoch_state = self.epoch_state(slot)
         # TODO: use the correct leader commitment set
-        if leader_proof := self.leader.try_prove_slot_leader(epoch_state.total_active_stake(), self.follower.tip_state().nonce, slot, {self.leader.coin.commitment()}, parent):
+        if leader_proof := self.leader.try_prove_slot_leader(epoch_state.total_active_stake(), epoch_state.nonce(), slot, {self.leader.coin.commitment()}, parent):
             orphans = self.follower.unimported_orphans(parent)
             self.leader.coin = self.leader.coin.evolve()
             return BlockHeader(

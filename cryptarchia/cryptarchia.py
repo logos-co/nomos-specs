@@ -477,7 +477,7 @@ class Follower:
     ) -> bool:
         threshold_0, threshold_1 = lottery_threshold(self.config.active_slot_coeff, epoch_state.total_active_stake())
         return (
-            proof.verify(slot, current_state.nonce, threshold_0, threshold_1, current_state.commitments_lead, parent)  # verify slot leader proof
+            proof.verify(slot, epoch_state.nonce() , threshold_0, threshold_1, current_state.commitments_lead, parent)  # verify slot leader proof
             # TODO: remove it because membership verification is included in the proof verification along with the PoS lottery:
             and (
                 current_state.verify_eligible_to_lead(proof.commitment)
