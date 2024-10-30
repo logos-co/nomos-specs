@@ -766,13 +766,6 @@ def common_prefix_depth(
     assert False
 
 
-def common_prefix_len(a, b) -> int:
-    for i, (x, y) in enumerate(zip(a.blocks, b.blocks)):
-        if x.id() != y.id():
-            return i
-    return min(len(a.blocks), len(b.blocks))
-
-
 def chain_density(chain: Chain, slot: Slot) -> int:
     return len(
         [
@@ -795,10 +788,7 @@ def maxvalid_bg(
 ) -> Chain:
     cmax = local_chain
     for chain in forks:
-        lowest_common_ancestor = common_prefix_len(cmax, chain)
-        m = cmax.length() - lowest_common_ancestor
-        m2 = common_prefix_depth(cmax.tip_id(), chain.tip_id(), states)
-        assert m == m2, f"{m} != {m2}"
+        m = common_prefix_depth(cmax.tip_id(), chain.tip_id(), states)
         if m <= k:
             # Classic longest chain rule with parameter k
             if cmax.length() < chain.length():
@@ -806,9 +796,7 @@ def maxvalid_bg(
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
-            forking_slot = Slot(
-                cmax.blocks[lowest_common_ancestor].slot.absolute_slot + s
-            )
+            forking_slot = Slot(cmax.blocks[-m].slot.absolute_slot + s)
             cmax_density = chain_density(cmax, forking_slot)
             candidate_density = chain_density(chain, forking_slot)
             if cmax_density < candidate_density:
