@@ -44,28 +44,28 @@ class TestForkChoice(TestCase):
             b.id(): LedgerState(block=b) for b in [b0, b1, b2, b3, b4, b5, b6, b7]
         }
 
-        assert (d := common_prefix_depth(b0.id(), b0.id(), states)) == 0, d
-        assert (d := common_prefix_depth(b1.id(), b0.id(), states)) == 1, d
-        assert (d := common_prefix_depth(b0.id(), b1.id(), states)) == 0, d
-        assert (d := common_prefix_depth(b1.id(), b1.id(), states)) == 0, d
-        assert (d := common_prefix_depth(b2.id(), b0.id(), states)) == 2, d
-        assert (d := common_prefix_depth(b0.id(), b2.id(), states)) == 0, d
-        assert (d := common_prefix_depth(b3.id(), b0.id(), states)) == 3, d
-        assert (d := common_prefix_depth(b0.id(), b3.id(), states)) == 0, d
-        assert (d := common_prefix_depth(b1.id(), b4.id(), states)) == 1, d
-        assert (d := common_prefix_depth(b4.id(), b1.id(), states)) == 1, d
-        assert (d := common_prefix_depth(b1.id(), b5.id(), states)) == 1, d
-        assert (d := common_prefix_depth(b5.id(), b1.id(), states)) == 2, d
-        assert (d := common_prefix_depth(b2.id(), b5.id(), states)) == 2, d
-        assert (d := common_prefix_depth(b5.id(), b2.id(), states)) == 2, d
-        assert (d := common_prefix_depth(b3.id(), b5.id(), states)) == 3, d
-        assert (d := common_prefix_depth(b5.id(), b3.id(), states)) == 2, d
-        assert (d := common_prefix_depth(b3.id(), b6.id(), states)) == 1, d
-        assert (d := common_prefix_depth(b6.id(), b3.id(), states)) == 1, d
-        assert (d := common_prefix_depth(b3.id(), b7.id(), states)) == 1, d
-        assert (d := common_prefix_depth(b7.id(), b3.id(), states)) == 2, d
-        assert (d := common_prefix_depth(b5.id(), b7.id(), states)) == 2, d
-        assert (d := common_prefix_depth(b7.id(), b5.id(), states)) == 4, d
+        assert (d := common_prefix_depth(b0.id(), b0.id(), states)) == (0, 0), d
+        assert (d := common_prefix_depth(b1.id(), b0.id(), states)) == (1, 0), d
+        assert (d := common_prefix_depth(b0.id(), b1.id(), states)) == (0, 1), d
+        assert (d := common_prefix_depth(b1.id(), b1.id(), states)) == (0, 0), d
+        assert (d := common_prefix_depth(b2.id(), b0.id(), states)) == (2, 0), d
+        assert (d := common_prefix_depth(b0.id(), b2.id(), states)) == (0, 2), d
+        assert (d := common_prefix_depth(b3.id(), b0.id(), states)) == (3, 0), d
+        assert (d := common_prefix_depth(b0.id(), b3.id(), states)) == (0, 3), d
+        assert (d := common_prefix_depth(b1.id(), b4.id(), states)) == (1, 1), d
+        assert (d := common_prefix_depth(b4.id(), b1.id(), states)) == (1, 1), d
+        assert (d := common_prefix_depth(b1.id(), b5.id(), states)) == (1, 2), d
+        assert (d := common_prefix_depth(b5.id(), b1.id(), states)) == (2, 1), d
+        assert (d := common_prefix_depth(b2.id(), b5.id(), states)) == (2, 2), d
+        assert (d := common_prefix_depth(b5.id(), b2.id(), states)) == (2, 2), d
+        assert (d := common_prefix_depth(b3.id(), b5.id(), states)) == (3, 2), d
+        assert (d := common_prefix_depth(b5.id(), b3.id(), states)) == (2, 3), d
+        assert (d := common_prefix_depth(b3.id(), b6.id(), states)) == (1, 1), d
+        assert (d := common_prefix_depth(b6.id(), b3.id(), states)) == (1, 1), d
+        assert (d := common_prefix_depth(b3.id(), b7.id(), states)) == (1, 2), d
+        assert (d := common_prefix_depth(b7.id(), b3.id(), states)) == (2, 1), d
+        assert (d := common_prefix_depth(b5.id(), b7.id(), states)) == (2, 4), d
+        assert (d := common_prefix_depth(b7.id(), b5.id(), states)) == (4, 2), d
 
     def test_fork_choice_long_sparse_chain(self):
         # The longest chain is not dense after the fork

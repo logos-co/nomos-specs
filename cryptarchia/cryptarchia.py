@@ -2,7 +2,7 @@ from typing import TypeAlias, List, Optional, Dict
 from hashlib import sha256, blake2b
 from math import floor
 from copy import deepcopy
-from itertools import chain
+import itertools
 import functools
 from dataclasses import dataclass, field, replace
 import logging
@@ -347,7 +347,7 @@ class LedgerState:
 
         self.nonce = h.digest()
         self.block = block
-        for proof in chain(block.orphaned_proofs, [block]):
+        for proof in itertools.chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
 
     def apply_leader_proof(self, proof: MockLeaderProof):
@@ -722,7 +722,7 @@ class Leader:
 
 def common_prefix_depth(
     local_chain: Id, fork: Id, states: Dict[Id, LedgerState]
-) -> int:
+) -> (int, int):
 
     local_block = local_chain
     fork_block = fork
@@ -747,7 +747,7 @@ def common_prefix_depth(
 
         if local_block in seen:
             # we had seen this block from the fork chain
-            return depth
+            return depth, seen[local_block]
 
         if local_block in states:
             seen[local_block] = depth
@@ -756,7 +756,7 @@ def common_prefix_depth(
         if fork_block in seen:
             # we had seen the fork in the local chain
             # return the depth w.r.t to the local chain
-            return seen[fork_block]
+            return seen[fork_block], depth
 
         if fork_block in states:
             seen[fork_block] = depth
@@ -786,21 +786,26 @@ def maxvalid_bg(
     k: int,
     s: int,
 ) -> Chain:
+    # assert type(local_chain) == Id
+    # assert all(type(f) == Id for f in forks)
+
     cmax = local_chain
-    for chain in forks:
-        m = common_prefix_depth(cmax.tip_id(), chain.tip_id(), states)
-        if m <= k:
+    for fork in forks:
+        local_depth, fork_depth = common_prefix_depth(
+            cmax.tip_id(), fork.tip_id(), states
+        )
+        if local_depth <= k:
             # Classic longest chain rule with parameter k
-            if cmax.length() < chain.length():
-                cmax = chain
+            if local_depth < fork_depth:
+                cmax = fork
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
-            forking_slot = Slot(cmax.blocks[-m].slot.absolute_slot + s)
+            forking_slot = Slot(cmax.blocks[-local_depth].slot.absolute_slot + s)
             cmax_density = chain_density(cmax, forking_slot)
-            candidate_density = chain_density(chain, forking_slot)
+            candidate_density = chain_density(fork, forking_slot)
             if cmax_density < candidate_density:
-                cmax = chain
+                cmax = fork
 
     return cmax
 
