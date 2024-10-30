@@ -100,11 +100,17 @@ class TestForkChoice(TestCase):
             b.id(): LedgerState(block=b) for b in short_chain.blocks + long_chain.blocks
         }
 
-        assert maxvalid_bg(short_chain, [long_chain], states, k, s) == short_chain
+        assert (
+            maxvalid_bg(short_chain.tip_id(), [long_chain.tip_id()], states, k, s)
+            == short_chain.tip_id()
+        )
 
         # However, if we set k to the fork length, it will be accepted
         k = long_chain.length()
-        assert maxvalid_bg(short_chain, [long_chain], states, k, s) == long_chain
+        assert (
+            maxvalid_bg(short_chain.tip_id(), [long_chain.tip_id()], states, k, s)
+            == long_chain.tip_id()
+        )
 
     def test_fork_choice_long_dense_chain(self):
         # The longest chain is also the densest after the fork
@@ -133,7 +139,10 @@ class TestForkChoice(TestCase):
             b.id(): LedgerState(block=b) for b in short_chain.blocks + long_chain.blocks
         }
 
-        assert maxvalid_bg(short_chain, [long_chain], states, k, s) == long_chain
+        assert (
+            maxvalid_bg(short_chain.tip_id(), [long_chain.tip_id()], states, k, s)
+            == long_chain.tip_id()
+        )
 
     def test_fork_choice_integration(self):
         c_a, c_b = Coin(sk=0, value=10), Coin(sk=1, value=10)
