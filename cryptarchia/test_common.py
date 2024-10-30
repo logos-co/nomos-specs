@@ -53,7 +53,7 @@ def mk_config(initial_stake_distribution: list[Coin]) -> Config:
 
 def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
     return LedgerState(
-        block=bytes(32),
+        block=BlockHeader(slot=Slot(0), parent=bytes(32)),
         nonce=bytes(32),
         commitments_spend={c.commitment() for c in initial_stake_distribution},
         commitments_lead={c.commitment() for c in initial_stake_distribution},
@@ -62,26 +62,30 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
 
 
 def mk_block(
-    parent: Id, slot: int, coin: Coin, content=bytes(32), orphaned_proofs=[]
+    parent: BlockHeader, slot: int, coin: Coin, content=bytes(32), orphaned_proofs=[]
 ) -> BlockHeader:
-    assert len(parent) == 32
+    assert type(parent) == BlockHeader, type(parent)
+    assert type(slot) == int, type(slot)
     from hashlib import sha256
 
     return BlockHeader(
         slot=Slot(slot),
-        parent=parent,
+        parent=parent.id(),
         content_size=len(content),
         content_id=sha256(content).digest(),
-        leader_proof=MockLeaderProof.new(coin, Slot(slot), parent=parent),
+        leader_proof=MockLeaderProof.new(coin, Slot(slot), parent=parent.id()),
         orphaned_proofs=orphaned_proofs,
     )
 
 
-def mk_chain(parent, coin: Coin, slots: list[int]) -> tuple[list[BlockHeader], Coin]:
+def mk_chain(
+    parent: BlockHeader, coin: Coin, slots: list[int]
+) -> tuple[list[BlockHeader], Coin]:
+    assert type(parent) == BlockHeader
     chain = []
     for s in slots:
         block = mk_block(parent=parent, slot=s, coin=coin)
         chain.append(block)
-        parent = block.id()
+        parent = block
         coin = coin.evolve()
     return chain, coin

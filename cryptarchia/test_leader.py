@@ -18,8 +18,8 @@ from .test_common import mk_config
 class TestLeader(TestCase):
     def test_slot_leader_statistics(self):
         epoch = EpochState(
-            stake_distribution_snapshot=LedgerState(),
-            nonce_snapshot=LedgerState(nonce=b"1010101010"),
+            stake_distribution_snapshot=LedgerState(block=None),
+            nonce_snapshot=LedgerState(block=None, nonce=b"1010101010"),
             inferred_total_active_stake=1000,
         )
 

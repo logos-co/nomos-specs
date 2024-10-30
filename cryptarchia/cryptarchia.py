@@ -1,4 +1,4 @@
-from typing import TypeAlias, List, Optional
+from typing import TypeAlias, List, Optional, Dict
 from hashlib import sha256, blake2b
 from math import floor
 from copy import deepcopy
@@ -174,11 +174,11 @@ class Coin:
 
 @dataclass
 class MockLeaderProof:
-    commitment: Id
-    nullifier: Id
-    evolved_commitment: Id
-    slot: Slot
-    parent: Id
+    commitment: Id = bytes(32)
+    nullifier: Id = bytes(32)
+    evolved_commitment: Id = bytes(32)
+    slot: Slot = field(default_factory=lambda: Slot(0))
+    parent: Id = bytes(32)
 
     @staticmethod
     def new(coin: Coin, slot: Slot, parent: Id):
@@ -194,17 +194,30 @@ class MockLeaderProof:
 
     def verify(self, slot: Slot, parent: Id):
         # TODO: verification not implemented
-        return slot == self.slot and parent == self.parent
+        if slot != self.slot:
+            logger.warning("PoL: wrong slot")
+            return False
+        if parent != self.parent:
+            logger.warning("PoL: wrong parent")
+            return False
+        return True
 
 
 @dataclass
 class BlockHeader:
     slot: Slot
-    parent: Id
-    content_size: int
-    content_id: Id
-    leader_proof: MockLeaderProof
+    parent: Id = bytes(32)
+    content_size: int = 0
+    content_id: Id = bytes(32)
+    leader_proof: MockLeaderProof = field(default_factory=MockLeaderProof)
+
     orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
+
+    def __post_init__(self):
+        assert type(self.slot) == Slot
+        assert type(self.parent) == Id
+        assert self.slot == self.leader_proof.slot
+        assert self.parent == self.leader_proof.parent
 
     def update_header_hash(self, h):
         # version byte
@@ -277,7 +290,7 @@ class LedgerState:
     A snapshot of the ledger state up to some block
     """
 
-    block: Id = None
+    block: BlockHeader
 
     # This nonce is used to derive the seed for the slot leader lottery.
     # It's updated at every block by hashing the previous nonce with the
@@ -324,7 +337,7 @@ class LedgerState:
         return nullifier not in self.nullifiers
 
     def apply(self, block: BlockHeader):
-        assert block.parent == self.block
+        assert block.parent == self.block.id()
 
         h = blake2b(digest_size=32)
         h.update("epoch-nonce".encode(encoding="utf-8"))
@@ -333,7 +346,7 @@ class LedgerState:
         h.update(block.slot.encode())
 
         self.nonce = h.digest()
-        self.block = block.id()
+        self.block = block
         for proof in chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
 
@@ -385,9 +398,9 @@ class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
         self.forks = []
-        self.local_chain = Chain([], genesis=genesis_state.block)
+        self.local_chain = Chain([], genesis=genesis_state.block.id())
         self.genesis_state = genesis_state
-        self.ledger_state = {genesis_state.block: genesis_state.copy()}
+        self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
 
     def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
@@ -453,14 +466,21 @@ class Follower:
         # This will change once we start putting merkle roots in headers
         current_state: LedgerState,
     ) -> bool:
-        return (
-            proof.verify(slot, parent)  # verify slot leader proof
-            and (
-                current_state.verify_eligible_to_lead(proof.commitment)
-                or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
-            )
-            and current_state.verify_unspent(proof.nullifier)
-        )
+        if not proof.verify(slot, parent):
+            logger.warning("invalid PoL")
+            return False
+        if not (
+            current_state.verify_eligible_to_lead(proof.commitment)
+            or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
+        ):
+            logger.warning("invalid commitment")
+            return False
+
+        if not current_state.verify_unspent(proof.nullifier):
+            logger.warning("PoL coin already spent")
+            return False
+
+        return True
 
     # Try appending this block to an existing chain and return whether
     # the operation was successful
@@ -475,9 +495,9 @@ class Follower:
         return None
 
     def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
-        if self.genesis_state.block == block.parent:
+        if self.genesis_state.block.id() == block.parent:
             # this block is forking off the genesis state
-            return Chain(blocks=[], genesis=self.genesis_state.block)
+            return Chain(blocks=[], genesis=self.genesis_state.block.id())
 
         chains = self.forks + [self.local_chain]
         for chain in chains:
@@ -485,7 +505,7 @@ class Follower:
             if block_position is not None:
                 return Chain(
                     blocks=chain.blocks[: block_position + 1],
-                    genesis=self.genesis_state.block,
+                    genesis=self.genesis_state.block.id(),
                 )
 
         return None
@@ -509,6 +529,10 @@ class Follower:
             logger.warning("invalid header")
             return
 
+        new_state = self.ledger_state[block.parent].copy()
+        new_state.apply(block)
+        self.ledger_state[block.id()] = new_state
+
         new_chain.blocks.append(block)
 
         # We may need to switch forks, lets run the fork choice rule to check.
@@ -517,10 +541,6 @@ class Follower:
             self.forks.remove(new_chain)
             self.forks.append(self.local_chain)
             self.local_chain = new_chain
-
-        new_state = self.ledger_state[block.parent].copy()
-        new_state.apply(block)
-        self.ledger_state[block.id()] = new_state
 
     def unimported_orphans(self, tip: Id) -> list[BlockHeader]:
         """
@@ -547,7 +567,11 @@ class Follower:
     # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Chain:
         return maxvalid_bg(
-            self.local_chain, self.forks, k=self.config.k, s=self.config.s
+            self.local_chain,
+            self.forks,
+            self.ledger_state,
+            k=self.config.k,
+            s=self.config.s,
         )
 
     def tip(self) -> BlockHeader:
@@ -596,7 +620,7 @@ class Follower:
         nonce_snapshot = self.nonce_snapshot(epoch, chain)
 
         # we memoize epoch states to avoid recursion killing our performance
-        memo_block_id = nonce_snapshot.block
+        memo_block_id = nonce_snapshot.block.id()
         if state := self.epoch_state.get((epoch, memo_block_id)):
             return state
 
@@ -696,7 +720,53 @@ class Leader:
         )
 
 
-def common_prefix_len(a: Chain, b: Chain) -> int:
+def common_prefix_depth(
+    local_chain: Id, fork: Id, states: Dict[Id, LedgerState]
+) -> int:
+
+    local_block = local_chain
+    fork_block = fork
+
+    seen = {}
+    depth = 0
+    while True:
+
+        if local_block not in states and fork_block not in states:
+            # conflicting genesis blocks
+            print("")
+            print("local\t", local_chain[:2])
+            print("fork\t", fork[:2])
+            print(
+                "states\n\t",
+                "\n\t".join(
+                    [f"{b[:2]} -> {s.block.parent[:2]}" for b, s in states.items()]
+                ),
+            )
+            print("seen\t", {s[:2] for s in seen})
+            break
+
+        if local_block in seen:
+            # we had seen this block from the fork chain
+            return depth
+
+        if local_block in states:
+            seen[local_block] = depth
+            local_block = states[local_block].block.parent
+
+        if fork_block in seen:
+            # we had seen the fork in the local chain
+            # return the depth w.r.t to the local chain
+            return seen[fork_block]
+
+        if fork_block in states:
+            seen[fork_block] = depth
+            fork_block = states[fork_block].block.parent
+        depth += 1
+
+    assert False
+
+
+def common_prefix_len(a, b) -> int:
     for i, (x, y) in enumerate(zip(a.blocks, b.blocks)):
         if x.id() != y.id():
             return i
@@ -716,11 +786,19 @@ def chain_density(chain: Chain, slot: Slot) -> int:
 # Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
 # k defines the forking depth of chain we accept without more analysis
 # s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
-def maxvalid_bg(local_chain: Chain, forks: List[Chain], k: int, s: int) -> Chain:
+def maxvalid_bg(
+    local_chain: Chain,
+    forks: List[Chain],
+    states: Dict[Id, LedgerState],
+    k: int,
+    s: int,
+) -> Chain:
     cmax = local_chain
     for chain in forks:
         lowest_common_ancestor = common_prefix_len(cmax, chain)
         m = cmax.length() - lowest_common_ancestor
+        m2 = common_prefix_depth(cmax.tip_id(), chain.tip_id(), states)
+        assert m == m2, f"{m} != {m2}"
         if m <= k:
             # Classic longest chain rule with parameter k
             if cmax.length() < chain.length():
