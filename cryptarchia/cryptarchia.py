@@ -766,22 +766,36 @@ def common_prefix_depth(
     assert False
 
 
-def chain_density(chain: Chain, slot: Slot) -> int:
+def chain_density_old(chain: Chain, prefix_len: int, slot: Slot) -> int:
     return len(
         [
             block
-            for block in chain.blocks
-            if block.slot.absolute_slot < slot.absolute_slot
+            for h, block in enumerate(chain.blocks)
+            if h >= prefix_len and block.slot.absolute_slot < slot.absolute_slot
         ]
     )
+
+
+def chain_density(
+    head: Id, slot: Slot, reorg_depth: int, states: Dict[Id, LedgerState]
+) -> int:
+    assert type(head) == Id
+    density = 0
+    block = head
+    for _ in range(reorg_depth):
+        if states[block].block.slot.absolute_slot < slot.absolute_slot:
+            density += 1
+        block = states[block].block.parent
+
+    return density
 
 
 # Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
 # k defines the forking depth of chain we accept without more analysis
 # s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
 def maxvalid_bg(
-    local_chain: Chain,
-    forks: List[Chain],
+    local_chain: Id,
+    forks: List[Id],
     states: Dict[Id, LedgerState],
     k: int,
     s: int,
@@ -801,12 +815,31 @@ def maxvalid_bg(
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
-            forking_slot = Slot(cmax.blocks[-local_depth].slot.absolute_slot + s)
-            cmax_density = chain_density(cmax, forking_slot)
-            candidate_density = chain_density(fork, forking_slot)
+            forking_block = local_chain.tip_id()
+            for _ in range(local_depth):
+                forking_block = states[forking_block].block.parent
+
+            forking_slot = Slot(states[forking_block].block.slot.absolute_slot + s)
+            cmax_density = chain_density(
+                cmax.tip_id(), forking_slot, local_depth, states
+            )
+            candidate_density = chain_density(
+                fork.tip_id(), forking_slot, fork_depth, states
+            )
+
+            prefix_len = cmax.length() - local_depth
+
+            assert cmax_density == (
+                d := chain_density_old(cmax, prefix_len, forking_slot)
+            ), f"{cmax_density} != {d}"
+            assert candidate_density == (
+                d := chain_density_old(fork, prefix_len, forking_slot)
+            ), f"{candidate_density} != {d}"
+
             if cmax_density < candidate_density:
                 cmax = fork
 
+    assert type(cmax) == Chain
     return cmax
 
 
