@@ -262,26 +262,6 @@ class BlockHeader:
 
 
 @dataclass
-class Chain:
-    blocks: List[BlockHeader]
-    genesis: Id
-
-    def tip_id(self) -> Id:
-        if len(self.blocks) == 0:
-            return self.genesis
-        return self.tip().id()
-
-    def tip(self) -> BlockHeader:
-        return self.blocks[-1]
-
-    def block_position(self, block: Id) -> Optional[int]:
-        for i, b in enumerate(self.blocks):
-            if b.id() == block:
-                return i
-        return None
-
-
-@dataclass
 class LedgerState:
     """
     A snapshot of the ledger state up to some block
@@ -764,7 +744,7 @@ def maxvalid_bg(
     states: Dict[Id, LedgerState],
     k: int,
     s: int,
-) -> Chain:
+) -> Id:
     assert type(local_chain) == Id
     assert all(type(f) == Id for f in forks)
 
@@ -789,7 +769,6 @@ def maxvalid_bg(
             if cmax_density < candidate_density:
                 cmax = fork
 
-    assert type(cmax) == Id
     return cmax
 
 

@@ -6,7 +6,6 @@ import hashlib
 from copy import deepcopy
 from cryptarchia.cryptarchia import (
     maxvalid_bg,
-    Chain,
     BlockHeader,
     Slot,
     Id,
@@ -94,22 +93,18 @@ class TestForkChoice(TestCase):
         k = 1
         s = 50
 
-        short_chain = Chain(short_chain, genesis=bytes(32))
-        long_chain = Chain(long_chain, genesis=bytes(32))
-        states = {
-            b.id(): LedgerState(block=b) for b in short_chain.blocks + long_chain.blocks
-        }
+        states = {b.id(): LedgerState(block=b) for b in short_chain + long_chain}
 
         assert (
-            maxvalid_bg(short_chain.tip_id(), [long_chain.tip_id()], states, k, s)
-            == short_chain.tip_id()
+            maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], states, k, s)
+            == short_chain[-1].id()
         )
 
         # However, if we set k to the fork length, it will be accepted
-        k = len(long_chain.blocks)
+        k = len(long_chain)
         assert (
-            maxvalid_bg(short_chain.tip_id(), [long_chain.tip_id()], states, k, s)
-            == long_chain.tip_id()
+            maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], states, k, s)
+            == long_chain[-1].id()
         )
 
     def test_fork_choice_long_dense_chain(self):
@@ -133,15 +128,11 @@ class TestForkChoice(TestCase):
 
         k = 1
         s = 50
-        short_chain = Chain(short_chain, genesis=bytes(32))
-        long_chain = Chain(long_chain, genesis=bytes(32))
-        states = {
-            b.id(): LedgerState(block=b) for b in short_chain.blocks + long_chain.blocks
-        }
+        states = {b.id(): LedgerState(block=b) for b in short_chain + long_chain}
 
         assert (
-            maxvalid_bg(short_chain.tip_id(), [long_chain.tip_id()], states, k, s)
-            == long_chain.tip_id()
+            maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], states, k, s)
+            == long_chain[-1].id()
         )
 
     def test_fork_choice_integration(self):

@@ -6,7 +6,6 @@ import hashlib
 from copy import deepcopy
 from cryptarchia.cryptarchia import (
     maxvalid_bg,
-    Chain,
     BlockHeader,
     Slot,
     Id,
