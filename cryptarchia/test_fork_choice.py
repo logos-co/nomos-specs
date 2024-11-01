@@ -156,7 +156,7 @@ class TestForkChoice(TestCase):
         follower.on_block(b1)
 
         assert follower.tip_id() == b1.id()
-        assert follower.forks == []
+        assert follower.forks == [], follower.forks
 
         # -- then we fork --
         #
@@ -174,7 +174,7 @@ class TestForkChoice(TestCase):
         follower.on_block(b3)
 
         assert follower.tip_id() == b2.id()
-        assert len(follower.forks) == 1 and follower.forks[0].tip_id() == b3.id()
+        assert len(follower.forks) == 1 and follower.forks[0] == b3.id()
 
         # -- extend the fork causing a re-org --
         #
@@ -189,4 +189,4 @@ class TestForkChoice(TestCase):
         follower.on_block(b4)
 
         assert follower.tip_id() == b4.id()
-        assert len(follower.forks) == 1 and follower.forks[0].tip_id() == b2.id()
+        assert len(follower.forks) == 1 and follower.forks[0] == b2.id(), follower.forks

@@ -398,7 +398,7 @@ class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
         self.forks = []
-        self.local_chain = Chain([], genesis=genesis_state.block.id())
+        self.local_chain = genesis_state.block.id()
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
@@ -482,66 +482,31 @@ class Follower:
 
         return True
 
-    # Try appending this block to an existing chain and return whether
-    # the operation was successful
-    def try_extend_chains(self, block: BlockHeader) -> Optional[Chain]:
-        if self.tip_id() == block.parent:
-            return self.local_chain
-
-        for chain in self.forks:
-            if chain.tip_id() == block.parent:
-                return chain
-
-        return None
-
-    def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
-        if self.genesis_state.block.id() == block.parent:
-            # this block is forking off the genesis state
-            return Chain(blocks=[], genesis=self.genesis_state.block.id())
-
-        chains = self.forks + [self.local_chain]
-        for chain in chains:
-            block_position = chain.block_position(block.parent)
-            if block_position is not None:
-                return Chain(
-                    blocks=chain.blocks[: block_position + 1],
-                    genesis=self.genesis_state.block.id(),
-                )
-
-        return None
-
     def on_block(self, block: BlockHeader):
         if not self.validate_header(block):
             logger.warning("invalid header")
             return
 
-        # check if the new block extends an existing chain
-        new_chain = self.try_extend_chains(block)
-        if new_chain is None:
-            # we failed to extend one of the existing chains,
-            # therefore we might need to create a new fork
-            new_chain = self.try_create_fork(block)
-            if new_chain is not None:
-                self.forks.append(new_chain)
-            else:
-                logger.warning("missing parent block")
-                # otherwise, we're missing the parent block
-                # in that case, just ignore the block
-                return
-
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
 
-        new_chain.blocks.append(block)
+        if block.parent == self.local_chain:
+            # simply extending the local chain
+            self.local_chain = block.id()
+        else:
+            # otherwise, this block creates a fork
+            self.forks.append(block.id())
 
-        # We may need to switch forks, lets run the fork choice rule to check.
-        new_chain_head = self.fork_choice()
-        if new_chain_head != self.local_chain.tip_id():
-            assert new_chain_head == new_chain.tip_id()
-            self.forks.remove(new_chain)
+            # remove any existing fork that is superceded by this block
+            if block.parent in self.forks:
+                self.forks.remove(block.parent)
+
+            # We may need to switch forks, lets run the fork choice rule to check.
+            new_tip = self.fork_choice()
             self.forks.append(self.local_chain)
-            self.local_chain = new_chain
+            self.forks.remove(new_tip)
+            self.local_chain = new_tip
 
     def unimported_orphans(self) -> list[BlockHeader]:
         """
@@ -554,9 +519,9 @@ class Follower:
 
         for fork in self.forks:
             _, fork_depth = common_prefix_depth(
-                tip_state.block.id(), fork.tip_id(), self.ledger_state
+                tip_state.block.id(), fork, self.ledger_state
             )
-            fork_chain = chain_suffix(fork.tip_id(), fork_depth, self.ledger_state)
+            fork_chain = chain_suffix(fork, fork_depth, self.ledger_state)
             for block_state in fork_chain:
                 b = block_state.block
                 if b.leader_proof.nullifier not in tip_state.nullifiers:
@@ -566,20 +531,20 @@ class Follower:
         return orphans
 
     # Evaluate the fork choice rule and return the chain we should be following
-    def fork_choice(self) -> Chain:
+    def fork_choice(self) -> Id:
         return maxvalid_bg(
-            self.local_chain.tip_id(),
-            [f.tip_id() for f in self.forks],
+            self.local_chain,
+            self.forks,
             self.ledger_state,
             k=self.config.k,
             s=self.config.s,
         )
 
     def tip(self) -> BlockHeader:
-        return self.local_chain.tip()
+        return self.tip_state().block
 
     def tip_id(self) -> Id:
-        return self.local_chain.tip_id()
+        return self.local_chain
 
     def tip_state(self) -> LedgerState:
         return self.ledger_state[self.tip_id()]

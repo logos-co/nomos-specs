@@ -89,7 +89,7 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_2)
         assert follower.tip() == block_1
         assert len(follower.forks) == 1, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_2
+        assert follower.forks[0] == block_2.id()
 
         # coin_2 wins slot 1 and chooses to extend from block_1
         # coin_3 also wins slot 1 and but chooses to extend from block_2
@@ -100,7 +100,7 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_4)
         assert follower.tip() == block_3
         assert len(follower.forks) == 1, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_4
+        assert follower.forks[0] == block_4.id()
 
         # coin_4 wins slot 1 and but chooses to extend from block_2 as well
         # The block is accepted. A new fork is created "from the block_2".
@@ -108,8 +108,8 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_5)
         assert follower.tip() == block_3
         assert len(follower.forks) == 2, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_4
-        assert follower.forks[1].tip() == block_5
+        assert follower.forks[0] == block_4.id()
+        assert follower.forks[1] == block_5.id()
 
         # A block based on an unknown parent is not accepted.
         # Nothing changes from the local chain and forks.
@@ -118,8 +118,8 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_6)
         assert follower.tip() == block_3
         assert len(follower.forks) == 2, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_4
-        assert follower.forks[1].tip() == block_5
+        assert follower.forks[0] == block_4.id()
+        assert follower.forks[1] == block_5.id()
 
     def test_epoch_transition(self):
         leader_coins = [Coin(sk=i, value=100) for i in range(4)]
