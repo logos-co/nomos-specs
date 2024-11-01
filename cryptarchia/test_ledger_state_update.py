@@ -18,6 +18,26 @@ from .test_common import mk_config, mk_block, mk_genesis_state
 
 
 class TestLedgerStateUpdate(TestCase):
+    def test_on_block_idempotent(self):
+        leader_coin = Coin(sk=0, value=100)
+        genesis = mk_genesis_state([leader_coin])
+
+        follower = Follower(genesis, mk_config([leader_coin]))
+
+        block = mk_block(slot=0, parent=genesis.block, coin=leader_coin)
+        follower.on_block(block)
+
+        # Follower should have accepted the block
+        assert follower.tip_state().height == 1
+        assert follower.tip() == block
+
+        follower.on_block(block)
+
+        assert follower.tip_state().height == 1
+        assert follower.tip() == block
+        assert len(follower.ledger_state) == 2
+        assert len(follower.forks) == 0
+
     def test_ledger_state_prevents_coin_reuse(self):
         leader_coin = Coin(sk=0, value=100)
         genesis = mk_genesis_state([leader_coin])
@@ -35,7 +55,7 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.tip_state().verify_unspent(leader_coin.nullifier()) == False
 
         reuse_coin_block = mk_block(slot=1, parent=block, coin=leader_coin)
-        follower.on_block(block)
+        follower.on_block(reuse_coin_block)
 
         # Follower should *not* have accepted the block
         assert follower.tip_state().height == 1

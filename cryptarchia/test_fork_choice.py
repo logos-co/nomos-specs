@@ -5,9 +5,8 @@ import hashlib
 
 from copy import deepcopy
 from cryptarchia.cryptarchia import (
-    ghost_fork_choice,
     block_weight,
-    maxvalid_bg,
+    ghost_maxvalid_bg,
     BlockHeader,
     Slot,
     Id,
@@ -85,11 +84,14 @@ class TestForkChoice(TestCase):
             ]
         }
 
-        tip = ghost_fork_choice(b0.id(), states)
-        assert tip == b4B.id()
+        assert (d := common_prefix_depth(b5B.id(), b3E.id(), states)) == (4, 2), d
 
-        tip = ghost_fork_choice(b1A.id(), states)
-        assert tip == b6A.id()
+        k = 100
+        s = int(3 * k / 0.05)
+        tip = ghost_maxvalid_bg(
+            b5B.id(), [b3E.id(), b4B.id(), b3C.id(), b3B.id(), b6A.id()], k, s, states
+        )
+        assert tip == b4B.id()
 
     def test_block_weight_paper(self):
         # Example from the GHOST paper
@@ -292,14 +294,14 @@ class TestForkChoice(TestCase):
         states = {b.id(): LedgerState(block=b) for b in short_chain + long_chain}
 
         assert (
-            maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], states, k, s)
+            ghost_maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], k, s, states)
             == short_chain[-1].id()
         )
 
         # However, if we set k to the fork length, it will be accepted
         k = len(long_chain)
         assert (
-            maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], states, k, s)
+            ghost_maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], k, s, states)
             == long_chain[-1].id()
         )
 
@@ -327,7 +329,7 @@ class TestForkChoice(TestCase):
         states = {b.id(): LedgerState(block=b) for b in short_chain + long_chain}
 
         assert (
-            maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], states, k, s)
+            ghost_maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], k, s, states)
             == long_chain[-1].id()
         )
 

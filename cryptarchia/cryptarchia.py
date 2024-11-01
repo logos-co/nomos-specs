@@ -464,6 +464,10 @@ class Follower:
         return True
 
     def on_block(self, block: BlockHeader):
+        if block.id() in self.ledger_state:
+            logger.warning("dropping already processed block")
+            return
+
         if not self.validate_header(block):
             logger.warning("invalid header")
             return
@@ -513,12 +517,12 @@ class Follower:
 
     # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Id:
-        return maxvalid_bg(
+        return ghost_maxvalid_bg(
             self.local_chain,
             self.forks,
-            self.ledger_state,
             k=self.config.k,
             s=self.config.s,
+            states=self.ledger_state,
         )
 
     def tip(self) -> BlockHeader:
@@ -673,7 +677,7 @@ def iter_chain(tip: Id, states: Dict[Id, LedgerState]):
 
 
 def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerState]:
-    return reversed(list(itertools.islice(iter_chain(tip, states), n)))
+    return list(reversed(list(itertools.islice(iter_chain(tip, states), n))))
 
 
 def common_prefix_depth(a: Id, b: Id, states: Dict[Id, LedgerState]) -> (int, int):
@@ -755,49 +759,42 @@ def block_weight(states: Dict[Id, LedgerState]) -> Dict[Id, int]:
     return block_weight
 
 
-def ghost_fork_choice(finalized: Id, states: Dict[Id, LedgerState]) -> Id:
-    weights = block_weight(states)
-    children = block_children(states)
-
-    tip = finalized
-    while len(children[tip]) > 0:
-        tip = max(children[tip], key=lambda c: weights[c])
-
-    return tip
-
-
 # Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
 # k defines the forking depth of chain we accept without more analysis
 # s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
-def maxvalid_bg(
+def ghost_maxvalid_bg(
     local_chain: Id,
     forks: List[Id],
-    states: Dict[Id, LedgerState],
     k: int,
     s: int,
+    states: Dict[Id, LedgerState],
 ) -> Id:
     assert type(local_chain) == Id
     assert all(type(f) == Id for f in forks)
 
+    weights = block_weight(states)
+
     cmax = local_chain
     for fork in forks:
-        local_depth, fork_depth = common_prefix_depth(cmax, fork, states)
-        if local_depth <= k:
+        cmax_depth, fork_depth = common_prefix_depth(cmax, fork, states)
+        if cmax_depth <= k:
+            cmax_divergent_block = chain_suffix(cmax, cmax_depth, states)[0].block.id()
+            fork_divergent_block = chain_suffix(fork, fork_depth, states)[0].block.id()
             # Classic longest chain rule with parameter k
-            if local_depth < fork_depth:
+            if weights[cmax_divergent_block] < weights[fork_divergent_block]:
                 cmax = fork
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
             forking_block = local_chain
-            for _ in range(local_depth):
+            for _ in range(cmax_depth):
                 forking_block = states[forking_block].block.parent
 
             forking_slot = Slot(states[forking_block].block.slot.absolute_slot + s)
-            cmax_density = chain_density(cmax, forking_slot, local_depth, states)
-            candidate_density = chain_density(fork, forking_slot, fork_depth, states)
+            cmax_density = chain_density(cmax, forking_slot, cmax_depth, states)
+            fork_density = chain_density(fork, forking_slot, fork_depth, states)
 
-            if cmax_density < candidate_density:
+            if cmax_density < fork_density:
                 cmax = fork
 
     return cmax
