@@ -499,15 +499,13 @@ class Follower:
         Orphans are returned in the order that they should be imported.
         """
         tip_state = self.tip_state().copy()
+        tip = tip_state.block.id()
 
         orphans = []
 
         for fork in self.forks:
-            _, fork_depth = common_prefix_depth(
-                tip_state.block.id(), fork, self.ledger_state
-            )
-            fork_chain = chain_suffix(fork, fork_depth, self.ledger_state)
-            for block_state in fork_chain:
+            _, fork_depth = common_prefix_depth(tip, fork, self.ledger_state)
+            for block_state in chain_suffix(fork, fork_depth, self.ledger_state):
                 b = block_state.block
                 if b.leader_proof.nullifier not in tip_state.nullifiers:
                     tip_state.nullifiers.add(b.leader_proof.nullifier)
@@ -715,14 +713,9 @@ def chain_density(
     head: Id, slot: Slot, reorg_depth: int, states: Dict[Id, LedgerState]
 ) -> int:
     assert type(head) == Id
-    density = 0
-    block = head
-    for _ in range(reorg_depth):
-        if states[block].block.slot.absolute_slot < slot.absolute_slot:
-            density += 1
-        block = states[block].block.parent
-
-    return density
+    chain = iter_chain(head, states)
+    segment = itertools.islice(chain, reorg_depth)
+    return sum(1 for b in segment if b.block.slot < slot)
 
 
 def block_children(states: Dict[Id, LedgerState]) -> Dict[Id, set[Id]]:
