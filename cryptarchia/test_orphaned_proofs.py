@@ -1,19 +1,8 @@
 from unittest import TestCase
-from itertools import repeat
-import numpy as np
-import hashlib
 
-from copy import deepcopy
-from cryptarchia.cryptarchia import (
-    BlockHeader,
-    Slot,
-    Id,
-    MockLeaderProof,
-    Coin,
-    Follower,
-)
+from cryptarchia.cryptarchia import Coin, Follower
 
-from .test_common import mk_chain, mk_config, mk_genesis_state, mk_block
+from .test_common import mk_config, mk_genesis_state, mk_block
 
 
 class TestOrphanedProofs(TestCase):

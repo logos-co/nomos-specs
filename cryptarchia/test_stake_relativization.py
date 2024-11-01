@@ -1,5 +1,4 @@
 from unittest import TestCase
-from dataclasses import dataclass
 import itertools
 
 import numpy as np

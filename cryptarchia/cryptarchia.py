@@ -1,4 +1,4 @@
-from typing import TypeAlias, List, Optional, Dict
+from typing import TypeAlias, List, Dict
 from hashlib import sha256, blake2b
 from math import floor
 from copy import deepcopy

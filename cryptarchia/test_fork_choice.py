@@ -1,7 +1,4 @@
 from unittest import TestCase
-from itertools import repeat
-import numpy as np
-import hashlib
 
 from copy import deepcopy
 from cryptarchia.cryptarchia import (
@@ -9,8 +6,6 @@ from cryptarchia.cryptarchia import (
     ghost_maxvalid_bg,
     BlockHeader,
     Slot,
-    Id,
-    MockLeaderProof,
     Coin,
     Follower,
     common_prefix_depth,
