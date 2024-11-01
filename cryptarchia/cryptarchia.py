@@ -403,13 +403,18 @@ class Follower:
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
 
-    def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
+    def validate_header(self, block: BlockHeader) -> bool:
         # TODO: verify blocks are not in the 'future'
-        if block.parent != chain.tip_id():
-            logger.warning("block parent is not chain tip")
+        if block.parent not in self.ledger_state:
+            logger.warning("We have not seen block parent")
             return False
 
         current_state = self.ledger_state[block.parent].copy()
+
+        # we use the proposed block epoch state to validate orphans as well
+        epoch_state = self.compute_epoch_state(
+            block.slot.epoch(self.config), block.parent
+        )
 
         # first, we verify adopted leadership transactions
         for orphan in block.orphaned_proofs:
@@ -422,10 +427,6 @@ class Follower:
             if orphan.id() not in self.ledger_state:
                 logger.warning("missing orphan proof")
                 return False
-
-            # we use the proposed block epoch state here instead of the orphan's
-            # epoch state. For very old orphans, these states may be different.
-            epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
 
             # (2.) is satisfied by verifying the proof against current state ensuring:
             # - it is a valid proof
@@ -444,7 +445,6 @@ class Follower:
             # effects to the ledger state
             current_state.apply_leader_proof(orphan.leader_proof)
 
-        epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
         # TODO: this is not the full block validation spec, only slot leader is verified
         return self.verify_slot_leader(
             block.slot,
@@ -511,6 +511,10 @@ class Follower:
         return None
 
     def on_block(self, block: BlockHeader):
+        if not self.validate_header(block):
+            logger.warning("invalid header")
+            return
+
         # check if the new block extends an existing chain
         new_chain = self.try_extend_chains(block)
         if new_chain is None:
@@ -524,10 +528,6 @@ class Follower:
                 # otherwise, we're missing the parent block
                 # in that case, just ignore the block
                 return
-
-        if not self.validate_header(block, new_chain):
-            logger.warning("invalid header")
-            return
 
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
@@ -584,32 +584,31 @@ class Follower:
     def tip_state(self) -> LedgerState:
         return self.ledger_state[self.tip_id()]
 
-    def state_at_slot_beginning(self, chain: Chain, slot: Slot) -> LedgerState:
-        for block in reversed(chain.blocks):
-            if block.slot < slot:
-                return self.ledger_state[block.id()]
-
+    def state_at_slot_beginning(self, tip: Id, slot: Slot) -> LedgerState:
+        for state in iter_chain(tip, self.ledger_state):
+            if state.block.slot < slot:
+                return state
         return self.genesis_state
 
     def epoch_start_slot(self, epoch) -> Slot:
         return Slot(epoch.epoch * self.config.epoch_length)
 
-    def stake_distribution_snapshot(self, epoch, chain):
+    def stake_distribution_snapshot(self, epoch, tip: Id):
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
         slot = Slot(epoch.prev().epoch * self.config.epoch_length)
-        return self.state_at_slot_beginning(chain, slot)
+        return self.state_at_slot_beginning(tip, slot)
 
-    def nonce_snapshot(self, epoch, chain):
+    def nonce_snapshot(self, epoch, tip):
         # nonce snapshot happens partway through the previous epoch after the
         # stake distribution has stabilized
         slot = Slot(
             self.config.epoch_relative_nonce_slot
             + self.epoch_start_slot(epoch.prev()).absolute_slot
         )
-        return self.state_at_slot_beginning(chain, slot)
+        return self.state_at_slot_beginning(tip, slot)
 
-    def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
+    def compute_epoch_state(self, epoch: Epoch, tip: Id) -> EpochState:
         if epoch.epoch == 0:
             return EpochState(
                 stake_distribution_snapshot=self.genesis_state,
@@ -617,8 +616,8 @@ class Follower:
                 inferred_total_active_stake=self.config.initial_total_active_stake,
             )
 
-        stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, chain)
-        nonce_snapshot = self.nonce_snapshot(epoch, chain)
+        stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, tip)
+        nonce_snapshot = self.nonce_snapshot(epoch, tip)
 
         # we memoize epoch states to avoid recursion killing our performance
         memo_block_id = nonce_snapshot.block.id()
@@ -628,7 +627,7 @@ class Follower:
         # To update our inference of total stake, we need the prior estimate which
         # was calculated last epoch. Thus we recurse here to retreive the previous
         # estimate of total stake.
-        prev_epoch = self.compute_epoch_state(epoch.prev(), chain)
+        prev_epoch = self.compute_epoch_state(epoch.prev(), tip)
         inferred_total_active_stake = self._infer_total_active_stake(
             prev_epoch, nonce_snapshot, stake_distribution_snapshot
         )
@@ -721,13 +720,14 @@ class Leader:
         )
 
 
-def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerState]:
-    chain = []
-    for _ in range(n):
-        chain.append(states[tip])
+def iter_chain(tip: Id, states: Dict[Id, LedgerState]):
+    while tip in states:
+        yield states[tip]
         tip = states[tip].block.parent
 
-    return reversed(chain)
+
+def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerState]:
+    return reversed(list(itertools.islice(iter_chain(tip, states), n)))
 
 
 def common_prefix_depth(

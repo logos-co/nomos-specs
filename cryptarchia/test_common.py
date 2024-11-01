@@ -20,7 +20,7 @@ class TestNode:
 
     def epoch_state(self, slot: Slot):
         return self.follower.compute_epoch_state(
-            slot.epoch(self.config), self.follower.local_chain
+            slot.epoch(self.config), self.follower.tip_id()
         )
 
     def on_slot(self, slot: Slot) -> BlockHeader | None:
