@@ -552,11 +552,6 @@ class Follower:
 
         orphans = []
         for fork in [self.local_chain, *self.forks]:
-            if fork.block_position(tip_state.block.id()) is not None:
-                # the tip is a member of this fork, it doesn't make sense
-                # to take orphans from this fork as they are all already "imported"
-                continue
-
             for block in fork.blocks:
                 for b in [*block.orphaned_proofs, block]:
                     if b.leader_proof.nullifier not in tip_state.nullifiers:
