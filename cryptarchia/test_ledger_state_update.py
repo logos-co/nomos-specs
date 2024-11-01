@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import Follower, Coin
+from .cryptarchia import Follower, Coin, iter_chain
 
 from .test_common import mk_config, mk_block, mk_genesis_state
 
@@ -18,12 +18,13 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block)
 
         # Follower should have accepted the block
-        assert follower.tip_state().height == 1
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
         assert follower.tip() == block
 
         follower.on_block(block)
 
-        assert follower.tip_state().height == 1
+        # Should have been a No-op
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
         assert follower.tip() == block
         assert len(follower.ledger_state) == 2
         assert len(follower.forks) == 0
@@ -38,7 +39,7 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block)
 
         # Follower should have accepted the block
-        assert follower.tip_state().height == 1
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
         assert follower.tip() == block
 
         # Follower should have updated their ledger state to mark the leader coin as spent
@@ -48,7 +49,7 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(reuse_coin_block)
 
         # Follower should *not* have accepted the block
-        assert follower.tip_state().height == 1
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
         assert follower.tip() == block
 
     def test_ledger_state_is_properly_updated_on_reorg(self):

@@ -211,7 +211,6 @@ class BlockHeader:
     content_size: int
     content_id: Id
     leader_proof: MockLeaderProof
-
     orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
 
     def __post_init__(self):
@@ -291,7 +290,6 @@ class LedgerState:
     # The number of observed leaders (blocks + orphans), this measurement is
     # used in inferring total active stake in the network.
     leader_count: int = 0
-    height: int = 0
 
     def copy(self):
         return LedgerState(
@@ -328,8 +326,6 @@ class LedgerState:
         self.block = block
         for proof in itertools.chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
-
-        self.height += 1
 
     def apply_leader_proof(self, proof: MockLeaderProof):
         self.nullifiers.add(proof.nullifier)
