@@ -675,22 +675,18 @@ def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerS
     return reversed(list(itertools.islice(iter_chain(tip, states), n)))
 
 
-def common_prefix_depth(
-    local_chain: Id, fork: Id, states: Dict[Id, LedgerState]
-) -> (int, int):
-
-    local_block = local_chain
-    fork_block = fork
+def common_prefix_depth(a: Id, b: Id, states: Dict[Id, LedgerState]) -> (int, int):
+    a_block = a
+    b_block = b
 
     seen = {}
     depth = 0
     while True:
-
-        if local_block not in states and fork_block not in states:
+        if a_block not in states and b_block not in states:
             # conflicting genesis blocks
             print("")
-            print("local\t", local_chain[:2])
-            print("fork\t", fork[:2])
+            print("a\t", a[:2])
+            print("b\t", b[:2])
             print(
                 "states\n\t",
                 "\n\t".join(
@@ -700,22 +696,22 @@ def common_prefix_depth(
             print("seen\t", {s[:2] for s in seen})
             break
 
-        if local_block in seen:
+        if a_block in seen:
             # we had seen this block from the fork chain
-            return depth, seen[local_block]
+            return depth, seen[a_block]
 
-        if local_block in states:
-            seen[local_block] = depth
-            local_block = states[local_block].block.parent
+        if a_block in states:
+            seen[a_block] = depth
+            a_block = states[a_block].block.parent
 
-        if fork_block in seen:
+        if b_block in seen:
             # we had seen the fork in the local chain
             # return the depth w.r.t to the local chain
-            return seen[fork_block], depth
+            return seen[b_block], depth
 
-        if fork_block in states:
-            seen[fork_block] = depth
-            fork_block = states[fork_block].block.parent
+        if b_block in states:
+            seen[b_block] = depth
+            b_block = states[b_block].block.parent
         depth += 1
 
     assert False
