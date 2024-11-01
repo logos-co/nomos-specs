@@ -4,7 +4,6 @@ from copy import deepcopy
 from cryptarchia.cryptarchia import (
     block_weight,
     ghost_maxvalid_bg,
-    BlockHeader,
     Slot,
     Coin,
     Follower,
@@ -33,7 +32,7 @@ class TestForkChoice(TestCase):
 
         coin = Coin(sk=1, value=100)
 
-        b0 = BlockHeader(slot=Slot(0), parent=bytes(32))
+        b0 = mk_genesis_state([]).block
 
         b1A = mk_block(b0, 1, coin, content=b"b1A")
         b2A = mk_block(b1A, 2, coin, content=b"b2A")
@@ -105,7 +104,7 @@ class TestForkChoice(TestCase):
 
         coin = Coin(sk=1, value=100)
 
-        b0 = BlockHeader(slot=Slot(0), parent=bytes(32))
+        b0 = mk_genesis_state([]).block
 
         b1A = mk_block(b0, 1, coin, content=b"b1A")
         b2A = mk_block(b1A, 2, coin, content=b"b2A")
@@ -186,7 +185,7 @@ class TestForkChoice(TestCase):
 
         coin = Coin(sk=1, value=100)
 
-        b0 = BlockHeader(slot=Slot(0), parent=bytes(32))
+        b0 = mk_genesis_state([]).block
         b1 = mk_block(b0, 1, coin)
         b2 = mk_block(b1, 2, coin)
         b3 = mk_block(b2, 3, coin)
@@ -223,7 +222,7 @@ class TestForkChoice(TestCase):
 
         coin = Coin(sk=1, value=100)
 
-        b0 = BlockHeader(slot=Slot(0), parent=bytes(32))
+        b0 = mk_genesis_state([]).block
         b1 = mk_block(b0, 1, coin)
         b2 = mk_block(b1, 2, coin)
         b3 = mk_block(b2, 3, coin)
@@ -261,7 +260,8 @@ class TestForkChoice(TestCase):
 
     def test_fork_choice_long_sparse_chain(self):
         # The longest chain is not dense after the fork
-        genesis = BlockHeader(slot=Slot(0), parent=bytes(32))
+        genesis = mk_genesis_state([]).block
+
         short_coin, long_coin = Coin(sk=0, value=100), Coin(sk=1, value=100)
         common, long_coin = mk_chain(parent=genesis, coin=long_coin, slots=range(50))
 
@@ -304,7 +304,7 @@ class TestForkChoice(TestCase):
         # The longest chain is also the densest after the fork
         short_coin, long_coin = Coin(sk=0, value=100), Coin(sk=1, value=100)
         common, long_coin = mk_chain(
-            parent=BlockHeader(slot=Slot(0), parent=bytes(32)),
+            parent=mk_genesis_state([]).block,
             coin=long_coin,
             slots=range(1, 50),
         )

@@ -175,11 +175,11 @@ class Coin:
 
 @dataclass
 class MockLeaderProof:
-    commitment: Id = bytes(32)
-    nullifier: Id = bytes(32)
-    evolved_commitment: Id = bytes(32)
-    slot: Slot = field(default_factory=lambda: Slot(0))
-    parent: Id = bytes(32)
+    commitment: Id
+    nullifier: Id
+    evolved_commitment: Id
+    slot: Slot
+    parent: Id
 
     @staticmethod
     def new(coin: Coin, slot: Slot, parent: Id):
@@ -207,10 +207,10 @@ class MockLeaderProof:
 @dataclass
 class BlockHeader:
     slot: Slot
-    parent: Id = bytes(32)
-    content_size: int = 0
-    content_id: Id = bytes(32)
-    leader_proof: MockLeaderProof = field(default_factory=MockLeaderProof)
+    parent: Id
+    content_size: int
+    content_id: Id
+    leader_proof: MockLeaderProof
 
     orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
 

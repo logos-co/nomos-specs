@@ -50,7 +50,15 @@ def mk_config(initial_stake_distribution: list[Coin]) -> Config:
 
 def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
     return LedgerState(
-        block=BlockHeader(slot=Slot(0), parent=bytes(32)),
+        block=BlockHeader(
+            slot=Slot(0),
+            parent=bytes(32),
+            content_size=0,
+            content_id=bytes(32),
+            leader_proof=MockLeaderProof.new(
+                Coin(sk=0, value=0), Slot(0), parent=bytes(32)
+            ),
+        ),
         nonce=bytes(32),
         commitments_spend={c.commitment() for c in initial_stake_distribution},
         commitments_lead={c.commitment() for c in initial_stake_distribution},
