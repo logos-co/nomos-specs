@@ -106,7 +106,7 @@ class TestForkChoice(TestCase):
         )
 
         # However, if we set k to the fork length, it will be accepted
-        k = long_chain.length()
+        k = len(long_chain.blocks)
         assert (
             maxvalid_bg(short_chain.tip_id(), [long_chain.tip_id()], states, k, s)
             == long_chain.tip_id()

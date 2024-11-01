@@ -44,7 +44,7 @@ class TestOrphanedProofs(TestCase):
 
         assert follower.tip() == b2
         assert [f.tip() for f in follower.forks] == [b3]
-        assert follower.unimported_orphans(follower.tip_id()) == [b3]
+        assert follower.unimported_orphans() == [b3]
 
         # -- extend with import --
         #
@@ -59,7 +59,7 @@ class TestOrphanedProofs(TestCase):
 
         assert follower.tip() == b4
         assert [f.tip() for f in follower.forks] == [b3]
-        assert follower.unimported_orphans(follower.tip_id()) == []
+        assert follower.unimported_orphans() == []
 
     def test_orphan_proof_import_from_long_running_fork(self):
         c_a, c_b = Coin(sk=0, value=10), Coin(sk=1, value=10)
@@ -90,7 +90,7 @@ class TestOrphanedProofs(TestCase):
 
         assert follower.tip() == b3
         assert [f.tip() for f in follower.forks] == [b5]
-        assert follower.unimported_orphans(follower.tip_id()) == [b4, b5]
+        assert follower.unimported_orphans() == [b4, b5]
 
         # -- extend b3, importing the fork --
         #
@@ -136,7 +136,7 @@ class TestOrphanedProofs(TestCase):
 
         assert follower.tip() == b4
         assert [f.tip() for f in follower.forks] == [b7]
-        assert follower.unimported_orphans(follower.tip_id()) == [b5, b6, b7]
+        assert follower.unimported_orphans() == [b5, b6, b7]
 
         # -- extend b4, importing the forks --
         #
@@ -154,7 +154,7 @@ class TestOrphanedProofs(TestCase):
 
         assert follower.tip() == b8
         assert [f.tip() for f in follower.forks] == [b7]
-        assert follower.unimported_orphans(follower.tip_id()) == []
+        assert follower.unimported_orphans() == []
 
     def test_unimported_orphans(self):
         # Given the following fork graph:
@@ -200,7 +200,7 @@ class TestOrphanedProofs(TestCase):
 
         assert follower.tip() == b3
         assert [f.tip() for f in follower.forks] == [b5, b6]
-        assert follower.unimported_orphans(follower.tip_id()) == [b4, b5, b6]
+        assert follower.unimported_orphans() == [b4, b5, b6]
 
         b7, c_a = mk_block(b3, 4, c_a, orphaned_proofs=[b4, b5, b6]), c_a.evolve()
 
@@ -250,15 +250,15 @@ class TestOrphanedProofs(TestCase):
             follower.on_block(b)
 
         assert follower.tip() == b4
-        assert follower.unimported_orphans(follower.tip_id()) == [b5]
+        assert follower.unimported_orphans() == [b5]
 
         for b in [b6, b7]:
             follower.on_block(b)
 
         assert follower.tip() == b6
-        assert follower.unimported_orphans(follower.tip_id()) == [b7]
+        assert follower.unimported_orphans() == [b7]
 
         follower.on_block(b8)
 
         assert follower.tip() == b8
-        assert follower.unimported_orphans(follower.tip_id()) == []
+        assert follower.unimported_orphans() == []

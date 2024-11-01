@@ -28,7 +28,7 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block)
 
         # Follower should have accepted the block
-        assert follower.local_chain.length() == 1
+        assert follower.tip_state().height == 1
         assert follower.tip() == block
 
         # Follower should have updated their ledger state to mark the leader coin as spent
@@ -38,7 +38,7 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block)
 
         # Follower should *not* have accepted the block
-        assert follower.local_chain.length() == 1
+        assert follower.tip_state().height == 1
         assert follower.tip() == block
 
     def test_ledger_state_is_properly_updated_on_reorg(self):

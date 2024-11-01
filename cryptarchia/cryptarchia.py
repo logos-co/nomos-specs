@@ -274,9 +274,6 @@ class Chain:
     def tip(self) -> BlockHeader:
         return self.blocks[-1]
 
-    def length(self) -> int:
-        return len(self.blocks)
-
     def block_position(self, block: Id) -> Optional[int]:
         for i, b in enumerate(self.blocks):
             if b.id() == block:
@@ -313,6 +310,7 @@ class LedgerState:
     # The number of observed leaders (blocks + orphans), this measurement is
     # used in inferring total active stake in the network.
     leader_count: int = 0
+    height: int = 0
 
     def copy(self):
         return LedgerState(
@@ -349,6 +347,8 @@ class LedgerState:
         self.block = block
         for proof in itertools.chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
+
+        self.height += 1
 
     def apply_leader_proof(self, proof: MockLeaderProof):
         self.nullifiers.add(proof.nullifier)
@@ -543,16 +543,16 @@ class Follower:
             self.forks.append(self.local_chain)
             self.local_chain = new_chain
 
-    def unimported_orphans(self, tip: Id) -> list[BlockHeader]:
+    def unimported_orphans(self) -> list[BlockHeader]:
         """
         Returns all unimported orphans w.r.t. the given tip's state.
         Orphans are returned in the order that they should be imported.
         """
-        tip_state = self.ledger_state[tip].copy()
+        tip_state = self.tip_state().copy()
 
         orphans = []
         for fork in [self.local_chain, *self.forks]:
-            if fork.block_position(tip) is not None:
+            if fork.block_position(tip_state.block.id()) is not None:
                 # the tip is a member of this fork, it doesn't make sense
                 # to take orphans from this fork as they are all already "imported"
                 continue

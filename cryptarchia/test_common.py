@@ -27,12 +27,11 @@ class TestNode:
         parent = self.follower.tip_id()
         epoch_state = self.epoch_state(slot)
         if leader_proof := self.leader.try_prove_slot_leader(epoch_state, slot, parent):
-            orphans = self.follower.unimported_orphans(parent)
             self.leader.coin = self.leader.coin.evolve()
             return BlockHeader(
                 parent=parent,
                 slot=slot,
-                orphaned_proofs=orphans,
+                orphaned_proofs=self.follower.unimported_orphans(),
                 leader_proof=leader_proof,
                 content_size=0,
                 content_id=bytes(32),
