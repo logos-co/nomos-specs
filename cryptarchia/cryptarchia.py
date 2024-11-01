@@ -6,6 +6,7 @@ import itertools
 import functools
 from dataclasses import dataclass, field, replace
 import logging
+from collections import defaultdict
 
 import numpy as np
 
@@ -718,6 +719,51 @@ def chain_density(
         block = states[block].block.parent
 
     return density
+
+
+def block_children(states: Dict[Id, LedgerState]) -> Dict[Id, set[Id]]:
+    children = defaultdict(set)
+    for c, state in states.items():
+        children[state.block.parent].add(c)
+
+    return children
+
+
+def block_weight(states: Dict[Id, LedgerState]) -> Dict[Id, int]:
+    children = block_children(states)
+
+    block_weight = {}
+
+    pending = {b for b in states if len(children[b]) == 0}
+    ready = set()
+
+    while len(pending) > 0:
+        new_ready = set()
+        for b in pending:
+            if children[b] <= ready:
+                block_weight[b] = 1 + sum(block_weight[c] for c in children[b])
+                new_ready.add(b)
+
+        for b in new_ready:
+            pending.remove(b)
+
+            if states[b].block.parent in states:
+                pending.add(states[b].block.parent)
+
+            ready.add(b)
+
+    return block_weight
+
+
+def ghost_fork_choice(finalized: Id, states: Dict[Id, LedgerState]) -> Id:
+    weights = block_weight(states)
+    children = block_children(states)
+
+    tip = finalized
+    while len(children[tip]) > 0:
+        tip = max(children[tip], key=lambda c: weights[c])
+
+    return tip
 
 
 # Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
