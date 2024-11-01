@@ -551,12 +551,17 @@ class Follower:
         tip_state = self.tip_state().copy()
 
         orphans = []
-        for fork in [self.local_chain, *self.forks]:
-            for block in fork.blocks:
-                for b in [*block.orphaned_proofs, block]:
-                    if b.leader_proof.nullifier not in tip_state.nullifiers:
-                        tip_state.nullifiers.add(b.leader_proof.nullifier)
-                        orphans += [b]
+
+        for fork in self.forks:
+            _, fork_depth = common_prefix_depth(
+                tip_state.block.id(), fork.tip_id(), self.ledger_state
+            )
+            fork_chain = chain_suffix(fork.tip_id(), fork_depth, self.ledger_state)
+            for block_state in fork_chain:
+                b = block_state.block
+                if b.leader_proof.nullifier not in tip_state.nullifiers:
+                    tip_state.nullifiers.add(b.leader_proof.nullifier)
+                    orphans += [b]
 
         return orphans
 
@@ -714,6 +719,15 @@ class Leader:
         return r < MOCK_LEADER_VRF.ORDER * phi(
             self.config.active_slot_coeff, relative_stake
         )
+
+
+def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerState]:
+    chain = []
+    for _ in range(n):
+        chain.append(states[tip])
+        tip = states[tip].block.parent
+
+    return reversed(chain)
 
 
 def common_prefix_depth(
