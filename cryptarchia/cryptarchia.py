@@ -676,42 +676,31 @@ def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerS
 
 
 def common_prefix_depth(a: Id, b: Id, states: Dict[Id, LedgerState]) -> (int, int):
-    a_block = a
-    b_block = b
+    a_blocks = iter_chain(a, states)
+    b_blocks = iter_chain(b, states)
 
     seen = {}
     depth = 0
     while True:
-        if a_block not in states and b_block not in states:
-            # conflicting genesis blocks
-            print("")
-            print("a\t", a[:2])
-            print("b\t", b[:2])
-            print(
-                "states\n\t",
-                "\n\t".join(
-                    [f"{b[:2]} -> {s.block.parent[:2]}" for b, s in states.items()]
-                ),
-            )
-            print("seen\t", {s[:2] for s in seen})
-            break
+        try:
+            a_block = next(a_blocks).block.id()
+            if a_block in seen:
+                # we had seen this block from the fork chain
+                return depth, seen[a_block]
 
-        if a_block in seen:
-            # we had seen this block from the fork chain
-            return depth, seen[a_block]
-
-        if a_block in states:
             seen[a_block] = depth
-            a_block = states[a_block].block.parent
+        except StopIteration:
+            pass
 
-        if b_block in seen:
-            # we had seen the fork in the local chain
-            # return the depth w.r.t to the local chain
-            return seen[b_block], depth
-
-        if b_block in states:
+        try:
+            b_block = next(b_blocks).block.id()
+            if b_block in seen:
+                # we had seen the fork in the local chain
+                return seen[b_block], depth
             seen[b_block] = depth
-            b_block = states[b_block].block.parent
+        except StopIteration:
+            pass
+
         depth += 1
 
     assert False
