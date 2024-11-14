@@ -748,7 +748,8 @@ def block_weight(states: Dict[Id, LedgerState]) -> Dict[Id, int]:
     return block_weight
 
 
-# Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
+# Implementation of the Cryptarchia fork choice rule:
+# We use a combination of the chain density rule from Ouroboros Genesis and GHOST
 # k defines the forking depth of chain we accept without more analysis
 # s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
 def ghost_maxvalid_bg(
@@ -767,19 +768,17 @@ def ghost_maxvalid_bg(
     for fork in forks:
         cmax_depth, fork_depth = common_prefix_depth(cmax, fork, states)
         if cmax_depth <= k:
+            # GHOST fork choice rule: select the branch with most weight at the point of divergence
             cmax_divergent_block = chain_suffix(cmax, cmax_depth, states)[0].block.id()
             fork_divergent_block = chain_suffix(fork, fork_depth, states)[0].block.id()
-            # Classic longest chain rule with parameter k
             if weights[cmax_divergent_block] < weights[fork_divergent_block]:
                 cmax = fork
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
-            forking_block = local_chain
-            for _ in range(cmax_depth):
-                forking_block = states[forking_block].block.parent
+            cmax_divergent_block = chain_suffix(cmax, cmax_depth, states)[0].block
 
-            forking_slot = Slot(states[forking_block].block.slot.absolute_slot + s)
+            forking_slot = Slot(cmax_divergent_block.slot.absolute_slot + s)
             cmax_density = chain_density(cmax, forking_slot, cmax_depth, states)
             fork_density = chain_density(fork, forking_slot, fork_depth, states)
 
