@@ -511,7 +511,7 @@ class Follower:
 
     # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Id:
-        return ghost_maxvalid_bg(
+        return maxvalid_bg(
             self.local_chain,
             self.forks,
             k=self.config.k,
@@ -722,32 +722,6 @@ def block_children(states: Dict[Id, LedgerState]) -> Dict[Id, set[Id]]:
     return children
 
 
-def block_weight(states: Dict[Id, LedgerState]) -> Dict[Id, int]:
-    children = block_children(states)
-
-    block_weight = {}
-
-    pending = {b for b in states if len(children[b]) == 0}
-    ready = set()
-
-    while len(pending) > 0:
-        new_ready = set()
-        for b in pending:
-            if children[b] <= ready:
-                block_weight[b] = 1 + sum(block_weight[c] for c in children[b])
-                new_ready.add(b)
-
-        for b in new_ready:
-            pending.remove(b)
-
-            if states[b].block.parent in states:
-                pending.add(states[b].block.parent)
-
-            ready.add(b)
-
-    return block_weight
-
-
 # Implementation of the Cryptarchia fork choice rule (following Ouroborous Genesis).
 # The fork choice has two phases:
 # 1. if the chain is not forking too deeply, we apply the longest chain fork choice rule
@@ -764,8 +738,6 @@ def maxvalid_bg(
 ) -> Id:
     assert type(local_chain) == Id
     assert all(type(f) == Id for f in forks)
-
-    weights = block_weight(states)
 
     cmax = local_chain
     for fork in forks:
