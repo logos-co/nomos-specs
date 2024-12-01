@@ -195,13 +195,7 @@ class MockLeaderProof:
 
     def verify(self, slot: Slot, parent: Id):
         # TODO: verification not implemented
-        if slot != self.slot:
-            logger.warning("PoL: wrong slot")
-            return False
-        if parent != self.parent:
-            logger.warning("PoL: wrong parent")
-            return False
-        return True
+        return slot == self.slot and parent == self.parent
 
 
 @dataclass
@@ -212,12 +206,6 @@ class BlockHeader:
     content_id: Id
     leader_proof: MockLeaderProof
     orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
-
-    def __post_init__(self):
-        assert type(self.slot) == Slot
-        assert type(self.parent) == Id
-        assert self.slot == self.leader_proof.slot
-        assert self.parent == self.leader_proof.parent
 
     def update_header_hash(self, h):
         # version byte
@@ -388,7 +376,8 @@ class Follower:
 
         current_state = self.ledger_state[block.parent].copy()
 
-        # we use the proposed block epoch state to validate orphans as well
+        # We use the proposed block epoch state to validate orphans as well.
+        # For very old orphans, these states may be different.
         epoch_state = self.compute_epoch_state(
             block.slot.epoch(self.config), block.parent
         )
@@ -443,21 +432,14 @@ class Follower:
         # This will change once we start putting merkle roots in headers
         current_state: LedgerState,
     ) -> bool:
-        if not proof.verify(slot, parent):
-            logger.warning("invalid PoL")
-            return False
-        if not (
-            current_state.verify_eligible_to_lead(proof.commitment)
-            or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
-        ):
-            logger.warning("invalid commitment")
-            return False
-
-        if not current_state.verify_unspent(proof.nullifier):
-            logger.warning("PoL coin already spent")
-            return False
-
-        return True
+        return (
+            proof.verify(slot, parent)  # verify slot leader proof
+            and (
+                current_state.verify_eligible_to_lead(proof.commitment)
+                or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
+            )
+            and current_state.verify_unspent(proof.nullifier)
+        )
 
     def on_block(self, block: BlockHeader):
         if block.id() in self.ledger_state:
