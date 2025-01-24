@@ -2,8 +2,8 @@ from itertools import chain
 from unittest import TestCase
 from typing import List, Optional
 
-from da.common import NodeId, build_blob_id, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
-from da.api.common import DAApi, VID, Metadata
+from da.common import NodeId, build_blob_id, NomosDaG2ProofOfPossession as bls_pop
+from da.api.common import DAApi, BlobMetadata, Metadata
 from da.verifier import DAVerifier, DABlob 
 from da.api.test_flow import MockStore
 from da.dispersal import Dispersal, DispersalSettings
@@ -25,7 +25,7 @@ class DAVerifierWApi:
             self.store.populate(blob, cert_id)
             return attestation
 
-    def receive_metadata(self, blob_metadata: BlobMetadata):
+    def receive_metadata(self, vid: BlobMetadata):
         # Usually the certificate would be verifier here,
         # but we are assuming that this it is already coming from the verified block,
         # in which case all certificates had been already verified by the DA Node.
@@ -66,16 +66,16 @@ class TestFullFlow(TestCase):
 
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
-        self.dispersal.disperse(encoded_data)
-        blob_id = build_blob_id(encoded_data.row_commitments)
-        blob_metadata = BlobMetadata(
-            blob_id,
+        certificate = self.dispersal.disperse(encoded_data)
+
+        vid = BlobMetadata(
+            certificate.id(),
             Metadata(app_id, index)
         )
 
         # verifier
         for node in self.api_nodes:
-            node.receive_metadata(blob_metadata)
+            node.receive_metadata(vid)
 
         # read from api and confirm its working
         # notice that we need to sort the api_nodes by their public key to have the blobs sorted in the same fashion
@@ -109,7 +109,7 @@ class TestFullFlow(TestCase):
         # Loop through each index and simulate dispersal with the same cert_id but different metadata
         for index in indexes:
             metadata = BlobMetadata(
-                blob_id,
+                certificate.id(),
                 Metadata(app_id, index)
             )
 

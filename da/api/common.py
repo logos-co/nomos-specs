@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Sequence
 
 from da.common import BlobId
-from da.verifier import DAShare
+from da.verifier import DABlob
 
 
 @dataclass

@@ -22,7 +22,7 @@ class TestVerifier(TestCase):
         aggregated_proof = kzg.generate_element_proof(0, aggregated_poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
         self.assertTrue(
             self.verifier._verify_column(
-                column, column_commitment, aggregated_column_commitment, aggregated_proof, 0
+                column, 0, column_commitment, aggregated_column_commitment, aggregated_proof,
             )
         )
 
@@ -30,9 +30,9 @@ class TestVerifier(TestCase):
         _ = TestEncoder()
         _.setUp()
         encoded_data = _.encoder.encode(_.data)
-        for i, column in enumerate(encoded_data.extended_matrix.columns):
+        for i, column in enumerate(encoded_data.chunked_data.columns):
             verifier = DAVerifier()
-            da_blob = DAShare(
+            da_blob = DABlob(
                 Column(column),
                 i,
                 encoded_data.combined_column_proofs[i],
@@ -60,4 +60,4 @@ class TestVerifier(TestCase):
                 encoded_data.combined_column_proofs[i],
                 encoded_data.row_commitments,
             )
-            self.assertIsNotNone(self.verifier.verify(da_blob))
+            self.assertFalse(self.verifier.verify(da_blob))
