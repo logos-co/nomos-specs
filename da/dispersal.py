@@ -16,9 +16,7 @@ class Dispersal:
     def __init__(self, settings: DispersalSettings):
         self.settings = settings
         # sort over public keys
-        self.settings.nodes_ids, self.settings.nodes_pubkey = zip(
-            *sorted(zip(self.settings.nodes_ids, self.settings.nodes_pubkey), key=lambda x: x[1])
-        )
+        self.settings.nodes_ids.sort()
 
     def _prepare_data(self, encoded_data: EncodedData) -> Generator[DABlob, None, None]:
         assert len(encoded_data.column_commitments) == len(self.settings.nodes_ids)
