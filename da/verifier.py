@@ -9,7 +9,7 @@ from eth2spec.eip7594.mainnet import (
 )
 
 import da.common
-from da.common import Column, Chunk, Attestation, BlobId, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
+from da.common import Column, Chunk, BlobId
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import ROOTS_OF_UNITY, GLOBAL_PARAMETERS, BLS_MODULUS
