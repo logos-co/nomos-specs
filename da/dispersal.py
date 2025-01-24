@@ -21,14 +21,19 @@ class Dispersal:
     def _prepare_data(self, encoded_data: EncodedData) -> Generator[DAShare, None, None]:
         columns = encoded_data.extended_matrix.columns
         row_commitments = encoded_data.row_commitments
-        column_proofs = encoded_data.combined_column_proofs
-        blobs_data = zip(columns, column_proofs)
-        for column_idx, (column, proof) in enumerate(blobs_data):
-            blob = DAShare(
-                Column(column),
+        rows_proofs = encoded_data.row_proofs
+        aggregated_column_commitment = encoded_data.aggregated_column_commitment
+        aggregated_column_proofs = encoded_data.aggregated_column_proofs
+        blobs_data = zip(columns, column_commitments, zip(*rows_proofs), aggregated_column_proofs)
+        for column_idx, (column, column_commitment, row_proofs, column_proof) in enumerate(blobs_data):
+            blob = DABlob(
+                column,
                 column_idx,
-                proof,
-                row_commitments
+                column_commitment,
+                aggregated_column_commitment,
+                column_proof,
+                row_commitments,
+                row_proofs
             )
             yield blob
 
