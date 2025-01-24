@@ -109,14 +109,14 @@ class TestEncoder(TestCase):
     def test_generate_aggregated_column_commitments(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
         _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
-        poly, commitment = self.encoder._compute_aggregated_column_commitment(chunks_matrix, column_commitments)
+        poly, commitment = self.encoder._compute_aggregated_column_commitment(column_commitments)
         self.assertIsNotNone(poly)
         self.assertIsNotNone(commitment)
 
     def test_generate_aggregated_column_proofs(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
         _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
-        poly, _ = self.encoder._compute_aggregated_column_commitment(chunks_matrix, column_commitments)
+        poly, _ = self.encoder._compute_aggregated_column_commitment(column_commitments)
         proofs = self.encoder._compute_aggregated_column_proofs(poly, column_commitments)
         self.assertEqual(len(proofs), len(column_commitments))
 

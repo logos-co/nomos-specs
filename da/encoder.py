@@ -86,11 +86,11 @@ class DAEncoder:
 
     @staticmethod
     def _compute_aggregated_column_commitment(
-        chunks_matrix: ChunksMatrix, column_commitments: Sequence[Commitment]
+        column_commitments: Sequence[Commitment]
     ) -> Tuple[Polynomial, Commitment]:
         data = bytes(chain.from_iterable(
-            DAEncoder.hash_commitment_blake2b31(column, commitment)
-            for column, commitment in zip(chunks_matrix.columns, column_commitments)
+            DAEncoder.hash_commitment_blake2b31(commitment)
+            for commitment in column_commitments
         ))
         return kzg.bytes_to_commitment(data, GLOBAL_PARAMETERS)
 
@@ -111,7 +111,7 @@ class DAEncoder:
         row_proofs = self._compute_rows_proofs(extended_matrix, row_polynomials, row_commitments)
         column_polynomials, column_commitments = zip(*self._compute_column_kzg_commitments(extended_matrix))
         aggregated_column_polynomial, aggregated_column_commitment = (
-            self._compute_aggregated_column_commitment(extended_matrix, column_commitments)
+            self._compute_aggregated_column_commitment(column_commitments)
         )
         aggregated_column_proofs = self._compute_aggregated_column_proofs(
             aggregated_column_polynomial, column_commitments
@@ -130,4 +130,7 @@ class DAEncoder:
 
     @staticmethod
     def hash_commitment_blake2b31(commitment: Commitment) -> bytes:
-        return blake2b(bytes(commitment), digest_size=31).digest()
+        return (
+            # digest size must be 31 bytes as we cannot encode 32 without risking overflowing the BLS_MODULUS
+            int.from_bytes(blake2b(bytes(commitment), digest_size=31).digest())
+        ).to_bytes(32, byteorder="big") # rewrap into 32 padded bytes for the field elements, EC library dependant
