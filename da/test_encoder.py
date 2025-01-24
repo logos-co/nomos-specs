@@ -35,14 +35,22 @@ class TestEncoder(TestCase):
         chunks_size = (len(data) // encoder_params.bytes_per_chunk) // encoder_params.column_count
         self.assertEqual(len(encoded_data.row_commitments), chunks_size)
 
-        verifier = DAVerifier()
-        # verify columns
-        for idx, (column, column_proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.combined_column_proofs)):
-            share = DAShare(
-                column=Column(column),
-                column_idx=idx,
-                combined_column_proof=column_proof,
-                row_commitments=encoded_data.row_commitments
+        # verify rows
+        for row, proofs, commitment in zip(encoded_data.extended_matrix, encoded_data.row_proofs, encoded_data.row_commitments):
+            for i, (chunk, proof) in enumerate(zip(row, proofs)):
+                self.assertTrue(
+                    kzg.verify_element_proof(bytes_to_bls_field(chunk), commitment, proof, i, ROOTS_OF_UNITY)
+                )
+
+        # verify column aggregation
+        for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.aggregated_column_proofs)):
+            data = DAEncoder.hash_commitment_blake2b31(commitment)
+            kzg.verify_element_proof(
+                bytes_to_bls_field(data),
+                encoded_data.aggregated_column_commitment,
+                proof,
+                i,
+                ROOTS_OF_UNITY
             )
             verifier.verify(share)
 

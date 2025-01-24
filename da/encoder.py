@@ -65,8 +65,40 @@ class DAEncoder:
             )
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
 
-    def _compute_combined_column_proofs(self, combined_poly: Polynomial) -> List[Proof]:
-        total_cols = self.params.column_count * 2
+    @staticmethod
+    def _compute_rows_proofs(
+        chunks_matrix: ChunksMatrix,
+        polynomials: Sequence[Polynomial],
+        row_commitments: Sequence[Commitment]
+    ) -> List[List[Proof]]:
+        proofs = []
+        for row, poly, commitment in zip(chunks_matrix, polynomials, row_commitments):
+            proofs.append(
+                [
+                    kzg.generate_element_proof(i, poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
+                    for i in range(len(row))
+                ]
+            )
+        return proofs
+
+    def _compute_column_kzg_commitments(self, chunks_matrix: ChunksMatrix) -> List[Tuple[Polynomial, Commitment]]:
+        return self._compute_row_kzg_commitments(chunks_matrix.transposed())
+
+    @staticmethod
+    def _compute_aggregated_column_commitment(
+        chunks_matrix: ChunksMatrix, column_commitments: Sequence[Commitment]
+    ) -> Tuple[Polynomial, Commitment]:
+        data = bytes(chain.from_iterable(
+            DAEncoder.hash_commitment_blake2b31(column, commitment)
+            for column, commitment in zip(chunks_matrix.columns, column_commitments)
+        ))
+        return kzg.bytes_to_commitment(data, GLOBAL_PARAMETERS)
+
+    @staticmethod
+    def _compute_aggregated_column_proofs(
+            polynomial: Polynomial,
+            column_commitments: Sequence[Commitment],
+    ) -> List[Proof]:
         return [
             kzg.generate_element_proof(i, combined_poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
             for i in range(total_cols)
@@ -87,3 +119,7 @@ class DAEncoder:
             combined_column_proofs
         )
         return result
+
+    @staticmethod
+    def hash_commitment_blake2b31(commitment: Commitment) -> bytes:
+        return blake2b(bytes(commitment), digest_size=31).digest()

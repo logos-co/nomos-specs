@@ -26,20 +26,22 @@ class DAShare:
 
 class DAVerifier:
     @staticmethod
-    def verify(blob: DAShare) -> bool:
-        """
-        Verifies that blob.column at index blob.column_idx is consistent
-        with the row commitments and the combined column proof.
-
-        Returns True if verification succeeds, False otherwise.
-        """
-        # 1. Derive challenge
-        h = derive_challenge(blob.row_commitments)
-        # 2. Reconstruct combined commitment: combined_commitment = sum_{i=0..l-1} h^i * row_commitments[i]
-        combined_commitment = combine_commitments(blob.row_commitments, h)
-        # 3. Compute combined evaluation v = sum_{i=0..l-1} (h^i * column_data[i])
-        combined_eval_point = compute_combined_evaluation(blob.column, h)
-        # 4. Verify the single KZG proof for evaluation at point w^{column_idx}
+    def _verify_column(
+            column: Column,
+            column_commitment: Commitment,
+            aggregated_column_commitment: Commitment,
+            aggregated_column_proof: Proof,
+            index: int
+    ) -> bool:
+        # 1. compute commitment for column
+        _, computed_column_commitment = kzg.bytes_to_commitment(column.as_bytes(), GLOBAL_PARAMETERS)
+        # 2. If computed column commitment != column commitment, fail
+        if column_commitment != computed_column_commitment:
+            return False
+        # 3. compute column hash
+        column_hash = DAEncoder.hash_commitment_blake2b31(column_commitment)
+        # 4. Check proof with commitment and proof over the aggregated column commitment
+        chunk = BLSFieldElement.from_bytes(column_hash)
         return kzg.verify_element_proof(
             combined_eval_point,
             combined_commitment,
