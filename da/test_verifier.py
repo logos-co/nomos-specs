@@ -35,7 +35,9 @@ class TestVerifier(TestCase):
             da_blob = DABlob(
                 Column(column),
                 i,
-                encoded_data.combined_column_proofs[i],
+                encoded_data.column_commitments[i],
+                encoded_data.aggregated_column_commitment,
+                encoded_data.aggregated_column_proofs[i],
                 encoded_data.row_commitments,
             )
             self.assertIsNotNone(verifier.verify(da_blob))
@@ -49,7 +51,9 @@ class TestVerifier(TestCase):
         da_blob = DAShare(
             Column(column),
             i,
-            encoded_data.combined_column_proofs[i],
+            encoded_data.column_commitments[i],
+            encoded_data.aggregated_column_commitment,
+            encoded_data.aggregated_column_proofs[i],
             encoded_data.row_commitments,
         )
         self.assertIsNotNone(self.verifier.verify(da_blob))
@@ -57,7 +61,9 @@ class TestVerifier(TestCase):
             da_blob = DAShare(
                 Column(column),
                 i,
-                encoded_data.combined_column_proofs[i],
+                encoded_data.column_commitments[i],
+                encoded_data.aggregated_column_commitment,
+                encoded_data.aggregated_column_proofs[i],
                 encoded_data.row_commitments,
             )
             self.assertFalse(self.verifier.verify(da_blob))

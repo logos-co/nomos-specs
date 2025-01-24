@@ -29,7 +29,7 @@ class DAVerifierWApi:
         # Usually the certificate would be verifier here,
         # but we are assuming that this it is already coming from the verified block,
         # in which case all certificates had been already verified by the DA Node.
-        self.api.write(blob_metadata.blob_id, blob_metadata.metadata)
+        self.api.write(vid.blob_id, vid.metadata)
 
     def read(self, app_id, indexes) -> List[Optional[DAShare]]:
         return self.api.read(app_id, indexes)
@@ -66,10 +66,9 @@ class TestFullFlow(TestCase):
 
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
-        certificate = self.dispersal.disperse(encoded_data)
-
+        blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
         vid = BlobMetadata(
-            certificate.id(),
+            blob_id,
             Metadata(app_id, index)
         )
 
@@ -104,12 +103,12 @@ class TestFullFlow(TestCase):
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
         self.dispersal.disperse(encoded_data)
-        blob_id = build_blob_id(encoded_data.row_commitments)
+        blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
 
         # Loop through each index and simulate dispersal with the same cert_id but different metadata
         for index in indexes:
             metadata = BlobMetadata(
-                certificate.id(),
+                blob_id,
                 Metadata(app_id, index)
             )
 
