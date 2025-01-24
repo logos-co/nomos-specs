@@ -87,12 +87,23 @@ class TestEncoder(TestCase):
 
     def test_generate_combined_column_proofs(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
-        row_polynomials, row_commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix))
-        h = derive_challenge(row_commitments)
-        combined_poly = compute_combined_polynomial(row_polynomials, h)
-        proofs = self.encoder._compute_combined_column_proofs(combined_poly)
-        expected_extended_columns = self.params.column_count * 2
-        self.assertEqual(len(proofs), expected_extended_columns)
+        polynomials, commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
+        self.assertEqual(len(commitments), len(chunks_matrix[0]))
+        self.assertEqual(len(polynomials), len(chunks_matrix[0]))
+
+    def test_generate_aggregated_column_commitments(self):
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
+        poly, commitment = self.encoder._compute_aggregated_column_commitment(column_commitments)
+        self.assertIsNotNone(poly)
+        self.assertIsNotNone(commitment)
+
+    def test_generate_aggregated_column_proofs(self):
+        chunks_matrix = self.encoder._chunkify_data(self.data)
+        _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
+        poly, _ = self.encoder._compute_aggregated_column_commitment(column_commitments)
+        proofs = self.encoder._compute_aggregated_column_proofs(poly, column_commitments)
+        self.assertEqual(len(proofs), len(column_commitments))
 
     def test_encode(self):
         from random import randbytes
