@@ -7,6 +7,8 @@ from eth2spec.eip7594.mainnet import Bytes32, KZGCommitment as Commitment
 from py_ecc.bls import G2ProofOfPossession
 
 
+type BlobId = bytes
+
 class NodeId(Bytes32):
     pass
 
@@ -56,7 +58,7 @@ class Certificate:
     row_commitments: List[Commitment]
 
     def id(self) -> bytes:
-        return build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
+        return build_blob_id(self.aggregated_column_commitment, self.row_commitments)
 
     def verify(self, nodes_public_keys: List[BLSPublicKey]) -> bool:
         """
@@ -66,11 +68,11 @@ class Certificate:
         """
         # we sort them as the signers bitfield is sorted by the public keys as well
         signers_keys = list(compress(sorted(nodes_public_keys), self.signers))
-        message = build_attestation_message(self.aggregated_column_commitment, self.row_commitments)
+        message = build_blob_id(self.aggregated_column_commitment, self.row_commitments)
         return NomosDaG2ProofOfPossession.AggregateVerify(signers_keys, [message]*len(signers_keys), self.aggregated_signatures)
 
 
-def build_attestation_message(aggregated_column_commitment: Commitment, row_commitments: Sequence[Commitment]) -> bytes:
+def build_blob_id(aggregated_column_commitment: Commitment, row_commitments: Sequence[Commitment]) -> BlobId:
     hasher = sha3_256()
     hasher.update(bytes(aggregated_column_commitment))
     for c in row_commitments:

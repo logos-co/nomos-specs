@@ -9,7 +9,7 @@ from eth2spec.eip7594.mainnet import (
 )
 
 import da.common
-from da.common import Column, Chunk, Attestation, BLSPrivateKey, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
+from da.common import Column, Chunk, Attestation, BlobId, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import ROOTS_OF_UNITY, GLOBAL_PARAMETERS, BLS_MODULUS
@@ -24,17 +24,16 @@ class DABlob:
     rows_commitments: List[Commitment]
     rows_proofs: List[Proof]
 
-    def id(self) -> bytes:
-        return da.common.build_attestation_message(self.aggregated_column_commitment, self.rows_commitments)
+    def blob_id(self) -> bytes:
+        return da.common.build_blob_id(self.aggregated_column_commitment, self.rows_commitments)
 
     def column_id(self) -> bytes:
         return sha3_256(self.column.as_bytes()).digest()
 
 
 class DAVerifier:
-    def __init__(self, sk: BLSPrivateKey, nodes_pks: List[BLSPublicKey]):
-        self.attested_blobs: Dict[bytes, (bytes, Attestation)] = dict()
-        self.sk = sk
+    def __init__(self, nodes_pks: List[BLSPublicKey]):
+        self.attested_blobs: Set[BlobId] = set()
         self.index = nodes_pks.index(bls_pop.SkToPk(self.sk))
 
     @staticmethod
@@ -77,16 +76,8 @@ class DAVerifier:
                 return False
         return True
 
-    def _build_attestation(self, blob: DABlob) -> Attestation:
-        hasher = sha3_256()
-        hasher.update(bytes(blob.aggregated_column_commitment))
-        for c in blob.rows_commitments:
-            hasher.update(bytes(c))
-        message = hasher.digest()
-        return Attestation(signature=bls_pop.Sign(self.sk, message))
-
-    def verify(self, blob: DABlob) -> Optional[Attestation]:
-        blob_id = blob.id()
+    def verify(self, blob: DABlob) -> bool:
+        blob_id = blob.blob_id()
         if previous_attestation := self.attested_blobs.get(blob_id):
             column_id, attestation = previous_attestation
             # we already attested, is cached so we return it
@@ -94,7 +85,7 @@ class DAVerifier:
                 return attestation
             # we already attested and they are asking us to attest the same data different column
             # skip
-            return None
+            return False
         is_column_verified = DAVerifier._verify_column(
             blob.column,
             blob.column_commitment,
@@ -103,12 +94,11 @@ class DAVerifier:
             self.index
         )
         if not is_column_verified:
-            return
+            return False
         are_chunks_verified = DAVerifier._verify_chunks(
             blob.column, blob.rows_commitments, blob.rows_proofs, self.index
         )
         if not are_chunks_verified:
-            return
-        attestation = self._build_attestation(blob)
-        self.attested_blobs[blob_id] = (blob.column_id(), attestation)
-        return attestation
+            return False
+        self.attested_blobs.add(blob_id)
+        return True

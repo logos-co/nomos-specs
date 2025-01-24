@@ -2,7 +2,7 @@ from itertools import chain
 from unittest import TestCase
 from typing import List, Optional
 
-from da.common import NodeId, build_attestation_message, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
+from da.common import NodeId, build_blob_id, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
 from da.api.common import DAApi, VID, Metadata
 from da.verifier import DAVerifier, DABlob 
 from da.api.test_flow import MockStore
@@ -21,7 +21,7 @@ class DAVerifierWApi:
         if attestation := self.verifier.verify(blob):
             # Warning: If aggregated col commitment and row commitment are the same,
             # the build_attestation_message method will produce the same output.
-            cert_id = build_attestation_message(blob.aggregated_column_commitment, blob.rows_commitments)
+            cert_id = build_blob_id(blob.aggregated_column_commitment, blob.rows_commitments)
             self.store.populate(blob, cert_id)
             return attestation
 

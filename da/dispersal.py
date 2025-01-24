@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from hashlib import sha3_256
 from typing import List, Optional, Generator, Sequence
 
-from da.common import Certificate, NodeId, BLSPublicKey, Bitfield, build_attestation_message, NomosDaG2ProofOfPossession as bls_pop
+from da.common import Certificate, NodeId, BLSPublicKey, Bitfield, build_blob_id, NomosDaG2ProofOfPossession as bls_pop
 from da.encoder import EncodedData
 from da.verifier import DABlob, Attestation
 
@@ -68,7 +68,7 @@ class Dispersal:
 
     @staticmethod
     def _build_attestation_message(encoded_data: EncodedData) -> bytes:
-        return build_attestation_message(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
+        return build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
 
     def disperse(self, encoded_data: EncodedData) -> Optional[Certificate]:
         attestations = []
