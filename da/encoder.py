@@ -6,7 +6,6 @@ from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Pr
 
 from da.common import ChunksMatrix, Chunk, Row
 from da.kzg_rs import kzg, rs
-from da.kzg_rs.bdfg_proving import derive_challenge
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY, BYTES_PER_FIELD_ELEMENT
 from da.kzg_rs.poly import Polynomial
 from da.kzg_rs.bdfg_proving import compute_combined_polynomial

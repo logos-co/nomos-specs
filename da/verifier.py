@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List
+from hashlib import sha3_256
+from typing import List, Sequence, Set
 
 from eth2spec.eip7594.mainnet import (
     KZGCommitment as Commitment,

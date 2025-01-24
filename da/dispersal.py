@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import List, Generator
 
-from da.common import Certificate, NodeId, BLSPublicKey, Bitfield, build_blob_id, NomosDaG2ProofOfPossession as bls_pop
+from da.common import NodeId
 from da.encoder import EncodedData
-from da.verifier import DAShare
+from da.verifier import DABlob
 
 
 @dataclass
