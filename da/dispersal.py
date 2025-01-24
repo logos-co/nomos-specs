@@ -1,10 +1,9 @@
 from dataclasses import dataclass
-from hashlib import sha3_256
-from typing import List, Optional, Generator, Sequence
+from typing import List, Generator
 
-from da.common import Certificate, NodeId, BLSPublicKey, Bitfield, build_blob_id, NomosDaG2ProofOfPossession as bls_pop
+from da.common import NodeId
 from da.encoder import EncodedData
-from da.verifier import DABlob, Attestation
+from da.verifier import DABlob
 
 
 @dataclass

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from hashlib import sha3_256
-from typing import List, Optional, Sequence, Set, Dict
+from typing import List, Sequence, Set
 
 from eth2spec.deneb.mainnet import BLSFieldElement
 from eth2spec.eip7594.mainnet import (
