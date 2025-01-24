@@ -32,41 +32,15 @@ class Dispersal:
             )
             yield blob
 
-    def _send_and_await_response(self, node: NodeId, blob: DAShare) -> bool:
+    def _send_and_await_response(self, node: NodeId, blob: DABlob) -> bool:
         pass
 
-    def _build_certificate(
-            self,
-            encoded_data: EncodedData,
-            attestations: Sequence[Attestation],
-            signers: Bitfield
-    ) -> Certificate:
-        assert len(attestations) >= self.settings.threshold
-        assert len(attestations) == signers.count(True)
-        aggregated = bls_pop.Aggregate([attestation.signature for attestation in attestations])
-        return Certificate(
-            aggregated_signatures=aggregated,
-            signers=signers,
-            aggregated_column_commitment=encoded_data.aggregated_column_commitment,
-            row_commitments=encoded_data.row_commitments
-        )
-
-    @staticmethod
-    def _verify_attestation(public_key: BLSPublicKey, attested_message: bytes, attestation: Attestation) -> bool:
-        return bls_pop.Verify(public_key, attested_message, attestation.signature)
-
-    @staticmethod
-    def _build_attestation_message(encoded_data: EncodedData) -> bytes:
-        return build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
-
-    def disperse(self, encoded_data: EncodedData) -> Optional[Certificate]:
+    def disperse(self, encoded_data: EncodedData):
         attestations = []
-        attested_message = self._build_attestation_message(encoded_data)
-        signed = Bitfield(False for _ in range(len(self.settings.nodes_ids)))
         blob_data = zip(
             self.settings.nodes_ids,
             self._prepare_data(encoded_data)
         )
-        for node, blob in blob_data:
+        for i, node, blob in blob_data:
             self._send_and_await_response(node, blob)
 

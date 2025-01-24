@@ -2,8 +2,8 @@ from unittest import TestCase
 
 from da.encoder import DAEncoderParams, DAEncoder
 from da.test_encoder import TestEncoder
-from da.verifier import DAVerifier, DAShare
-from da.common import NodeId
+from da.verifier import DAVerifier, DABlob
+from da.common import NodeId, NomosDaG2ProofOfPossession as bls_pop
 from da.dispersal import Dispersal, DispersalSettings
 
 
@@ -25,15 +25,11 @@ class TestDispersal(TestCase):
         encoded_data = DAEncoder(encoding_params).encode(data)
 
         # mock send and await method with local verifiers
-        verifiers_res = []
-        def __send_and_await_response(_, blob: DAShare):
+        def __send_and_await_response(blob: DABlob):
             verifier = DAVerifier()
-            res = verifier.verify(blob)
-            verifiers_res.append(res)
-            return res
+            return verifier.verify(blob)
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
-        self.dispersal.disperse(encoded_data)
-        for res in verifiers_res:
-            self.assertTrue(res)
+
+        self.assertTrue(self.dispersal.disperse(encoded_data))
 
