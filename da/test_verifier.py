@@ -1,11 +1,11 @@
 from unittest import TestCase
 
-from da.common import Column, NomosDaG2ProofOfPossession as bls_pop
+from da.common import Column
 from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY
 from da.test_encoder import TestEncoder
-from da.verifier import Attestation, DAVerifier, DABlob
+from da.verifier import DAVerifier, DABlob
 
 
 class TestVerifier(TestCase):
