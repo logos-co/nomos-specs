@@ -6,7 +6,9 @@ from eth2spec.eip7594.mainnet import (
     KZGProof as Proof,
 )
 
-from da.common import Column, BlobId, build_blob_id
+import da.common
+from da.common import Column, Chunk, Attestation, BlobId, BLSPublicKey, NomosDaG2ProofOfPossession as bls_pop
+from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.bdfg_proving import combine_commitments, derive_challenge, compute_combined_evaluation
 from da.kzg_rs.common import ROOTS_OF_UNITY
@@ -17,14 +19,26 @@ _DST = b"NOMOS_DA_V1"
 @dataclass
 class DAShare:
     column: Column
-    column_idx: int
-    combined_column_proof: Proof
-    row_commitments: List[Commitment]
+    column_commitment: Commitment
+    aggregated_column_commitment: Commitment
+    aggregated_column_proof: Proof
+    rows_commitments: List[Commitment]
+    rows_proofs: List[Proof]
+
+    def blob_id(self) -> bytes:
+        return da.common.build_blob_id(self.aggregated_column_commitment, self.rows_commitments)
+
+    def column_id(self) -> bytes:
+        return sha3_256(self.column.as_bytes()).digest()
 
     def blob_id(self) -> BlobId:
         return build_blob_id(self.row_commitments)
 
 class DAVerifier:
+    def __init__(self, nodes_pks: List[BLSPublicKey]):
+        self.attested_blobs: Set[BlobId] = set()
+        self.index = nodes_pks.index(bls_pop.SkToPk(self.sk))
+
     @staticmethod
     def _verify_column(
             column: Column,
@@ -49,3 +63,49 @@ class DAVerifier:
             blob.column_idx,
             ROOTS_OF_UNITY
         )
+
+    @staticmethod
+    def _verify_chunk(chunk: Chunk, commitment: Commitment, proof: Proof, index: int) -> bool:
+        chunk = BLSFieldElement(int.from_bytes(bytes(chunk)) % BLS_MODULUS)
+        return kzg.verify_element_proof(chunk, commitment, proof, index, ROOTS_OF_UNITY)
+
+    @staticmethod
+    def _verify_chunks(
+            chunks: Sequence[Chunk],
+            commitments: Sequence[Commitment],
+            proofs: Sequence[Proof],
+            index: int
+    ) -> bool:
+        if not (len(chunks) == len(commitments) == len(proofs)):
+            return False
+        for chunk, commitment, proof in zip(chunks, commitments, proofs):
+            if not DAVerifier._verify_chunk(chunk, commitment, proof, index):
+                return False
+        return True
+
+    def verify(self, blob: DABlob) -> bool:
+        blob_id = blob.blob_id()
+        if previous_attestation := self.attested_blobs.get(blob_id):
+            column_id, attestation = previous_attestation
+            # we already attested, is cached so we return it
+            if column_id == blob.column_id():
+                return attestation
+            # we already attested and they are asking us to attest the same data different column
+            # skip
+            return False
+        is_column_verified = DAVerifier._verify_column(
+            blob.column,
+            blob.column_commitment,
+            blob.aggregated_column_commitment,
+            blob.aggregated_column_proof,
+            self.index
+        )
+        if not is_column_verified:
+            return False
+        are_chunks_verified = DAVerifier._verify_chunks(
+            blob.column, blob.rows_commitments, blob.rows_proofs, self.index
+        )
+        if not are_chunks_verified:
+            return False
+        self.attested_blobs.add(blob_id)
+        return True

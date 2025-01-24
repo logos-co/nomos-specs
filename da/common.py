@@ -8,6 +8,8 @@ from py_ecc.bls import G2ProofOfPossession
 
 type BlobId = bytes
 
+type BlobId = bytes
+
 class NodeId(Bytes32):
     pass
 
@@ -40,8 +42,36 @@ class Bitfield(List[bool]):
     pass
 
 
-def build_blob_id(row_commitments: Sequence[Commitment]) -> BlobId:
-    hasher = blake2b(digest_size=32)
+@dataclass
+class Attestation:
+    signature: BLSSignature
+
+
+@dataclass
+class Certificate:
+    aggregated_signatures: BLSSignature
+    signers: Bitfield
+    aggregated_column_commitment: Commitment
+    row_commitments: List[Commitment]
+
+    def id(self) -> bytes:
+        return build_blob_id(self.aggregated_column_commitment, self.row_commitments)
+
+    def verify(self, nodes_public_keys: List[BLSPublicKey]) -> bool:
+        """
+        List of nodes public keys should be a trusted list of verified proof of possession keys.
+        Otherwise, we could fall under the Rogue Key Attack
+        `assert all(bls_pop.PopVerify(pk, proof) for pk, proof in zip(node_public_keys, pops))`
+        """
+        # we sort them as the signers bitfield is sorted by the public keys as well
+        signers_keys = list(compress(sorted(nodes_public_keys), self.signers))
+        message = build_blob_id(self.aggregated_column_commitment, self.row_commitments)
+        return NomosDaG2ProofOfPossession.AggregateVerify(signers_keys, [message]*len(signers_keys), self.aggregated_signatures)
+
+
+def build_blob_id(aggregated_column_commitment: Commitment, row_commitments: Sequence[Commitment]) -> BlobId:
+    hasher = sha3_256()
+    hasher.update(bytes(aggregated_column_commitment))
     for c in row_commitments:
         hasher.update(bytes(c))
     return hasher.digest()
