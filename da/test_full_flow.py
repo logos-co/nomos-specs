@@ -18,18 +18,17 @@ class DAVerifierWApi:
         self.verifier = DAVerifier()
 
     def receive_blob(self, blob: DABlob):
-        if attestation := self.verifier.verify(blob):
+        if self.verifier.verify(blob):
             # Warning: If aggregated col commitment and row commitment are the same,
             # the build_attestation_message method will produce the same output.
-            cert_id = build_blob_id(blob.aggregated_column_commitment, blob.rows_commitments)
-            self.store.populate(blob, cert_id)
-            return attestation
+            blob_id = build_blob_id(blob.aggregated_column_commitment, blob.rows_commitments)
+            self.store.populate(blob, blob_id)
 
-    def receive_metadata(self, vid: BlobMetadata):
+    def receive_metadata(self, blob_metadata: BlobMetadata):
         # Usually the certificate would be verifier here,
         # but we are assuming that this it is already coming from the verified block,
         # in which case all certificates had been already verified by the DA Node.
-        self.api.write(vid.blob_id, vid.metadata)
+        self.api.write(blob_metadata.blob_id, blob_metadata.metadata)
 
     def read(self, app_id, indexes) -> List[Optional[DABlob]]:
         return self.api.read(app_id, indexes)
@@ -62,19 +61,19 @@ class TestFullFlow(TestCase):
         # mock send and await method with local verifiers
         def __send_and_await_response(node: int, blob: DABlob):
             node = self.api_nodes[int.from_bytes(node)]
-            return node.receive_blob(blob)
+            node.receive_blob(blob)
 
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
         blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
-        vid = BlobMetadata(
+        blob_metadata = BlobMetadata(
             blob_id,
             Metadata(app_id, index)
         )
 
         # verifier
         for node in self.api_nodes:
-            node.receive_metadata(vid)
+            node.receive_metadata(blob_metadata)
 
         # read from api and confirm its working
         # notice that we need to sort the api_nodes by their public key to have the blobs sorted in the same fashion

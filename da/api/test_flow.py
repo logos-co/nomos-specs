@@ -14,8 +14,8 @@ class MockStore(BlobStore):
         self.blob_store = {}
         self.app_id_store = defaultdict(dict)
 
-    def populate(self, blob, cert_id: bytes):
-        self.blob_store[cert_id] = blob
+    def populate(self, blob, blob_id: BlobId):
+        self.blob_store[blob_id] = blob
 
     # Implements `add` method from BlobStore abstract class.
     def add(self, cert_id: bytes, metadata: Metadata):
