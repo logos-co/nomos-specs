@@ -5,7 +5,7 @@ from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY
 from da.test_encoder import TestEncoder
-from da.verifier import DAVerifier, DAShare
+from da.verifier import DAVerifier, DABlob
 
 
 class TestVerifier(TestCase):
