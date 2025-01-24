@@ -51,7 +51,7 @@ class DAVerifier:
         if column_commitment != computed_column_commitment:
             return False
         # 3. compute column hash
-        column_hash = DAEncoder.hash_column_and_commitment(column, column_commitment)
+        column_hash = DAEncoder.hash_commitment_blake2b31(column_commitment)
         # 4. Check proof with commitment and proof over the aggregated column commitment
         chunk = BLSFieldElement.from_bytes(column_hash)
         return kzg.verify_element_proof(

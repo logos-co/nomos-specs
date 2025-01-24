@@ -17,7 +17,7 @@ class TestVerifier(TestCase):
         column = Column(int.to_bytes(i, length=32) for i in range(8))
         _, column_commitment = kzg.bytes_to_commitment(column.as_bytes(), GLOBAL_PARAMETERS)
         aggregated_poly, aggregated_column_commitment = kzg.bytes_to_commitment(
-            DAEncoder.hash_column_and_commitment(column, column_commitment), GLOBAL_PARAMETERS
+            DAEncoder.hash_commitment_blake2b31(column_commitment), GLOBAL_PARAMETERS
         )
         aggregated_proof = kzg.generate_element_proof(0, aggregated_poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
         self.assertTrue(

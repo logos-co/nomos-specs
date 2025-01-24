@@ -89,7 +89,7 @@ class DAEncoder:
         chunks_matrix: ChunksMatrix, column_commitments: Sequence[Commitment]
     ) -> Tuple[Polynomial, Commitment]:
         data = bytes(chain.from_iterable(
-            DAEncoder.hash_column_and_commitment(column, commitment)
+            DAEncoder.hash_commitment_blake2b31(column, commitment)
             for column, commitment in zip(chunks_matrix.columns, column_commitments)
         ))
         return kzg.bytes_to_commitment(data, GLOBAL_PARAMETERS)
@@ -129,8 +129,5 @@ class DAEncoder:
         return result
 
     @staticmethod
-    def hash_column_and_commitment(column: Column, commitment: Commitment) -> bytes:
-        return (
-            # digest size must be 31 bytes as we cannot encode 32 without risking overflowing the BLS_MODULUS
-            int.from_bytes(blake2b(column.as_bytes() + bytes(commitment), digest_size=31).digest())
-        ).to_bytes(32, byteorder="big")
+    def hash_commitment_blake2b31(commitment: Commitment) -> bytes:
+        return blake2b(bytes(commitment), digest_size=31).digest()
