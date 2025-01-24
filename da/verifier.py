@@ -18,6 +18,7 @@ from da.kzg_rs.common import ROOTS_OF_UNITY, GLOBAL_PARAMETERS, BLS_MODULUS
 @dataclass
 class DABlob:
     column: Column
+    column_idx: int
     column_commitment: Commitment
     aggregated_column_commitment: Commitment
     aggregated_column_proof: Proof
@@ -32,17 +33,16 @@ class DABlob:
 
 
 class DAVerifier:
-    def __init__(self, nodes_pks: List[BLSPublicKey]):
+    def __init__(self):
         self.attested_blobs: Set[BlobId] = set()
-        self.index = nodes_pks.index(bls_pop.SkToPk(self.sk))
 
     @staticmethod
     def _verify_column(
             column: Column,
+            column_idx: int,
             column_commitment: Commitment,
             aggregated_column_commitment: Commitment,
             aggregated_column_proof: Proof,
-            index: int
     ) -> bool:
         # 1. compute commitment for column
         _, computed_column_commitment = kzg.bytes_to_commitment(column.as_bytes(), GLOBAL_PARAMETERS)
@@ -54,7 +54,7 @@ class DAVerifier:
         # 4. Check proof with commitment and proof over the aggregated column commitment
         chunk = BLSFieldElement.from_bytes(column_hash)
         return kzg.verify_element_proof(
-            chunk, aggregated_column_commitment, aggregated_column_proof, index, ROOTS_OF_UNITY
+            chunk, aggregated_column_commitment, aggregated_column_proof, column_idx, ROOTS_OF_UNITY
         )
 
     @staticmethod
@@ -78,25 +78,21 @@ class DAVerifier:
 
     def verify(self, blob: DABlob) -> bool:
         blob_id = blob.blob_id()
-        if previous_attestation := self.attested_blobs.get(blob_id):
-            column_id, attestation = previous_attestation
-            # we already attested, is cached so we return it
-            if column_id == blob.column_id():
-                return attestation
-            # we already attested and they are asking us to attest the same data different column
+        if blob_id in self.attested_blobs:
+            # we already attested and they are asking us to attest again
             # skip
             return False
         is_column_verified = DAVerifier._verify_column(
             blob.column,
+            blob.column_idx,
             blob.column_commitment,
             blob.aggregated_column_commitment,
             blob.aggregated_column_proof,
-            self.index
         )
         if not is_column_verified:
             return False
         are_chunks_verified = DAVerifier._verify_chunks(
-            blob.column, blob.rows_commitments, blob.rows_proofs, self.index
+            blob.column, blob.rows_commitments, blob.rows_proofs, blob.column_idx
         )
         if not are_chunks_verified:
             return False
