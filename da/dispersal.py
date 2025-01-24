@@ -44,12 +44,10 @@ class Dispersal:
         pass
 
     def disperse(self, encoded_data: EncodedData):
-        attestations = []
         blob_data = zip(
-            range(len(self.settings.nodes_ids)),
             self.settings.nodes_ids,
             self._prepare_data(encoded_data)
         )
-        for i, node, blob in blob_data:
+        for node, blob in blob_data:
             self._send_and_await_response(node, blob)
 

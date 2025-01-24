@@ -26,11 +26,15 @@ class TestDispersal(TestCase):
         encoded_data = DAEncoder(encoding_params).encode(data)
 
         # mock send and await method with local verifiers
-        def __send_and_await_response(blob: DABlob):
+        verifiers_res = []
+        def __send_and_await_response(_, blob: DABlob):
             verifier = DAVerifier()
-            return verifier.verify(blob)
+            res = verifier.verify(blob)
+            verifiers_res.append(res)
+            return res
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
-
-        self.assertTrue(self.dispersal.disperse(encoded_data))
+        self.dispersal.disperse(encoded_data)
+        for res in verifiers_res:
+            self.assertTrue(res)
 

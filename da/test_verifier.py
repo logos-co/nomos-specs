@@ -34,6 +34,7 @@ class TestVerifier(TestCase):
             verifier = DAVerifier()
             da_blob = DABlob(
                 Column(column),
+                i,
                 encoded_data.column_commitments[i],
                 encoded_data.aggregated_column_commitment,
                 encoded_data.aggregated_column_proofs[i],
@@ -50,6 +51,7 @@ class TestVerifier(TestCase):
         i, column = next(columns)
         da_blob = DABlob(
             Column(column),
+            i,
             encoded_data.column_commitments[i],
             encoded_data.aggregated_column_commitment,
             encoded_data.aggregated_column_proofs[i],
@@ -60,6 +62,7 @@ class TestVerifier(TestCase):
         for i, column in columns:
             da_blob = DABlob(
                 Column(column),
+                i,
                 encoded_data.column_commitments[i],
                 encoded_data.aggregated_column_commitment,
                 encoded_data.aggregated_column_proofs[i],
