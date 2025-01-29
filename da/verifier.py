@@ -33,9 +33,6 @@ class DABlob:
 
 
 class DAVerifier:
-    def __init__(self):
-        self.attested_blobs: Set[BlobId] = set()
-
     @staticmethod
     def _verify_column(
             column: Column,
@@ -77,11 +74,18 @@ class DAVerifier:
         return True
 
     def verify(self, blob: DABlob) -> bool:
-        blob_id = blob.blob_id()
-        if blob_id in self.attested_blobs:
-            # we already attested and they are asking us to attest again
-            # skip
-            return False
+        """
+        Verify the integrity of the given blob.
+
+        This function must be idempotent. The implementer should ensure that
+        repeated verification attempts do not result in inconsistent states.
+
+        Args:
+            blob (DABlob): The blob to verify.
+
+        Returns:
+            bool: True if the blob is verified successfully, False otherwise.
+        """
         is_column_verified = DAVerifier._verify_column(
             blob.column,
             blob.column_idx,
@@ -91,10 +95,12 @@ class DAVerifier:
         )
         if not is_column_verified:
             return False
+
         are_chunks_verified = DAVerifier._verify_chunks(
             blob.column, blob.rows_commitments, blob.rows_proofs, blob.column_idx
         )
         if not are_chunks_verified:
             return False
-        self.attested_blobs.add(blob_id)
+
+        # Ensure idempotency: Implementers should define how to avoid redundant verification.
         return True
