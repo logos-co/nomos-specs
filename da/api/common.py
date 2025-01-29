@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, List, Sequence
 
-from da.common import Certificate
+from da.common import BlobId
 from da.verifier import DABlob
 
 
@@ -15,16 +15,16 @@ class Metadata:
 
 
 @dataclass
-class VID:
-    # da certificate id
-    cert_id: bytes
+class BlobMetadata:
+    # da blob_id id
+    blob_id: BlobId
     # application + index information
     metadata: Metadata
 
 
 class BlobStore(ABC):
     @abstractmethod
-    def add(self, certificate: Certificate, metadata: Metadata):
+    def add(self, id: BlobId, metadata: Metadata):
         """
         Raises: ValueError if there is already a registered certificate fot the given metadata
         """
@@ -39,14 +39,14 @@ class DAApi:
     def __init__(self, bs: BlobStore):
         self.store = bs
 
-    def write(self, certificate: Certificate, metadata: Metadata):
+    def write(self, id: BlobId, metadata: Metadata):
         """
         Write method should be used by a service that is able to retrieve verified certificates
         from the latest Block. Once a certificate is retrieved, api creates a relation between
         the blob of an original data, certificate and index for the app_id of the certificate.
         Raises: ValueError if there is already a registered certificate for a given metadata
         """
-        self.store.add(certificate, metadata)
+        self.store.add(id, metadata)
 
     def read(self, app_id, indexes) -> List[Optional[DABlob]]:
         """

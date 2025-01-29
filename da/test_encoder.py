@@ -47,7 +47,7 @@ class TestEncoder(TestCase):
 
         # verify column aggregation
         for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.aggregated_column_proofs)):
-            data = DAEncoder.hash_column_and_commitment(column, commitment)
+            data = DAEncoder.hash_commitment_blake2b31(commitment)
             kzg.verify_element_proof(
                 bytes_to_bls_field(data),
                 encoded_data.aggregated_column_commitment,
@@ -109,14 +109,14 @@ class TestEncoder(TestCase):
     def test_generate_aggregated_column_commitments(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
         _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
-        poly, commitment = self.encoder._compute_aggregated_column_commitment(chunks_matrix, column_commitments)
+        poly, commitment = self.encoder._compute_aggregated_column_commitment(column_commitments)
         self.assertIsNotNone(poly)
         self.assertIsNotNone(commitment)
 
     def test_generate_aggregated_column_proofs(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
         _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
-        poly, _ = self.encoder._compute_aggregated_column_commitment(chunks_matrix, column_commitments)
+        poly, _ = self.encoder._compute_aggregated_column_commitment(column_commitments)
         proofs = self.encoder._compute_aggregated_column_proofs(poly, column_commitments)
         self.assertEqual(len(proofs), len(column_commitments))
 

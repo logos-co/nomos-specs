@@ -14,8 +14,8 @@ class MockStore(BlobStore):
         self.blob_store = {}
         self.app_id_store = defaultdict(dict)
 
-    def populate(self, blob, cert_id: bytes):
-        self.blob_store[cert_id] = blob
+    def populate(self, blob, blob_id: BlobId):
+        self.blob_store[blob_id] = blob
 
     # Implements `add` method from BlobStore abstract class.
     def add(self, cert_id: bytes, metadata: Metadata):
@@ -35,36 +35,36 @@ class MockStore(BlobStore):
 class TestFlow(TestCase):
     def test_api_write_read(self):
         expected_blob = "hello"
-        cert_id = b"11"*32
+        blob_id = b"11"*32
         app_id = 1
         idx = 1
         mock_meta = Metadata(1, 1)
 
         mock_store = MockStore()
-        mock_store.populate(expected_blob, cert_id)
+        mock_store.populate(expected_blob, blob_id)
 
         api = DAApi(mock_store)
 
-        api.write(cert_id, mock_meta)
+        api.write(blob_id, mock_meta)
         blobs = api.read(app_id, [idx])
 
         self.assertEqual([expected_blob], blobs)
 
     def test_same_index(self):
         expected_blob = "hello"
-        cert_id = b"11"*32
+        blob_id = b"11"*32
         app_id = 1
         idx = 1
         mock_meta = Metadata(1, 1)
 
         mock_store = MockStore()
-        mock_store.populate(expected_blob, cert_id)
+        mock_store.populate(expected_blob, blob_id)
 
         api = DAApi(mock_store)
 
-        api.write(cert_id, mock_meta)
+        api.write(blob_id, mock_meta)
         with self.assertRaises(ValueError):
-            api.write(cert_id, mock_meta)
+            api.write(blob_id, mock_meta)
 
         blobs = api.read(app_id, [idx])
 
@@ -72,7 +72,7 @@ class TestFlow(TestCase):
 
     def test_multiple_indexes_same_data(self):
         expected_blob = "hello"
-        cert_id = b"11"*32
+        blob_id = b"11"*32
         app_id = 1
         idx1 = 1
         idx2 = 2
@@ -80,13 +80,13 @@ class TestFlow(TestCase):
         mock_meta2 = Metadata(app_id, idx2)
 
         mock_store = MockStore()
-        mock_store.populate(expected_blob, cert_id)
+        mock_store.populate(expected_blob, blob_id)
 
         api = DAApi(mock_store)
 
-        api.write(cert_id, mock_meta1)
-        mock_store.populate(expected_blob, cert_id)
-        api.write(cert_id, mock_meta2)
+        api.write(blob_id, mock_meta1)
+        mock_store.populate(expected_blob, blob_id)
+        api.write(blob_id, mock_meta2)
 
         blobs_idx1 = api.read(app_id, [idx1])
         blobs_idx2 = api.read(app_id, [idx2])
