@@ -65,6 +65,7 @@ class TestFullFlow(TestCase):
 
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
+        self.dispersal.disperse(encoded_data)
         blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
         blob_metadata = BlobMetadata(
             blob_id,
