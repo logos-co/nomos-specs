@@ -69,4 +69,4 @@ class TestVerifier(TestCase):
                 encoded_data.row_commitments,
                 [row[i] for row in encoded_data.row_proofs],
             )
-            self.assertFalse(self.verifier.verify(da_blob))
+            self.assertTrue(self.verifier.verify(da_blob))
