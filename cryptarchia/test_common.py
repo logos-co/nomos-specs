@@ -1,7 +1,5 @@
 from .cryptarchia import (
     Config,
-    TimeConfig,
-    Id,
     Slot,
     Coin,
     BlockHeader,
@@ -20,19 +18,18 @@ class TestNode:
 
     def epoch_state(self, slot: Slot):
         return self.follower.compute_epoch_state(
-            slot.epoch(self.config), self.follower.local_chain
+            slot.epoch(self.config), self.follower.tip_id()
         )
 
     def on_slot(self, slot: Slot) -> BlockHeader | None:
         parent = self.follower.tip_id()
         epoch_state = self.epoch_state(slot)
         if leader_proof := self.leader.try_prove_slot_leader(epoch_state, slot, parent):
-            orphans = self.follower.unimported_orphans(parent)
             self.leader.coin = self.leader.coin.evolve()
             return BlockHeader(
                 parent=parent,
                 slot=slot,
-                orphaned_proofs=orphans,
+                orphaned_proofs=self.follower.unimported_orphans(),
                 leader_proof=leader_proof,
                 content_size=0,
                 content_id=bytes(32),
@@ -53,7 +50,15 @@ def mk_config(initial_stake_distribution: list[Coin]) -> Config:
 
 def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
     return LedgerState(
-        block=bytes(32),
+        block=BlockHeader(
+            slot=Slot(0),
+            parent=bytes(32),
+            content_size=0,
+            content_id=bytes(32),
+            leader_proof=MockLeaderProof.new(
+                Coin(sk=0, value=0), Slot(0), parent=bytes(32)
+            ),
+        ),
         nonce=bytes(32),
         commitments_spend={c.commitment() for c in initial_stake_distribution},
         commitments_lead={c.commitment() for c in initial_stake_distribution},
@@ -62,26 +67,30 @@ def mk_genesis_state(initial_stake_distribution: list[Coin]) -> LedgerState:
 
 
 def mk_block(
-    parent: Id, slot: int, coin: Coin, content=bytes(32), orphaned_proofs=[]
+    parent: BlockHeader, slot: int, coin: Coin, content=bytes(32), orphaned_proofs=[]
 ) -> BlockHeader:
-    assert len(parent) == 32
+    assert type(parent) == BlockHeader, type(parent)
+    assert type(slot) == int, type(slot)
     from hashlib import sha256
 
     return BlockHeader(
         slot=Slot(slot),
-        parent=parent,
+        parent=parent.id(),
         content_size=len(content),
         content_id=sha256(content).digest(),
-        leader_proof=MockLeaderProof.new(coin, Slot(slot), parent=parent),
+        leader_proof=MockLeaderProof.new(coin, Slot(slot), parent=parent.id()),
         orphaned_proofs=orphaned_proofs,
     )
 
 
-def mk_chain(parent, coin: Coin, slots: list[int]) -> tuple[list[BlockHeader], Coin]:
+def mk_chain(
+    parent: BlockHeader, coin: Coin, slots: list[int]
+) -> tuple[list[BlockHeader], Coin]:
+    assert type(parent) == BlockHeader
     chain = []
     for s in slots:
         block = mk_block(parent=parent, slot=s, coin=coin)
         chain.append(block)
-        parent = block.id()
+        parent = block
         coin = coin.evolve()
     return chain, coin

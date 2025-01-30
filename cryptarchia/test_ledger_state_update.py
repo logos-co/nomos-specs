@@ -2,22 +2,33 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import (
-    Follower,
-    TimeConfig,
-    BlockHeader,
-    Config,
-    Coin,
-    LedgerState,
-    MockLeaderProof,
-    Slot,
-    Id,
-)
+from .cryptarchia import Follower, Coin, iter_chain
 
 from .test_common import mk_config, mk_block, mk_genesis_state
 
 
 class TestLedgerStateUpdate(TestCase):
+    def test_on_block_idempotent(self):
+        leader_coin = Coin(sk=0, value=100)
+        genesis = mk_genesis_state([leader_coin])
+
+        follower = Follower(genesis, mk_config([leader_coin]))
+
+        block = mk_block(slot=0, parent=genesis.block, coin=leader_coin)
+        follower.on_block(block)
+
+        # Follower should have accepted the block
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
+        assert follower.tip() == block
+
+        follower.on_block(block)
+
+        # Should have been a No-op
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
+        assert follower.tip() == block
+        assert len(follower.ledger_state) == 2
+        assert len(follower.forks) == 0
+
     def test_ledger_state_prevents_coin_reuse(self):
         leader_coin = Coin(sk=0, value=100)
         genesis = mk_genesis_state([leader_coin])
@@ -28,17 +39,17 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block)
 
         # Follower should have accepted the block
-        assert follower.local_chain.length() == 1
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
         assert follower.tip() == block
 
         # Follower should have updated their ledger state to mark the leader coin as spent
         assert follower.tip_state().verify_unspent(leader_coin.nullifier()) == False
 
-        reuse_coin_block = mk_block(slot=1, parent=block.id(), coin=leader_coin)
-        follower.on_block(block)
+        reuse_coin_block = mk_block(slot=1, parent=block, coin=leader_coin)
+        follower.on_block(reuse_coin_block)
 
         # Follower should *not* have accepted the block
-        assert follower.local_chain.length() == 1
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
         assert follower.tip() == block
 
     def test_ledger_state_is_properly_updated_on_reorg(self):
@@ -67,7 +78,7 @@ class TestLedgerStateUpdate(TestCase):
 
         # 4) then coin[2] wins slot 1 and chooses to extend from block_2
 
-        block_3 = mk_block(parent=block_2.id(), slot=1, coin=coin[2])
+        block_3 = mk_block(parent=block_2, slot=1, coin=coin[2])
         follower.on_block(block_3)
         # the follower should have switched over to the block_2 fork
         assert follower.tip() == block_3
@@ -89,37 +100,37 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_2)
         assert follower.tip() == block_1
         assert len(follower.forks) == 1, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_2
+        assert follower.forks[0] == block_2.id()
 
         # coin_2 wins slot 1 and chooses to extend from block_1
         # coin_3 also wins slot 1 and but chooses to extend from block_2
         # Both blocks are accepted. Both the local chain and the fork grow. No fork is newly created.
-        block_3 = mk_block(parent=block_1.id(), slot=1, coin=coins[2])
-        block_4 = mk_block(parent=block_2.id(), slot=1, coin=coins[3])
+        block_3 = mk_block(parent=block_1, slot=1, coin=coins[2])
+        block_4 = mk_block(parent=block_2, slot=1, coin=coins[3])
         follower.on_block(block_3)
         follower.on_block(block_4)
         assert follower.tip() == block_3
         assert len(follower.forks) == 1, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_4
+        assert follower.forks[0] == block_4.id()
 
         # coin_4 wins slot 1 and but chooses to extend from block_2 as well
         # The block is accepted. A new fork is created "from the block_2".
-        block_5 = mk_block(parent=block_2.id(), slot=1, coin=coins[4])
+        block_5 = mk_block(parent=block_2, slot=1, coin=coins[4])
         follower.on_block(block_5)
         assert follower.tip() == block_3
         assert len(follower.forks) == 2, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_4
-        assert follower.forks[1].tip() == block_5
+        assert follower.forks[0] == block_4.id()
+        assert follower.forks[1] == block_5.id()
 
         # A block based on an unknown parent is not accepted.
         # Nothing changes from the local chain and forks.
-        unknown_block = mk_block(parent=block_5.id(), slot=2, coin=coins[5])
-        block_6 = mk_block(parent=unknown_block.id(), slot=2, coin=coins[6])
+        unknown_block = mk_block(parent=block_5, slot=2, coin=coins[5])
+        block_6 = mk_block(parent=unknown_block, slot=2, coin=coins[6])
         follower.on_block(block_6)
         assert follower.tip() == block_3
         assert len(follower.forks) == 2, f"{len(follower.forks)}"
-        assert follower.forks[0].tip() == block_4
-        assert follower.forks[1].tip() == block_5
+        assert follower.forks[0] == block_4.id()
+        assert follower.forks[1] == block_5.id()
 
     def test_epoch_transition(self):
         leader_coins = [Coin(sk=i, value=100) for i in range(4)]
@@ -138,14 +149,14 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.tip() == block_1
         assert follower.tip().slot.epoch(config).epoch == 0
 
-        block_2 = mk_block(slot=19, parent=block_1.id(), coin=leader_coins[1])
+        block_2 = mk_block(slot=19, parent=block_1, coin=leader_coins[1])
         follower.on_block(block_2)
         assert follower.tip() == block_2
         assert follower.tip().slot.epoch(config).epoch == 0
 
         # ---- EPOCH 1 ----
 
-        block_3 = mk_block(slot=20, parent=block_2.id(), coin=leader_coins[2])
+        block_3 = mk_block(slot=20, parent=block_2, coin=leader_coins[2])
         follower.on_block(block_3)
         assert follower.tip() == block_3
         assert follower.tip().slot.epoch(config).epoch == 1
@@ -157,7 +168,7 @@ class TestLedgerStateUpdate(TestCase):
         # To ensure this is the case, we add a new coin just to the state associated with that slot,
         # so that the new block can be accepted only if that is the snapshot used
         # first, verify that if we don't change the state, the block is not accepted
-        block_4 = mk_block(slot=40, parent=block_3.id(), coin=Coin(sk=4, value=100))
+        block_4 = mk_block(slot=40, parent=block_3, coin=Coin(sk=4, value=100))
         follower.on_block(block_4)
         assert follower.tip() == block_3
         # then we add the coin to "spendable commitments" associated with slot 9
@@ -181,12 +192,12 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.tip() == block_1
 
         # coin can't be reused to win following slots:
-        block_2_reuse = mk_block(slot=1, parent=block_1.id(), coin=coin)
+        block_2_reuse = mk_block(slot=1, parent=block_1, coin=coin)
         follower.on_block(block_2_reuse)
         assert follower.tip() == block_1
 
         # but the evolved coin is eligible
-        block_2_evolve = mk_block(slot=1, parent=block_1.id(), coin=coin.evolve())
+        block_2_evolve = mk_block(slot=1, parent=block_1, coin=coin.evolve())
         follower.on_block(block_2_evolve)
         assert follower.tip() == block_2_evolve
 
@@ -212,12 +223,12 @@ class TestLedgerStateUpdate(TestCase):
         )
 
         # the new coin is not yet eligible for elections
-        block_0_1_attempt = mk_block(slot=1, parent=block_0_0.id(), coin=coin_new)
+        block_0_1_attempt = mk_block(slot=1, parent=block_0_0, coin=coin_new)
         follower.on_block(block_0_1_attempt)
         assert follower.tip() == block_0_0
 
         # whereas the evolved coin from genesis can be spent immediately
-        block_0_1 = mk_block(slot=1, parent=block_0_0.id(), coin=coin.evolve())
+        block_0_1 = mk_block(slot=1, parent=block_0_0, coin=coin.evolve())
         follower.on_block(block_0_1)
         assert follower.tip() == block_0_1
 
@@ -226,7 +237,7 @@ class TestLedgerStateUpdate(TestCase):
         # The newly minted coin is still not eligible in the following epoch since the
         # stake distribution snapshot is taken at the beginning of the previous epoch
 
-        block_1_0 = mk_block(slot=20, parent=block_0_1.id(), coin=coin_new)
+        block_1_0 = mk_block(slot=20, parent=block_0_1, coin=coin_new)
         follower.on_block(block_1_0)
         assert follower.tip() == block_0_1
 
@@ -234,16 +245,12 @@ class TestLedgerStateUpdate(TestCase):
 
         # The coin is finally eligible 2 epochs after it was first minted
 
-        block_2_0 = mk_block(
-            slot=40,
-            parent=block_0_1.id(),
-            coin=coin_new,
-        )
+        block_2_0 = mk_block(slot=40, parent=block_0_1, coin=coin_new)
         follower.on_block(block_2_0)
         assert follower.tip() == block_2_0
 
         # And now the minted coin can freely use the evolved coin for subsequent blocks
-        block_2_1 = mk_block(slot=40, parent=block_2_0.id(), coin=coin_new.evolve())
+        block_2_1 = mk_block(slot=40, parent=block_2_0, coin=coin_new.evolve())
         follower.on_block(block_2_1)
         assert follower.tip() == block_2_1
 
@@ -259,7 +266,7 @@ class TestLedgerStateUpdate(TestCase):
 
         coin_new = coin.evolve()
         coin_new_new = coin_new.evolve()
-        block_0_1 = mk_block(slot=1, parent=block_0_0.id(), coin=coin_new_new)
+        block_0_1 = mk_block(slot=1, parent=block_0_0, coin=coin_new_new)
         follower.on_block(block_0_1)
         # the coin evolved twice should not be accepted as it is not in the lead commitments
         assert follower.tip() == block_0_0
@@ -272,7 +279,7 @@ class TestLedgerStateUpdate(TestCase):
         orphan = mk_block(parent=genesis.block, slot=0, coin=coin_orphan)
         block_0_1 = mk_block(
             slot=1,
-            parent=block_0_0.id(),
+            parent=block_0_0,
             coin=coin_orphan.evolve(),
             orphaned_proofs=[orphan],
         )

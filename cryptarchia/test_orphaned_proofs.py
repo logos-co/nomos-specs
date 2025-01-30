@@ -1,21 +1,8 @@
 from unittest import TestCase
-from itertools import repeat
-import numpy as np
-import hashlib
 
-from copy import deepcopy
-from cryptarchia.cryptarchia import (
-    maxvalid_bg,
-    Chain,
-    BlockHeader,
-    Slot,
-    Id,
-    MockLeaderProof,
-    Coin,
-    Follower,
-)
+from cryptarchia.cryptarchia import Coin, Follower
 
-from .test_common import mk_chain, mk_config, mk_genesis_state, mk_block
+from .test_common import mk_config, mk_genesis_state, mk_block
 
 
 class TestOrphanedProofs(TestCase):
@@ -36,15 +23,15 @@ class TestOrphanedProofs(TestCase):
         #
 
         b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
-        b2, c_a = mk_block(b1.id(), 2, c_a), c_a.evolve()
-        b3, c_b = mk_block(b1.id(), 2, c_b), c_b.evolve()
+        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
+        b3, c_b = mk_block(b1, 2, c_b), c_b.evolve()
 
         for b in [b1, b2, b3]:
             follower.on_block(b)
 
         assert follower.tip() == b2
-        assert [f.tip() for f in follower.forks] == [b3]
-        assert follower.unimported_orphans(follower.tip_id()) == [b3]
+        assert [f for f in follower.forks] == [b3.id()]
+        assert follower.unimported_orphans() == [b3]
 
         # -- extend with import --
         #
@@ -54,12 +41,12 @@ class TestOrphanedProofs(TestCase):
         #  \  /
         #   b3
         #
-        b4, c_a = mk_block(b2.id(), 3, c_a, orphaned_proofs=[b3]), c_a.evolve()
+        b4, c_a = mk_block(b2, 3, c_a, orphaned_proofs=[b3]), c_a.evolve()
         follower.on_block(b4)
 
         assert follower.tip() == b4
-        assert [f.tip() for f in follower.forks] == [b3]
-        assert follower.unimported_orphans(follower.tip_id()) == []
+        assert [f for f in follower.forks] == [b3.id()]
+        assert follower.unimported_orphans() == []
 
     def test_orphan_proof_import_from_long_running_fork(self):
         c_a, c_b = Coin(sk=0, value=10), Coin(sk=1, value=10)
@@ -79,18 +66,18 @@ class TestOrphanedProofs(TestCase):
 
         b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
 
-        b2, c_a = mk_block(b1.id(), 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2.id(), 3, c_a), c_a.evolve()
+        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
+        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
 
-        b4, c_b = mk_block(b1.id(), 2, c_b), c_b.evolve()
-        b5, c_b = mk_block(b4.id(), 3, c_b), c_b.evolve()
+        b4, c_b = mk_block(b1, 2, c_b), c_b.evolve()
+        b5, c_b = mk_block(b4, 3, c_b), c_b.evolve()
 
         for b in [b1, b2, b3, b4, b5]:
             follower.on_block(b)
 
         assert follower.tip() == b3
-        assert [f.tip() for f in follower.forks] == [b5]
-        assert follower.unimported_orphans(follower.tip_id()) == [b4, b5]
+        assert [f for f in follower.forks] == [b5.id()]
+        assert follower.unimported_orphans() == [b4, b5]
 
         # -- extend b3, importing the fork --
         #
@@ -100,11 +87,11 @@ class TestOrphanedProofs(TestCase):
         #  \ /     /
         #   b4 - b5
 
-        b6, c_a = mk_block(b3.id(), 4, c_a, orphaned_proofs=[b4, b5]), c_a.evolve()
+        b6, c_a = mk_block(b3, 4, c_a, orphaned_proofs=[b4, b5]), c_a.evolve()
         follower.on_block(b6)
 
         assert follower.tip() == b6
-        assert [f.tip() for f in follower.forks] == [b5]
+        assert [f for f in follower.forks] == [b5.id()]
 
     def test_orphan_proof_import_from_fork_without_direct_shared_parent(self):
         coins = [Coin(sk=i, value=10) for i in range(2)]
@@ -123,20 +110,20 @@ class TestOrphanedProofs(TestCase):
 
         b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
 
-        b2, c_a = mk_block(b1.id(), 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2.id(), 3, c_a), c_a.evolve()
-        b4, c_a = mk_block(b3.id(), 4, c_a), c_a.evolve()
+        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
+        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
+        b4, c_a = mk_block(b3, 4, c_a), c_a.evolve()
 
-        b5, c_b = mk_block(b1.id(), 2, c_b), c_b.evolve()
-        b6, c_b = mk_block(b5.id(), 3, c_b), c_b.evolve()
-        b7, c_b = mk_block(b6.id(), 4, c_b), c_b.evolve()
+        b5, c_b = mk_block(b1, 2, c_b), c_b.evolve()
+        b6, c_b = mk_block(b5, 3, c_b), c_b.evolve()
+        b7, c_b = mk_block(b6, 4, c_b), c_b.evolve()
 
         for b in [b1, b2, b3, b4, b5, b6, b7]:
             follower.on_block(b)
 
         assert follower.tip() == b4
-        assert [f.tip() for f in follower.forks] == [b7]
-        assert follower.unimported_orphans(follower.tip_id()) == [b5, b6, b7]
+        assert [f for f in follower.forks] == [b7.id()]
+        assert follower.unimported_orphans() == [b5, b6, b7]
 
         # -- extend b4, importing the forks --
         #
@@ -149,12 +136,12 @@ class TestOrphanedProofs(TestCase):
         # Earlier implementations of orphan proof validation failed to
         # validate b7 as an orphan here.
 
-        b8, c_a = mk_block(b4.id(), 5, c_a, orphaned_proofs=[b5, b6, b7]), c_a.evolve()
+        b8, c_a = mk_block(b4, 5, c_a, orphaned_proofs=[b5, b6, b7]), c_a.evolve()
         follower.on_block(b8)
 
         assert follower.tip() == b8
-        assert [f.tip() for f in follower.forks] == [b7]
-        assert follower.unimported_orphans(follower.tip_id()) == []
+        assert [f for f in follower.forks] == [b7.id()]
+        assert follower.unimported_orphans() == []
 
     def test_unimported_orphans(self):
         # Given the following fork graph:
@@ -187,22 +174,22 @@ class TestOrphanedProofs(TestCase):
 
         b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
 
-        b2, c_a = mk_block(b1.id(), 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2.id(), 3, c_a), c_a.evolve()
+        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
+        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
 
-        b4, c_b = mk_block(b1.id(), 2, c_b), c_b.evolve()
-        b5, c_b = mk_block(b4.id(), 3, c_b), c_b.evolve()
+        b4, c_b = mk_block(b1, 2, c_b), c_b.evolve()
+        b5, c_b = mk_block(b4, 3, c_b), c_b.evolve()
 
-        b6, c_c = mk_block(b4.id(), 3, c_c), c_c.evolve()
+        b6, c_c = mk_block(b4, 3, c_c), c_c.evolve()
 
         for b in [b1, b2, b3, b4, b5, b6]:
             follower.on_block(b)
 
         assert follower.tip() == b3
-        assert [f.tip() for f in follower.forks] == [b5, b6]
-        assert follower.unimported_orphans(follower.tip_id()) == [b4, b5, b6]
+        assert [f for f in follower.forks] == [b5.id(), b6.id()]
+        assert follower.unimported_orphans() == [b4, b5, b6]
 
-        b7, c_a = mk_block(b3.id(), 4, c_a, orphaned_proofs=[b4, b5, b6]), c_a.evolve()
+        b7, c_a = mk_block(b3, 4, c_a, orphaned_proofs=[b4, b5, b6]), c_a.evolve()
 
         follower.on_block(b7)
         assert follower.tip() == b7
@@ -235,30 +222,30 @@ class TestOrphanedProofs(TestCase):
         follower = Follower(genesis, config)
 
         b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
-        b2, c_a = mk_block(b1.id(), 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2.id(), 3, c_a), c_a.evolve()
+        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
+        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
 
-        b4, c_b = mk_block(b3.id(), 4, c_b), c_b.evolve()
-        b5, c_a = mk_block(b3.id(), 4, c_a), c_a.evolve()
+        b4, c_b = mk_block(b3, 4, c_b), c_b.evolve()
+        b5, c_a = mk_block(b3, 4, c_a), c_a.evolve()
 
-        b6, c_b = mk_block(b4.id(), 5, c_b, orphaned_proofs=[b5]), c_b.evolve()
-        b7, c_a = mk_block(b4.id(), 5, c_a, orphaned_proofs=[b5]), c_a.evolve()
+        b6, c_b = mk_block(b4, 5, c_b, orphaned_proofs=[b5]), c_b.evolve()
+        b7, c_a = mk_block(b4, 5, c_a, orphaned_proofs=[b5]), c_a.evolve()
 
-        b8, c_b = mk_block(b6.id(), 6, c_b, orphaned_proofs=[b7]), c_b.evolve()
+        b8, c_b = mk_block(b6, 6, c_b, orphaned_proofs=[b7]), c_b.evolve()
 
         for b in [b1, b2, b3, b4, b5]:
             follower.on_block(b)
 
         assert follower.tip() == b4
-        assert follower.unimported_orphans(follower.tip_id()) == [b5]
+        assert follower.unimported_orphans() == [b5]
 
         for b in [b6, b7]:
             follower.on_block(b)
 
         assert follower.tip() == b6
-        assert follower.unimported_orphans(follower.tip_id()) == [b7]
+        assert follower.unimported_orphans() == [b7]
 
         follower.on_block(b8)
 
         assert follower.tip() == b8
-        assert follower.unimported_orphans(follower.tip_id()) == []
+        assert follower.unimported_orphans() == []

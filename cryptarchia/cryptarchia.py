@@ -1,11 +1,12 @@
-from typing import TypeAlias, List, Optional
+from typing import TypeAlias, List, Dict
 from hashlib import sha256, blake2b
 from math import floor
 from copy import deepcopy
-from itertools import chain
+import itertools
 import functools
 from dataclasses import dataclass, field, replace
 import logging
+from collections import defaultdict
 
 import numpy as np
 
@@ -249,35 +250,12 @@ class BlockHeader:
 
 
 @dataclass
-class Chain:
-    blocks: List[BlockHeader]
-    genesis: Id
-
-    def tip_id(self) -> Id:
-        if len(self.blocks) == 0:
-            return self.genesis
-        return self.tip().id()
-
-    def tip(self) -> BlockHeader:
-        return self.blocks[-1]
-
-    def length(self) -> int:
-        return len(self.blocks)
-
-    def block_position(self, block: Id) -> Optional[int]:
-        for i, b in enumerate(self.blocks):
-            if b.id() == block:
-                return i
-        return None
-
-
-@dataclass
 class LedgerState:
     """
     A snapshot of the ledger state up to some block
     """
 
-    block: Id = None
+    block: BlockHeader
 
     # This nonce is used to derive the seed for the slot leader lottery.
     # It's updated at every block by hashing the previous nonce with the
@@ -324,7 +302,7 @@ class LedgerState:
         return nullifier not in self.nullifiers
 
     def apply(self, block: BlockHeader):
-        assert block.parent == self.block
+        assert block.parent == self.block.id()
 
         h = blake2b(digest_size=32)
         h.update("epoch-nonce".encode(encoding="utf-8"))
@@ -333,8 +311,8 @@ class LedgerState:
         h.update(block.slot.encode())
 
         self.nonce = h.digest()
-        self.block = block.id()
-        for proof in chain(block.orphaned_proofs, [block]):
+        self.block = block
+        for proof in itertools.chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
 
     def apply_leader_proof(self, proof: MockLeaderProof):
@@ -385,18 +363,24 @@ class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
         self.forks = []
-        self.local_chain = Chain([], genesis=genesis_state.block)
+        self.local_chain = genesis_state.block.id()
         self.genesis_state = genesis_state
-        self.ledger_state = {genesis_state.block: genesis_state.copy()}
+        self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
 
-    def validate_header(self, block: BlockHeader, chain: Chain) -> bool:
+    def validate_header(self, block: BlockHeader) -> bool:
         # TODO: verify blocks are not in the 'future'
-        if block.parent != chain.tip_id():
-            logger.warning("block parent is not chain tip")
+        if block.parent not in self.ledger_state:
+            logger.warning("We have not seen block parent")
             return False
 
         current_state = self.ledger_state[block.parent].copy()
+
+        # We use the proposed block epoch state to validate orphans as well.
+        # For very old orphans, these states may be different.
+        epoch_state = self.compute_epoch_state(
+            block.slot.epoch(self.config), block.parent
+        )
 
         # first, we verify adopted leadership transactions
         for orphan in block.orphaned_proofs:
@@ -409,10 +393,6 @@ class Follower:
             if orphan.id() not in self.ledger_state:
                 logger.warning("missing orphan proof")
                 return False
-
-            # we use the proposed block epoch state here instead of the orphan's
-            # epoch state. For very old orphans, these states may be different.
-            epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
 
             # (2.) is satisfied by verifying the proof against current state ensuring:
             # - it is a valid proof
@@ -431,7 +411,6 @@ class Follower:
             # effects to the ledger state
             current_state.apply_leader_proof(orphan.leader_proof)
 
-        epoch_state = self.compute_epoch_state(block.slot.epoch(self.config), chain)
         # TODO: this is not the full block validation spec, only slot leader is verified
         return self.verify_slot_leader(
             block.slot,
@@ -462,129 +441,100 @@ class Follower:
             and current_state.verify_unspent(proof.nullifier)
         )
 
-    # Try appending this block to an existing chain and return whether
-    # the operation was successful
-    def try_extend_chains(self, block: BlockHeader) -> Optional[Chain]:
-        if self.tip_id() == block.parent:
-            return self.local_chain
-
-        for chain in self.forks:
-            if chain.tip_id() == block.parent:
-                return chain
-
-        return None
-
-    def try_create_fork(self, block: BlockHeader) -> Optional[Chain]:
-        if self.genesis_state.block == block.parent:
-            # this block is forking off the genesis state
-            return Chain(blocks=[], genesis=self.genesis_state.block)
-
-        chains = self.forks + [self.local_chain]
-        for chain in chains:
-            block_position = chain.block_position(block.parent)
-            if block_position is not None:
-                return Chain(
-                    blocks=chain.blocks[: block_position + 1],
-                    genesis=self.genesis_state.block,
-                )
-
-        return None
-
     def on_block(self, block: BlockHeader):
-        # check if the new block extends an existing chain
-        new_chain = self.try_extend_chains(block)
-        if new_chain is None:
-            # we failed to extend one of the existing chains,
-            # therefore we might need to create a new fork
-            new_chain = self.try_create_fork(block)
-            if new_chain is not None:
-                self.forks.append(new_chain)
-            else:
-                logger.warning("missing parent block")
-                # otherwise, we're missing the parent block
-                # in that case, just ignore the block
-                return
-
-        if not self.validate_header(block, new_chain):
-            logger.warning("invalid header")
+        if block.id() in self.ledger_state:
+            logger.warning("dropping already processed block")
             return
 
-        new_chain.blocks.append(block)
-
-        # We may need to switch forks, lets run the fork choice rule to check.
-        new_chain = self.fork_choice()
-        if new_chain != self.local_chain:
-            self.forks.remove(new_chain)
-            self.forks.append(self.local_chain)
-            self.local_chain = new_chain
+        if not self.validate_header(block):
+            logger.warning("invalid header")
+            return
 
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
 
-    def unimported_orphans(self, tip: Id) -> list[BlockHeader]:
+        if block.parent == self.local_chain:
+            # simply extending the local chain
+            self.local_chain = block.id()
+        else:
+            # otherwise, this block creates a fork
+            self.forks.append(block.id())
+
+            # remove any existing fork that is superceded by this block
+            if block.parent in self.forks:
+                self.forks.remove(block.parent)
+
+            # We may need to switch forks, lets run the fork choice rule to check.
+            new_tip = self.fork_choice()
+            self.forks.append(self.local_chain)
+            self.forks.remove(new_tip)
+            self.local_chain = new_tip
+
+    def unimported_orphans(self) -> list[BlockHeader]:
         """
         Returns all unimported orphans w.r.t. the given tip's state.
         Orphans are returned in the order that they should be imported.
         """
-        tip_state = self.ledger_state[tip].copy()
+        tip_state = self.tip_state().copy()
+        tip = tip_state.block.id()
 
         orphans = []
-        for fork in [self.local_chain, *self.forks]:
-            if fork.block_position(tip) is not None:
-                # the tip is a member of this fork, it doesn't make sense
-                # to take orphans from this fork as they are all already "imported"
-                continue
 
-            for block in fork.blocks:
-                for b in [*block.orphaned_proofs, block]:
-                    if b.leader_proof.nullifier not in tip_state.nullifiers:
-                        tip_state.nullifiers.add(b.leader_proof.nullifier)
-                        orphans += [b]
+        for fork in self.forks:
+            _, fork_depth = common_prefix_depth(tip, fork, self.ledger_state)
+            for block_state in chain_suffix(fork, fork_depth, self.ledger_state):
+                b = block_state.block
+                if b.leader_proof.nullifier not in tip_state.nullifiers:
+                    tip_state.nullifiers.add(b.leader_proof.nullifier)
+                    orphans += [b]
 
         return orphans
 
     # Evaluate the fork choice rule and return the chain we should be following
-    def fork_choice(self) -> Chain:
+    def fork_choice(self) -> Id:
         return maxvalid_bg(
-            self.local_chain, self.forks, k=self.config.k, s=self.config.s
+            self.local_chain,
+            self.forks,
+            k=self.config.k,
+            s=self.config.s,
+            states=self.ledger_state,
         )
 
     def tip(self) -> BlockHeader:
-        return self.local_chain.tip()
+        return self.tip_state().block
 
     def tip_id(self) -> Id:
-        return self.local_chain.tip_id()
+        return self.local_chain
 
     def tip_state(self) -> LedgerState:
         return self.ledger_state[self.tip_id()]
 
-    def state_at_slot_beginning(self, chain: Chain, slot: Slot) -> LedgerState:
-        for block in reversed(chain.blocks):
-            if block.slot < slot:
-                return self.ledger_state[block.id()]
-
+    def state_at_slot_beginning(self, tip: Id, slot: Slot) -> LedgerState:
+        for state in iter_chain(tip, self.ledger_state):
+            if state.block.slot < slot:
+                return state
         return self.genesis_state
 
     def epoch_start_slot(self, epoch) -> Slot:
         return Slot(epoch.epoch * self.config.epoch_length)
 
-    def stake_distribution_snapshot(self, epoch, chain):
+    def stake_distribution_snapshot(self, epoch, tip: Id):
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
         slot = Slot(epoch.prev().epoch * self.config.epoch_length)
-        return self.state_at_slot_beginning(chain, slot)
+        return self.state_at_slot_beginning(tip, slot)
 
-    def nonce_snapshot(self, epoch, chain):
+    def nonce_snapshot(self, epoch, tip):
         # nonce snapshot happens partway through the previous epoch after the
         # stake distribution has stabilized
         slot = Slot(
             self.config.epoch_relative_nonce_slot
             + self.epoch_start_slot(epoch.prev()).absolute_slot
         )
-        return self.state_at_slot_beginning(chain, slot)
+        return self.state_at_slot_beginning(tip, slot)
 
-    def compute_epoch_state(self, epoch: Epoch, chain: Chain) -> EpochState:
+    def compute_epoch_state(self, epoch: Epoch, tip: Id) -> EpochState:
         if epoch.epoch == 0:
             return EpochState(
                 stake_distribution_snapshot=self.genesis_state,
@@ -592,18 +542,18 @@ class Follower:
                 inferred_total_active_stake=self.config.initial_total_active_stake,
             )
 
-        stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, chain)
-        nonce_snapshot = self.nonce_snapshot(epoch, chain)
+        stake_distribution_snapshot = self.stake_distribution_snapshot(epoch, tip)
+        nonce_snapshot = self.nonce_snapshot(epoch, tip)
 
         # we memoize epoch states to avoid recursion killing our performance
-        memo_block_id = nonce_snapshot.block
+        memo_block_id = nonce_snapshot.block.id()
         if state := self.epoch_state.get((epoch, memo_block_id)):
             return state
 
         # To update our inference of total stake, we need the prior estimate which
         # was calculated last epoch. Thus we recurse here to retreive the previous
         # estimate of total stake.
-        prev_epoch = self.compute_epoch_state(epoch.prev(), chain)
+        prev_epoch = self.compute_epoch_state(epoch.prev(), tip)
         inferred_total_active_stake = self._infer_total_active_stake(
             prev_epoch, nonce_snapshot, stake_distribution_snapshot
         )
@@ -696,45 +646,99 @@ class Leader:
         )
 
 
-def common_prefix_len(a: Chain, b: Chain) -> int:
-    for i, (x, y) in enumerate(zip(a.blocks, b.blocks)):
-        if x.id() != y.id():
-            return i
-    return min(len(a.blocks), len(b.blocks))
+def iter_chain(tip: Id, states: Dict[Id, LedgerState]):
+    while tip in states:
+        yield states[tip]
+        tip = states[tip].block.parent
 
 
-def chain_density(chain: Chain, slot: Slot) -> int:
-    return len(
-        [
-            block
-            for block in chain.blocks
-            if block.slot.absolute_slot < slot.absolute_slot
-        ]
-    )
+def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerState]:
+    return list(reversed(list(itertools.islice(iter_chain(tip, states), n))))
 
 
-# Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
-# k defines the forking depth of chain we accept without more analysis
+def common_prefix_depth(a: Id, b: Id, states: Dict[Id, LedgerState]) -> (int, int):
+    a_blocks = iter_chain(a, states)
+    b_blocks = iter_chain(b, states)
+
+    seen = {}
+    depth = 0
+    while True:
+        try:
+            a_block = next(a_blocks).block.id()
+            if a_block in seen:
+                # we had seen this block from the fork chain
+                return depth, seen[a_block]
+
+            seen[a_block] = depth
+        except StopIteration:
+            pass
+
+        try:
+            b_block = next(b_blocks).block.id()
+            if b_block in seen:
+                # we had seen the fork in the local chain
+                return seen[b_block], depth
+            seen[b_block] = depth
+        except StopIteration:
+            pass
+
+        depth += 1
+
+    assert False
+
+
+def chain_density(
+    head: Id, slot: Slot, reorg_depth: int, states: Dict[Id, LedgerState]
+) -> int:
+    assert type(head) == Id
+    chain = iter_chain(head, states)
+    segment = itertools.islice(chain, reorg_depth)
+    return sum(1 for b in segment if b.block.slot < slot)
+
+
+def block_children(states: Dict[Id, LedgerState]) -> Dict[Id, set[Id]]:
+    children = defaultdict(set)
+    for c, state in states.items():
+        children[state.block.parent].add(c)
+
+    return children
+
+
+# Implementation of the Cryptarchia fork choice rule (following Ouroborous Genesis).
+# The fork choice has two phases:
+# 1. if the chain is not forking too deeply, we apply the longest chain fork choice rule
+# 2. otherwise we look at the chain density immidiately following the fork
+#
+# k defines the forking depth of a chain at which point we switch phases.
 # s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
-def maxvalid_bg(local_chain: Chain, forks: List[Chain], k: int, s: int) -> Chain:
+def maxvalid_bg(
+    local_chain: Id,
+    forks: List[Id],
+    k: int,
+    s: int,
+    states: Dict[Id, LedgerState],
+) -> Id:
+    assert type(local_chain) == Id
+    assert all(type(f) == Id for f in forks)
+
     cmax = local_chain
-    for chain in forks:
-        lowest_common_ancestor = common_prefix_len(cmax, chain)
-        m = cmax.length() - lowest_common_ancestor
-        if m <= k:
-            # Classic longest chain rule with parameter k
-            if cmax.length() < chain.length():
-                cmax = chain
+    for fork in forks:
+        cmax_depth, fork_depth = common_prefix_depth(cmax, fork, states)
+        if cmax_depth <= k:
+            # Longest chain fork choice rule
+            if cmax_depth < fork_depth:
+                cmax = fork
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
-            forking_slot = Slot(
-                cmax.blocks[lowest_common_ancestor].slot.absolute_slot + s
-            )
-            cmax_density = chain_density(cmax, forking_slot)
-            candidate_density = chain_density(chain, forking_slot)
-            if cmax_density < candidate_density:
-                cmax = chain
+            cmax_divergent_block = chain_suffix(cmax, cmax_depth, states)[0].block
+
+            forking_slot = Slot(cmax_divergent_block.slot.absolute_slot + s)
+            cmax_density = chain_density(cmax, forking_slot, cmax_depth, states)
+            fork_density = chain_density(fork, forking_slot, fork_depth, states)
+
+            if cmax_density < fork_density:
+                cmax = fork
 
     return cmax
 

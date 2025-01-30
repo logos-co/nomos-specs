@@ -1,5 +1,4 @@
 from unittest import TestCase
-from dataclasses import dataclass
 import itertools
 
 import numpy as np
@@ -29,13 +28,13 @@ class TestStakeRelativization(TestCase):
         # on fork, tip state is not updated
         orphan = mk_block(genesis.block, slot=1, coin=c_b)
         follower.on_block(orphan)
-        assert follower.tip_state().block == b1.id()
+        assert follower.tip_state().block == b1
         assert follower.tip_state().leader_count == 1
 
         # after orphan is adopted, leader count should jumpy by 2 (each orphan counts as a leader)
-        b2 = mk_block(b1.id(), slot=2, coin=c_a.evolve(), orphaned_proofs=[orphan])
+        b2 = mk_block(b1, slot=2, coin=c_a.evolve(), orphaned_proofs=[orphan])
         follower.on_block(b2)
-        assert follower.tip_state().block == b2.id()
+        assert follower.tip_state().block == b2
         assert follower.tip_state().leader_count == 3
 
     def test_inference_on_empty_genesis_epoch(self):

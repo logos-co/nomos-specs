@@ -2,24 +2,15 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import (
-    Leader,
-    Config,
-    EpochState,
-    LedgerState,
-    Coin,
-    phi,
-    TimeConfig,
-    Slot,
-)
+from .cryptarchia import Leader, EpochState, LedgerState, Coin, phi, Slot
 from .test_common import mk_config
 
 
 class TestLeader(TestCase):
     def test_slot_leader_statistics(self):
         epoch = EpochState(
-            stake_distribution_snapshot=LedgerState(),
-            nonce_snapshot=LedgerState(nonce=b"1010101010"),
+            stake_distribution_snapshot=LedgerState(block=None),
+            nonce_snapshot=LedgerState(block=None, nonce=b"1010101010"),
             inferred_total_active_stake=1000,
         )
 
