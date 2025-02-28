@@ -1,15 +1,15 @@
-from typing import TypeAlias, List, Dict
-from hashlib import sha256, blake2b
-from math import floor
-from copy import deepcopy
-import itertools
 import functools
-from dataclasses import dataclass, field, replace
+import itertools
 import logging
 from collections import defaultdict
+from copy import deepcopy
+from dataclasses import dataclass, field, replace
+from hashlib import blake2b, sha256
+from math import floor
+from typing import Dict, Generator, List, TypeAlias
 
 import numpy as np
-
+from sortedcontainers import SortedDict
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +123,9 @@ class Slot:
 
     def __lt__(self, other):
         return self.absolute_slot < other.absolute_slot
+
+    def __hash__(self):
+        return hash(self.absolute_slot)
 
 
 @dataclass
@@ -367,6 +370,7 @@ class Follower:
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
+        self.block_storage = BlockStorage()
 
     def validate_header(self, block: BlockHeader) -> bool:
         # TODO: verify blocks are not in the 'future'
@@ -471,6 +475,8 @@ class Follower:
             self.forks.remove(new_tip)
             self.local_chain = new_tip
 
+        self.block_storage.add_block(block)
+
     def unimported_orphans(self) -> list[BlockHeader]:
         """
         Returns all unimported orphans w.r.t. the given tip's state.
@@ -486,6 +492,8 @@ class Follower:
             for block_state in chain_suffix(fork, fork_depth, self.ledger_state):
                 b = block_state.block
                 if b.leader_proof.nullifier not in tip_state.nullifiers:
+                    # YJ: Why do this? This function is used only in tests.
+                    # Let's try to remove this line and run tests.
                     tip_state.nullifiers.add(b.leader_proof.nullifier)
                     orphans += [b]
 
@@ -591,6 +599,26 @@ class Follower:
             / expected_blocks_per_slot
         )
         return int(prev_epoch.inferred_total_active_stake - h * blocks_per_slot_err)
+
+
+class BlockStorage:
+    def __init__(self):
+        self.blocks: dict[Id, BlockHeader] = dict()
+        self.ids_by_slot: SortedDict[Slot, set[Id]] = SortedDict()
+
+    def add_block(self, block: BlockHeader):
+        id = block.id()
+        self.blocks[id] = block
+        if block.slot not in self.ids_by_slot:
+            self.ids_by_slot[block.slot] = set()
+        self.ids_by_slot[block.slot].add(id)
+
+    def blocks_by_range(
+        self, from_slot: Slot, to_slot: Slot
+    ) -> Generator[BlockHeader, None, None]:
+        for slot in self.ids_by_slot.irange(from_slot, to_slot, inclusive=(True, True)):
+            for id in self.ids_by_slot[slot]:
+                yield self.blocks[id]
 
 
 def phi(f: float, alpha: float) -> float:

@@ -2,9 +2,8 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import Follower, Coin, iter_chain
-
-from .test_common import mk_config, mk_block, mk_genesis_state
+from .cryptarchia import Coin, Follower, iter_chain
+from .test_common import mk_block, mk_config, mk_genesis_state
 
 
 class TestLedgerStateUpdate(TestCase):
@@ -139,7 +138,7 @@ class TestLedgerStateUpdate(TestCase):
 
         follower = Follower(genesis, config)
 
-        # We assume an epoch length of 10 slots in this test.
+        # We assume an epoch length of 20 slots in this test.
         assert config.epoch_length == 20, f"epoch len: {config.epoch_length}"
 
         # ---- EPOCH 0 ----
@@ -164,14 +163,14 @@ class TestLedgerStateUpdate(TestCase):
         # ---- EPOCH 2 ----
 
         # when trying to propose a block for epoch 2, the stake distribution snapshot should be taken
-        # at the end of epoch 0, i.e. slot 9
+        # at the end of epoch 0, i.e. slot 19
         # To ensure this is the case, we add a new coin just to the state associated with that slot,
         # so that the new block can be accepted only if that is the snapshot used
         # first, verify that if we don't change the state, the block is not accepted
         block_4 = mk_block(slot=40, parent=block_3, coin=Coin(sk=4, value=100))
         follower.on_block(block_4)
         assert follower.tip() == block_3
-        # then we add the coin to "spendable commitments" associated with slot 9
+        # then we add the coin to "spendable commitments" associated with slot 19
         follower.ledger_state[block_2.id()].commitments_spend.add(
             Coin(sk=4, value=100).commitment()
         )

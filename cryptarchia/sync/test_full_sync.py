@@ -75,8 +75,12 @@ class TestFullSync(TestCase):
 
         new_follower = Follower(genesis, config)
         full_sync(new_follower, [follower], genesis.block.slot)
-        assert new_follower.tip() == follower.tip()
-        assert new_follower.forks == follower.forks
+        # Since the length of two forks is the same, the tip is chosen
+        # depending on the order of block delivery.
+        assert new_follower.tip() in [b2, b4]
+        expected_forks = [b2.id(), b4.id()]
+        expected_forks.remove(new_follower.tip_id())
+        assert new_follower.forks == expected_forks
 
     def test_continue_syncing_forks(self):
         # b0 - b1 - b2 == tip
@@ -137,7 +141,7 @@ class TestFullSync(TestCase):
         b0, c_b = mk_block(genesis.block, 1, c_b), c_b.evolve()
         b3, c_b = mk_block(b0, 2, c_b), c_b.evolve()
         b4, c_b = mk_block(b3, 3, c_b), c_b.evolve()
-        b5, c_b = mk_block(b4, 3, c_b), c_b.evolve()
+        b5, c_b = mk_block(b4, 4, c_b), c_b.evolve()
         for b in [b0, b3, b4, b5]:
             peer_1.on_block(b)
         assert peer_1.tip() == b5
