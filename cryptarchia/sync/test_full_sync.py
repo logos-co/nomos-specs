@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from cryptarchia.cryptarchia import Coin, Follower
-from cryptarchia.sync.range_sync import range_sync
+from cryptarchia.sync.full_sync import full_sync
 from cryptarchia.test_common import mk_block, mk_config, mk_genesis_state
 
 
@@ -21,6 +21,6 @@ class TestRangeSync(TestCase):
         assert follower.forks == []
 
         new_follower = Follower(genesis, config)
-        range_sync(new_follower, [follower], genesis.block.slot)
+        full_sync(new_follower, [follower], genesis.block.slot)
         assert new_follower.tip() == b2
         assert new_follower.forks == []

@@ -1,30 +1,31 @@
 from collections import defaultdict
 from typing import Generator
 
-from dill.tests.test_diff import A
-
 from cryptarchia.cryptarchia import BlockHeader, Follower, Id, Slot
 
-SLOT_TOLERANCE = 2
+SLOT_TOLERANCE = 1
 
 
-def range_sync(local: Follower, remotes: list[Follower], start_slot: Slot):
-    while groups := {
-        tip: group
-        for tip, group in group_by_tip(remotes).items()
-        if group[0].tip().slot.absolute_slot - start_slot.absolute_slot > SLOT_TOLERANCE
-    }:
+def full_sync(local: Follower, remotes: list[Follower], start_slot: Slot):
+    while groups := group_sync_targets(remotes, start_slot):
         for _, group in groups.items():
             remote = group[0]
-            for block in request_blocks_by_range(remote, start_slot, remote.tip().slot):
-                local.on_block(block)
+            range_sync(local, remote, start_slot, remote.tip().slot)
         start_slot = Slot(local.tip().slot.absolute_slot + 1)
 
 
-def group_by_tip(remotes: list[Follower]) -> dict[Id, list[Follower]]:
+def range_sync(local: Follower, remote: Follower, from_slot: Slot, to_slot: Slot):
+    for block in request_blocks_by_range(remote, from_slot, to_slot):
+        local.on_block(block)
+
+
+def group_sync_targets(
+    targets: list[Follower], start_slot: Slot
+) -> dict[Id, list[Follower]]:
     groups: dict[Id, list[Follower]] = defaultdict(list)
-    for remote in remotes:
-        groups[remote.tip_id()].append(remote)
+    for target in targets:
+        if target.tip().slot.absolute_slot - start_slot.absolute_slot > SLOT_TOLERANCE:
+            groups[target.tip_id()].append(target)
     return groups
 
 
