@@ -1,0 +1,2 @@
+class ParentNotFound(Exception):
+    pass

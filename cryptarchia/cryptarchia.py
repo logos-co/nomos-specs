@@ -11,6 +11,8 @@ from typing import Dict, Generator, List, TypeAlias
 import numpy as np
 from sortedcontainers import SortedDict
 
+from cryptarchia.error import ParentNotFound
+
 logger = logging.getLogger(__name__)
 
 
@@ -454,6 +456,8 @@ class Follower:
             logger.warning("invalid header")
             return
 
+        if block.parent not in self.ledger_state:
+            raise ParentNotFound
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
