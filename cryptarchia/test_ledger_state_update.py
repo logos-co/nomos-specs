@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import Follower, Coin, iter_chain
+from .cryptarchia import Follower, Coin, ParentNotFound, iter_chain
 
 from .test_common import mk_config, mk_block, mk_genesis_state
 
@@ -126,7 +126,8 @@ class TestLedgerStateUpdate(TestCase):
         # Nothing changes from the local chain and forks.
         unknown_block = mk_block(parent=block_5, slot=2, coin=coins[5])
         block_6 = mk_block(parent=unknown_block, slot=2, coin=coins[6])
-        follower.on_block(block_6)
+        with self.assertRaises(ParentNotFound):
+            follower.on_block(block_6)
         assert follower.tip() == block_3
         assert len(follower.forks) == 2, f"{len(follower.forks)}"
         assert follower.forks[0] == block_4.id()
