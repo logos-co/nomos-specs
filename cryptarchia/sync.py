@@ -16,7 +16,8 @@ def sync(local: Follower, peers: list[Follower]):
     # Syncs the local block tree with the peers, starting from the local tip.
     # This covers the case where the local tip is not on the latest honest chain anymore.
 
-    # Repeat the sync process until no peer has a tip ahead of the local tip.
+    # Repeat the sync process until no peer has a tip ahead of the local tip,
+    # because peers' tips may advance during the sync process.
     while True:
         # Fetch blocks from the peers in the range of slots from the local tip to the latest tip.
         # Gather orphaned blocks, which are blocks from forks that are absent in the local block tree.
