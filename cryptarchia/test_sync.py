@@ -22,10 +22,9 @@ class TestSync(TestCase):
         self.assertEqual(peer.forks, [])
 
         local = Follower(genesis, config)
-        self.assertFalse(sync(local, [peer]))
+        sync(local, [peer])
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
-        self.assertTrue(sync(local, [peer]))
 
     def test_sync_single_chain_from_middle(self):
         # b0 - b1 - b2 - b3
@@ -47,10 +46,9 @@ class TestSync(TestCase):
         for b in [b0, b1]:
             peer.on_block(b)
         # start syncing from b1
-        self.assertFalse(sync(local, [peer]))
+        sync(local, [peer])
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
-        self.assertTrue(sync(local, [peer]))
 
     def test_sync_forks_from_genesis(self):
         # b0 - b1 - b2 - b5 == tip
@@ -72,10 +70,9 @@ class TestSync(TestCase):
         self.assertEqual(peer.forks, [b4.id()])
 
         local = Follower(genesis, config)
-        self.assertFalse(sync(local, [peer]))
+        sync(local, [peer])
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
-        self.assertTrue(sync(local, [peer]))
 
     def test_sync_forks_from_middle(self):
         # b0 - b1 - b2 - b5 == tip
@@ -102,10 +99,9 @@ class TestSync(TestCase):
         local = Follower(genesis, config)
         for b in [b0, b1, b3]:
             peer.on_block(b)
-        self.assertFalse(sync(local, [peer]))
+        sync(local, [peer])
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
-        self.assertTrue(sync(local, [peer]))
 
     def test_sync_forks_by_backfilling(self):
         # b0 - b1 - b2 - b5 == tip
@@ -131,11 +127,10 @@ class TestSync(TestCase):
         local = Follower(genesis, config)
         for b in [b0, b1]:
             peer.on_block(b)
-        self.assertFalse(sync(local, [peer]))
+        sync(local, [peer])
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
         self.assertEqual(len(local.ledger_state), len(peer.ledger_state))
-        self.assertTrue(sync(local, [peer]))
 
     def test_sync_multiple_peers_from_genesis(self):
         # Peer-0:                b5
@@ -169,11 +164,10 @@ class TestSync(TestCase):
         self.assertEqual(peer2.forks, [])
 
         local = Follower(genesis, config)
-        self.assertFalse(sync(local, [peer0, peer1, peer2]))
+        sync(local, [peer0, peer1, peer2])
         self.assertEqual(local.tip(), b5)
         self.assertEqual(local.forks, [b4.id()])
         self.assertEqual(len(local.ledger_state), 7)
-        self.assertTrue(sync(local, [peer0, peer1, peer2]))
 
 
 class TestSyncFromCheckpoint(TestCase):
@@ -201,7 +195,7 @@ class TestSyncFromCheckpoint(TestCase):
         checkpoint = peer.ledger_state[b2.id()]
         local = Follower(genesis, config)
         local.apply_checkpoint(checkpoint)
-        self.assertFalse(sync(local, [peer]))
+        sync(local, [peer])
         # Result:
         # () - () - b2 - b3
         #           ||
@@ -211,7 +205,6 @@ class TestSyncFromCheckpoint(TestCase):
         self.assertEqual(
             set(local.ledger_state.keys()), set([genesis.block.id(), b2.id(), b3.id()])
         )
-        self.assertTrue(sync(local, [peer]))
 
     def test_sync_forks(self):
         #       checkpoint
@@ -241,7 +234,7 @@ class TestSyncFromCheckpoint(TestCase):
         checkpoint = peer.ledger_state[b2.id()]
         local = Follower(genesis, config)
         local.apply_checkpoint(checkpoint)
-        self.assertFalse(sync(local, [peer]))
+        sync(local, [peer])
         # Result:
         # b0 - b1 - b2 - b5 == tip
         #    \
@@ -249,7 +242,6 @@ class TestSyncFromCheckpoint(TestCase):
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
         self.assertEqual(set(local.ledger_state.keys()), set(peer.ledger_state.keys()))
-        self.assertTrue(sync(local, [peer]))
 
     def test_sync_from_dishonest_checkpoint(self):
         # Peer0: b0 - b1 - b2 - b5 == tip
@@ -284,11 +276,10 @@ class TestSyncFromCheckpoint(TestCase):
         checkpoint = peer1.ledger_state[b4.id()]
         local = Follower(genesis, config)
         local.apply_checkpoint(checkpoint)
-        self.assertFalse(sync(local, [peer0, peer1]))
+        sync(local, [peer0, peer1])
         # b0 - b1 - b2 - b5 == tip
         #    \
         #      b3 - b4
         self.assertEqual(local.tip(), b5)
         self.assertEqual(local.forks, [b4.id()])
         self.assertEqual(len(local.ledger_state.keys()), 7)
-        self.assertTrue(sync(local, [peer0, peer1]))

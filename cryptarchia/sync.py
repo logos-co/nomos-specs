@@ -12,40 +12,36 @@ from cryptarchia.cryptarchia import (
 )
 
 
-def sync(local: Follower, peers: list[Follower]) -> bool:
+def sync(local: Follower, peers: list[Follower]):
     # Syncs the local block tree with the peers, starting from the local tip.
     # This covers the case where the local tip is not on the latest honest chain anymore.
-    #
-    # The caller should call this function repeatedly until it returns True,
-    # which means that no peers have blocks ahead of the local tip.
 
-    # Fetch blocks from the peers in the range of slots from the local tip to the latest tip.
-    # Gather orphaned blocks, which are blocks from forks that are absent in the local block tree.
-    start_slot = local.tip().slot
-    orphans: set[BlockHeader] = set()
-    # Filter and group peers by their tip to minimize the number of fetches.
-    groups = filter_and_group_peers_by_tip(peers, start_slot)
-    if len(groups) == 0:
-        return True  # No peers have blocks ahead of the local tip.
-    for group in groups.values():
-        for block in fetch_blocks_by_slot(group, start_slot):
-            try:
-                local.on_block(block)
-                orphans.discard(block)
-            except ParentNotFound:
-                orphans.add(block)
+    # Repeat the sync process until no peer has a tip ahead of the local tip.
+    while True:
+        # Fetch blocks from the peers in the range of slots from the local tip to the latest tip.
+        # Gather orphaned blocks, which are blocks from forks that are absent in the local block tree.
+        start_slot = local.tip().slot
+        orphans: set[BlockHeader] = set()
+        # Filter and group peers by their tip to minimize the number of fetches.
+        groups = filter_and_group_peers_by_tip(peers, start_slot)
+        if len(groups) == 0:  # No peer has a tip ahead of the local tip.
+            return
 
-    # Backfill the orphan forks starting from the orphan blocks with applying fork choice rule.
-    #
-    # Sort the orphan blocks by slot in descending order to minimize the number of backfillings.
-    for orphan in sorted(orphans, key=lambda b: b.slot, reverse=True):
-        # Skip the orphan block processed during the previous backfillings.
-        if orphan not in local.ledger_state:
-            backfill_fork(local, peers, orphan)
+        for group in groups.values():
+            for block in fetch_blocks_by_slot(group, start_slot):
+                try:
+                    local.on_block(block)
+                    orphans.discard(block)
+                except ParentNotFound:
+                    orphans.add(block)
 
-    # The caller should call this function again,
-    # assuming that peers' tips have been updated during the sync.
-    return False
+        # Backfill the orphan forks starting from the orphan blocks with applying fork choice rule.
+        #
+        # Sort the orphan blocks by slot in descending order to minimize the number of backfillings.
+        for orphan in sorted(orphans, key=lambda b: b.slot, reverse=True):
+            # Skip the orphan block processed during the previous backfillings.
+            if orphan not in local.ledger_state:
+                backfill_fork(local, peers, orphan)
 
 
 def filter_and_group_peers_by_tip(
