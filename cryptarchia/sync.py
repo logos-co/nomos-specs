@@ -12,16 +12,22 @@ from cryptarchia.cryptarchia import (
 )
 
 
-def sync(local: Follower, peers: list[Follower]):
+def sync(local: Follower, peers: list[Follower]) -> bool:
     # Syncs the local block tree with the peers, starting from the local tip.
     # This covers the case where the local tip is not on the latest honest chain anymore.
+    #
+    # The caller should call this function repeatedly until it returns True,
+    # which means that no peers have blocks ahead of the local tip.
 
     # Fetch blocks from the peers in the range of slots from the local tip to the latest tip.
     # Gather orphaned blocks, which are blocks from forks that are absent in the local block tree.
     start_slot = local.tip().slot
     orphans: set[BlockHeader] = set()
     # Filter and group peers by their tip to minimize the number of fetches.
-    for group in filter_and_group_peers_by_tip(peers, start_slot).values():
+    groups = filter_and_group_peers_by_tip(peers, start_slot)
+    if len(groups) == 0:
+        return True  # No peers have blocks ahead of the local tip.
+    for group in groups.values():
         for block in fetch_blocks_by_slot(group, start_slot):
             try:
                 local.on_block(block)
@@ -36,6 +42,10 @@ def sync(local: Follower, peers: list[Follower]):
         # Skip the orphan block processed during the previous backfillings.
         if orphan not in local.ledger_state:
             backfill_fork(local, peers, orphan)
+
+    # The caller should call this function again,
+    # assuming that peers' tips have been updated during the sync.
+    return False
 
 
 def filter_and_group_peers_by_tip(
