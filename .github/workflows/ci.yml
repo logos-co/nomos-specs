@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          # Semantic version range syntax or exact version of a Python version
+          # TODO: Revert this to '3.x' once we have an updated version of `poseidon-hash` that works for Python >=3.13.
           python-version: '3.12'
       - name: Install dependencies
         run: pip install -r requirements.txt
