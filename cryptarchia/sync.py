@@ -23,9 +23,11 @@ def sync(local: Follower, peers: list[Follower]):
         # Gather orphaned blocks, which are blocks from forks that are absent in the local block tree.
         start_slot = local.tip().slot
         orphans: set[BlockHeader] = set()
-        # Filter and group peers by their tip to minimize the number of fetches.
+        # Filter peers that have a tip ahead of the local tip
+        # and group peers by their tip to minimize the number of fetches.
         groups = filter_and_group_peers_by_tip(peers, start_slot)
-        if len(groups) == 0:  # No peer has a tip ahead of the local tip.
+        # Finish the sync process if no peer has a tip ahead of the local tip.
+        if len(groups) == 0:
             return
 
         for group in groups.values():
@@ -40,7 +42,8 @@ def sync(local: Follower, peers: list[Follower]):
         #
         # Sort the orphan blocks by slot in descending order to minimize the number of backfillings.
         for orphan in sorted(orphans, key=lambda b: b.slot, reverse=True):
-            # Skip the orphan block processed during the previous backfillings.
+            # Skip the orphan block if it has been processed during the previous backfillings.
+            # (i.e. if it has been already added to the local block tree)
             if orphan not in local.ledger_state:
                 backfill_fork(local, peers, orphan)
 
