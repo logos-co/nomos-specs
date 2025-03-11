@@ -1,4 +1,4 @@
-from typing import TypeAlias, List, Dict
+from typing import TypeAlias, List, Dict, Generator
 from hashlib import sha256, blake2b
 from math import floor
 from copy import deepcopy
@@ -124,6 +124,9 @@ class Slot:
     def __lt__(self, other):
         return self.absolute_slot < other.absolute_slot
 
+    def __hash__(self):
+        return hash(self.absolute_slot)
+
 
 @dataclass
 class Coin:
@@ -247,6 +250,9 @@ class BlockHeader:
         h = blake2b(digest_size=32)
         self.update_header_hash(h)
         return h.digest()
+
+    def __hash__(self):
+        return hash(self.id())
 
 
 @dataclass
@@ -372,7 +378,7 @@ class Follower:
         # TODO: verify blocks are not in the 'future'
         if block.parent not in self.ledger_state:
             logger.warning("We have not seen block parent")
-            return False
+            raise ParentNotFound
 
         current_state = self.ledger_state[block.parent].copy()
 
@@ -441,18 +447,24 @@ class Follower:
             and current_state.verify_unspent(proof.nullifier)
         )
 
-    def on_block(self, block: BlockHeader):
+    def apply_block_to_ledger_state(self, block: BlockHeader) -> bool:
         if block.id() in self.ledger_state:
             logger.warning("dropping already processed block")
-            return
+            return False
 
         if not self.validate_header(block):
             logger.warning("invalid header")
-            return
+            return False
 
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
+
+        return True
+
+    def on_block(self, block: BlockHeader):
+        if not self.apply_block_to_ledger_state(block):
+            return
 
         if block.parent == self.local_chain:
             # simply extending the local chain
@@ -471,6 +483,15 @@ class Follower:
             self.forks.remove(new_tip)
             self.local_chain = new_tip
 
+    def apply_checkpoint(self, checkpoint: LedgerState):
+        checkpoint_block_id = checkpoint.block.id()
+        self.ledger_state[checkpoint_block_id] = checkpoint
+        if self.local_chain != self.genesis_state.block.id():
+            self.forks.append(self.local_chain)
+        if checkpoint_block_id in self.forks:
+            self.forks.remove(checkpoint_block_id)
+        self.local_chain = checkpoint_block_id
+
     def unimported_orphans(self) -> list[BlockHeader]:
         """
         Returns all unimported orphans w.r.t. the given tip's state.
@@ -482,9 +503,10 @@ class Follower:
         orphans = []
 
         for fork in self.forks:
-            _, fork_depth = common_prefix_depth(tip, fork, self.ledger_state)
-            for block_state in chain_suffix(fork, fork_depth, self.ledger_state):
-                b = block_state.block
+            _, _, fork_depth, fork_suffix = common_prefix_depth(
+                tip, fork, self.ledger_state
+            )
+            for b in fork_suffix:
                 if b.leader_proof.nullifier not in tip_state.nullifiers:
                     tip_state.nullifiers.add(b.leader_proof.nullifier)
                     orphans += [b]
@@ -592,6 +614,17 @@ class Follower:
         )
         return int(prev_epoch.inferred_total_active_stake - h * blocks_per_slot_err)
 
+    def blocks_by_slot(self, from_slot: Slot) -> Generator[BlockHeader, None, None]:
+        # Returns blocks in the given range of slots in order of slot
+        # NOTE: In real implementation, this should be done by optimized data structures.
+        blocks_by_slot: dict[Slot, list[BlockHeader]] = defaultdict(list)
+        for state in self.ledger_state.values():
+            if from_slot <= state.block.slot:
+                blocks_by_slot[state.block.slot].append(state.block)
+        for slot in sorted(blocks_by_slot.keys()):
+            for block in blocks_by_slot[slot]:
+                yield block
+
 
 def phi(f: float, alpha: float) -> float:
     """
@@ -646,39 +679,68 @@ class Leader:
         )
 
 
-def iter_chain(tip: Id, states: Dict[Id, LedgerState]):
+def iter_chain(
+    tip: Id, states: Dict[Id, LedgerState]
+) -> Generator[LedgerState, None, None]:
     while tip in states:
         yield states[tip]
         tip = states[tip].block.parent
 
 
-def chain_suffix(tip: Id, n: int, states: Dict[Id, LedgerState]) -> list[LedgerState]:
-    return list(reversed(list(itertools.islice(iter_chain(tip, states), n))))
+def iter_chain_blocks(
+    tip: Id, states: Dict[Id, LedgerState]
+) -> Generator[BlockHeader, None, None]:
+    for state in iter_chain(tip, states):
+        yield state.block
 
 
-def common_prefix_depth(a: Id, b: Id, states: Dict[Id, LedgerState]) -> (int, int):
-    a_blocks = iter_chain(a, states)
-    b_blocks = iter_chain(b, states)
+def common_prefix_depth(
+    a: Id, b: Id, states: Dict[Id, LedgerState]
+) -> tuple[int, list[BlockHeader], int, list[BlockHeader]]:
+    return common_prefix_depth_from_chains(
+        iter_chain_blocks(a, states), iter_chain_blocks(b, states)
+    )
 
+
+def common_prefix_depth_from_chains(
+    a_blocks: Generator[BlockHeader, None, None],
+    b_blocks: Generator[BlockHeader, None, None],
+) -> tuple[int, list[BlockHeader], int, list[BlockHeader]]:
     seen = {}
+    a_suffix: list[BlockHeader] = []
+    b_suffix: list[BlockHeader] = []
     depth = 0
     while True:
         try:
-            a_block = next(a_blocks).block.id()
-            if a_block in seen:
+            a_block = next(a_blocks)
+            a_suffix.append(a_block)
+            a_block_id = a_block.id()
+            if a_block_id in seen:
                 # we had seen this block from the fork chain
-                return depth, seen[a_block]
+                return (
+                    depth,
+                    list(reversed(a_suffix[: depth + 1])),
+                    seen[a_block_id],
+                    list(reversed(b_suffix[: seen[a_block_id] + 1])),
+                )
 
-            seen[a_block] = depth
+            seen[a_block_id] = depth
         except StopIteration:
             pass
 
         try:
-            b_block = next(b_blocks).block.id()
-            if b_block in seen:
+            b_block = next(b_blocks)
+            b_suffix.append(b_block)
+            b_block_id = b_block.id()
+            if b_block_id in seen:
                 # we had seen the fork in the local chain
-                return seen[b_block], depth
-            seen[b_block] = depth
+                return (
+                    seen[b_block_id],
+                    list(reversed(a_suffix[: seen[b_block_id] + 1])),
+                    depth,
+                    list(reversed(b_suffix[: depth + 1])),
+                )
+            seen[b_block_id] = depth
         except StopIteration:
             pass
 
@@ -687,13 +749,8 @@ def common_prefix_depth(a: Id, b: Id, states: Dict[Id, LedgerState]) -> (int, in
     assert False
 
 
-def chain_density(
-    head: Id, slot: Slot, reorg_depth: int, states: Dict[Id, LedgerState]
-) -> int:
-    assert type(head) == Id
-    chain = iter_chain(head, states)
-    segment = itertools.islice(chain, reorg_depth)
-    return sum(1 for b in segment if b.block.slot < slot)
+def chain_density(chain: list[BlockHeader], slot: Slot) -> int:
+    return sum(1 for b in chain if b.slot < slot)
 
 
 def block_children(states: Dict[Id, LedgerState]) -> Dict[Id, set[Id]]:
@@ -723,7 +780,9 @@ def maxvalid_bg(
 
     cmax = local_chain
     for fork in forks:
-        cmax_depth, fork_depth = common_prefix_depth(cmax, fork, states)
+        cmax_depth, cmax_suffix, fork_depth, fork_suffix = common_prefix_depth(
+            cmax, fork, states
+        )
         if cmax_depth <= k:
             # Longest chain fork choice rule
             if cmax_depth < fork_depth:
@@ -731,16 +790,20 @@ def maxvalid_bg(
         else:
             # The chain is forking too much, we need to pay a bit more attention
             # In particular, select the chain that is the densest after the fork
-            cmax_divergent_block = chain_suffix(cmax, cmax_depth, states)[0].block
+            cmax_divergent_block = cmax_suffix[0]
 
             forking_slot = Slot(cmax_divergent_block.slot.absolute_slot + s)
-            cmax_density = chain_density(cmax, forking_slot, cmax_depth, states)
-            fork_density = chain_density(fork, forking_slot, fork_depth, states)
+            cmax_density = chain_density(cmax_suffix, forking_slot)
+            fork_density = chain_density(fork_suffix, forking_slot)
 
             if cmax_density < fork_density:
                 cmax = fork
 
     return cmax
+
+
+class ParentNotFound(Exception):
+    pass
 
 
 if __name__ == "__main__":
