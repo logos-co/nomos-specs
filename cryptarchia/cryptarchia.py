@@ -10,7 +10,6 @@ from collections import defaultdict
 
 import numpy as np
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -368,16 +367,15 @@ class EpochState:
 class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
-        self.forks = []
+        self.forks: list[Id] = []
         self.local_chain = genesis_state.block.id()
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
 
-    def validate_header(self, block: BlockHeader) -> bool:
+    def validate_header(self, block: BlockHeader):
         # TODO: verify blocks are not in the 'future'
         if block.parent not in self.ledger_state:
-            logger.warning("We have not seen block parent")
             raise ParentNotFound
 
         current_state = self.ledger_state[block.parent].copy()
@@ -397,8 +395,7 @@ class Follower:
             # We take a shortcut for (1.) by restricting orphans to proofs we've
             # already processed in other branches.
             if orphan.id() not in self.ledger_state:
-                logger.warning("missing orphan proof")
-                return False
+                raise MissingOrphanProof
 
             # (2.) is satisfied by verifying the proof against current state ensuring:
             # - it is a valid proof
@@ -410,21 +407,21 @@ class Follower:
                 epoch_state,
                 current_state,
             ):
-                logger.warning("invalid orphan proof")
-                return False
+                raise InvalidOrphanProof
 
             # if an adopted leadership proof is valid we need to apply its
             # effects to the ledger state
             current_state.apply_leader_proof(orphan.leader_proof)
 
         # TODO: this is not the full block validation spec, only slot leader is verified
-        return self.verify_slot_leader(
+        if not self.verify_slot_leader(
             block.slot,
             block.parent,
             block.leader_proof,
             epoch_state,
             current_state,
-        )
+        ):
+            raise InvalidLeaderProof
 
     def verify_slot_leader(
         self,
@@ -452,9 +449,7 @@ class Follower:
             logger.warning("dropping already processed block")
             return False
 
-        if not self.validate_header(block):
-            logger.warning("invalid header")
-            return False
+        self.validate_header(block)
 
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
@@ -803,7 +798,23 @@ def maxvalid_bg(
 
 
 class ParentNotFound(Exception):
-    pass
+    def __str__(self):
+        return "Parent not found"
+
+
+class MissingOrphanProof(Exception):
+    def __str__(self):
+        return "Missing orphan proof"
+
+
+class InvalidOrphanProof(Exception):
+    def __str__(self):
+        return "Invalid orphan proof"
+
+
+class InvalidLeaderProof(Exception):
+    def __str__(self):
+        return "Invalid leader proof"
 
 
 if __name__ == "__main__":
