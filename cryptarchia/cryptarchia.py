@@ -16,6 +16,16 @@ logger = logging.getLogger(__name__)
 Id: TypeAlias = bytes
 
 
+class Hash(bytes):
+    def __new__(cls, dst, *data):
+        assert isinstance(dst, bytes)
+        h = sha256()
+        h.update(dst)
+        for d in data:
+            h.update(d)
+        return super().__new__(cls, h.digest())
+
+
 @dataclass(frozen=True)
 class Epoch:
     # identifier of the epoch, counting incrementally from 0
@@ -144,12 +154,7 @@ class Coin:
         return int.to_bytes(self.pk, length=32, byteorder="big")
 
     def evolve(self) -> "Coin":
-        h = blake2b(digest_size=32)
-        h.update(b"coin-evolve")
-        h.update(self.encode_sk())
-        h.update(self.nonce)
-        evolved_nonce = h.digest()
-
+        evolved_nonce = Hash(b"coin-evolve", self.encode_sk(), self.nonce)
         return Coin(nonce=evolved_nonce, sk=self.sk, value=self.value)
 
     def commitment(self) -> Id:
@@ -309,13 +314,12 @@ class LedgerState:
     def apply(self, block: BlockHeader):
         assert block.parent == self.block.id()
 
-        h = blake2b(digest_size=32)
-        h.update("epoch-nonce".encode(encoding="utf-8"))
-        h.update(self.nonce)
-        h.update(block.leader_proof.nullifier)
-        h.update(block.slot.encode())
-
-        self.nonce = h.digest()
+        self.nonce = Hash(
+            b"EPOCH_NONCE",
+            self.nonce,
+            block.leader_proof.nullifier,
+            block.slot.encode(),
+        )
         self.block = block
         for proof in itertools.chain(block.orphaned_proofs, [block]):
             self.apply_leader_proof(proof.leader_proof)
@@ -633,20 +637,20 @@ def phi(f: float, alpha: float) -> float:
 
 
 class MOCK_LEADER_VRF:
-    """NOT SECURE: A mock VRF function"""
+    """A mock VRF function"""
 
     ORDER = 2**256
 
     @classmethod
     def vrf(cls, coin: Coin, epoch_nonce: bytes, slot: Slot) -> int:
-        h = sha256()
-        h.update(b"lead")
-        h.update(epoch_nonce)
-        h.update(slot.encode())
-        h.update(coin.encode_sk())
-        h.update(coin.nonce)
-
-        return int.from_bytes(h.digest())
+        ticket = Hash(
+            b"LEAD",
+            epoch_nonce,
+            slot.encode(),
+            coin.commitment(),
+            coin.encode_sk(),
+        )
+        return int.from_bytes(ticket)
 
     @classmethod
     def verify(cls, r, pk, nonce, slot):
