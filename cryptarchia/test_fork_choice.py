@@ -174,18 +174,18 @@ class TestForkChoice(TestCase):
         genesis = mk_genesis_state([]).block
 
         short_note, long_note = Note(sk=0, value=100), Note(sk=1, value=100)
-        common, long_note = mk_chain(parent=genesis, note=long_note, slots=range(50))
+        common = mk_chain(parent=genesis, note=long_note, slots=range(50))
 
-        long_chain_sparse_ext, long_note = mk_chain(
+        long_chain_sparse_ext = mk_chain(
             parent=common[-1], note=long_note, slots=range(50, 100, 2)
         )
 
-        short_chain_dense_ext, _ = mk_chain(
+        short_chain_dense_ext = mk_chain(
             parent=common[-1], note=short_note, slots=range(50, 100)
         )
 
         # add more blocks to the long chain to ensure the long chain is indeed longer
-        long_chain_further_ext, _ = mk_chain(
+        long_chain_further_ext = mk_chain(
             parent=long_chain_sparse_ext[-1], note=long_note, slots=range(100, 126)
         )
 
@@ -214,16 +214,16 @@ class TestForkChoice(TestCase):
     def test_fork_choice_long_dense_chain(self):
         # The longest chain is also the densest after the fork
         short_note, long_note = Note(sk=0, value=100), Note(sk=1, value=100)
-        common, long_note = mk_chain(
+        common = mk_chain(
             parent=mk_genesis_state([]).block,
             note=long_note,
             slots=range(1, 50),
         )
 
-        long_chain_dense_ext, _ = mk_chain(
+        long_chain_dense_ext = mk_chain(
             parent=common[-1], note=long_note, slots=range(50, 100)
         )
-        short_chain_sparse_ext, _ = mk_chain(
+        short_chain_sparse_ext = mk_chain(
             parent=common[-1], note=short_note, slots=range(50, 100, 2)
         )
 
@@ -246,7 +246,7 @@ class TestForkChoice(TestCase):
         genesis = mk_genesis_state(notes)
         follower = Follower(genesis, config)
 
-        b1, n_a = mk_block(genesis.block, 1, n_a), n_a.evolve()
+        b1 = mk_block(genesis.block, 1, n_a)
 
         follower.on_block(b1)
 
@@ -262,8 +262,8 @@ class TestForkChoice(TestCase):
         #    b3
         #
 
-        b2, n_a = mk_block(b1, 2, n_a), n_a.evolve()
-        b3, n_b = mk_block(b1, 2, n_b), n_b.evolve()
+        b2 = mk_block(b1, 2, n_a)
+        b3 = mk_block(b1, 2, n_b)
 
         follower.on_block(b2)
         follower.on_block(b3)
@@ -280,7 +280,7 @@ class TestForkChoice(TestCase):
         #    b3 - b4 == tip
         #
 
-        b4, n_b = mk_block(b3, 3, n_b), n_a.evolve()
+        b4 = mk_block(b3, 3, n_b)
         follower.on_block(b4)
 
         assert follower.tip_id() == b4.id()

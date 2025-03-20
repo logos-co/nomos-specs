@@ -159,10 +159,6 @@ class Note:
     def encode_pk(self) -> bytes:
         return int.to_bytes(self.pk, length=32, byteorder="big")
 
-    def evolve(self) -> "Note":
-        evolved_nonce = Hash(b"coin-evolve", self.encode_sk(), self.nonce)
-        return Note(nonce=evolved_nonce, sk=self.sk, value=self.value)
-
     def commitment(self) -> Hash:
         value_bytes = int.to_bytes(self.value, length=32, byteorder="big")
         return Hash(

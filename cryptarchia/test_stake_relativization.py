@@ -32,7 +32,7 @@ class TestStakeRelativization(TestCase):
         assert follower.tip_state().leader_count == 1
 
         # continuing the chain increments the leader count
-        b2 = mk_block(b1, slot=2, note=n_a.evolve())
+        b2 = mk_block(b1, slot=2, note=n_a)
         follower.on_block(b2)
         assert follower.tip_state().block == b2
         assert follower.tip_state().leader_count == 2

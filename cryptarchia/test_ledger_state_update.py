@@ -32,7 +32,7 @@ class TestLedgerStateUpdate(TestCase):
         assert len(follower.ledger_state) == 2
         assert len(follower.forks) == 0
 
-    def test_ledger_state_prevents_note_reuse(self):
+    def test_ledger_state_allows_note_reuse(self):
         leader_note = Note(sk=0, value=100)
         genesis = mk_genesis_state([leader_note])
 
@@ -45,16 +45,12 @@ class TestLedgerStateUpdate(TestCase):
         assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
         assert follower.tip() == block
 
-        # Follower should have updated their ledger state to mark the leader note as spent
-        assert follower.tip_state().verify_unspent(leader_note.nullifier()) == False
-
         reuse_note_block = mk_block(slot=1, parent=block, note=leader_note)
-        with self.assertRaises(InvalidLeaderProof):
-            follower.on_block(reuse_note_block)
+        follower.on_block(reuse_note_block)
 
-        # Follower should *not* have accepted the block
-        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
-        assert follower.tip() == block
+        # Follower should have accepted the block
+        assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 3
+        assert follower.tip() == reuse_note_block
 
     def test_ledger_state_is_properly_updated_on_reorg(self):
         note = [Note(sk=0, value=100), Note(sk=1, value=100), Note(sk=2, value=100)]
@@ -72,7 +68,6 @@ class TestLedgerStateUpdate(TestCase):
 
         follower.on_block(block_1)
         assert follower.tip() == block_1
-        assert not follower.tip_state().verify_unspent(note[0].nullifier())
 
         # 3) then sees block 2, but sticks with block_1 as the tip
 
@@ -86,9 +81,6 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_3)
         # the follower should have switched over to the block_2 fork
         assert follower.tip() == block_3
-
-        # and the original note[0] should now be removed from the spent pool
-        assert follower.tip_state().verify_unspent(note[0].nullifier())
 
     def test_fork_creation(self):
         notes = [Note(sk=i, value=100) for i in range(7)]
@@ -177,15 +169,15 @@ class TestLedgerStateUpdate(TestCase):
         with self.assertRaises(InvalidLeaderProof):
             follower.on_block(block_4)
         assert follower.tip() == block_3
-        # then we add the note to "spendable commitments" associated with slot 9
-        follower.ledger_state[block_2.id()].commitments_spend.add(
+        # then we add the note to "commitments" associated with slot 9
+        follower.ledger_state[block_2.id()].commitments.add(
             Note(sk=4, value=100).commitment()
         )
         follower.on_block(block_4)
         assert follower.tip() == block_4
         assert follower.tip().slot.epoch(config).epoch == 2
 
-    def test_evolved_note_is_eligible_for_leadership(self):
+    def test_note_added_after_stake_freeze_is_ineligible_for_leadership(self):
         note = Note(sk=0, value=100)
 
         genesis = mk_genesis_state([note])
@@ -197,16 +189,19 @@ class TestLedgerStateUpdate(TestCase):
         follower.on_block(block_1)
         assert follower.tip() == block_1
 
-        # note can't be reused to win following slots:
-        block_2_reuse = mk_block(slot=1, parent=block_1, note=note)
-        with self.assertRaises(InvalidLeaderProof):
-            follower.on_block(block_2_reuse)
-        assert follower.tip() == block_1
+        # note can be reused to win following slots:
+        block_2 = mk_block(slot=1, parent=block_1, note=note)
+        follower.on_block(block_2)
+        assert follower.tip() == block_2
 
-        # but the evolved note is eligible
-        block_2_evolve = mk_block(slot=1, parent=block_1, note=note.evolve())
-        follower.on_block(block_2_evolve)
-        assert follower.tip() == block_2_evolve
+        # but the a new note is ineligible
+        note_new = Note(sk=1, value=10)
+        follower.tip_state().commitments.add(note_new.commitment())
+        block_3_new = mk_block(slot=2, parent=block_2, note=note_new)
+        with self.assertRaises(InvalidLeaderProof):
+            follower.on_block(block_3_new)
+
+        assert follower.tip() == block_2
 
     def test_new_notes_becoming_eligible_after_stake_distribution_stabilizes(self):
         note = Note(sk=0, value=100)
@@ -225,9 +220,7 @@ class TestLedgerStateUpdate(TestCase):
 
         # mint a new note to be used for leader elections in upcoming epochs
         note_new = Note(sk=1, value=10)
-        follower.ledger_state[block_0_0.id()].commitments_spend.add(
-            note_new.commitment()
-        )
+        follower.ledger_state[block_0_0.id()].commitments.add(note_new.commitment())
 
         # the new note is not yet eligible for elections
         block_0_1_attempt = mk_block(slot=1, parent=block_0_0, note=note_new)
@@ -235,30 +228,20 @@ class TestLedgerStateUpdate(TestCase):
             follower.on_block(block_0_1_attempt)
         assert follower.tip() == block_0_0
 
-        # whereas the evolved note from genesis can be spent immediately
-        block_0_1 = mk_block(slot=1, parent=block_0_0, note=note.evolve())
-        follower.on_block(block_0_1)
-        assert follower.tip() == block_0_1
-
         # ---- EPOCH 1 ----
 
         # The newly minted note is still not eligible in the following epoch since the
         # stake distribution snapshot is taken at the beginning of the previous epoch
 
-        block_1_0 = mk_block(slot=20, parent=block_0_1, note=note_new)
+        block_1_0_attempt = mk_block(slot=20, parent=block_0_0, note=note_new)
         with self.assertRaises(InvalidLeaderProof):
-            follower.on_block(block_1_0)
-        assert follower.tip() == block_0_1
+            follower.on_block(block_1_0_attempt)
+        assert follower.tip() == block_0_0
 
         # ---- EPOCH 2 ----
 
         # The note is finally eligible 2 epochs after it was first minted
 
-        block_2_0 = mk_block(slot=40, parent=block_0_1, note=note_new)
+        block_2_0 = mk_block(slot=40, parent=block_0_0, note=note_new)
         follower.on_block(block_2_0)
         assert follower.tip() == block_2_0
-
-        # And now the minted note can freely use the evolved note for subsequent blocks
-        block_2_1 = mk_block(slot=40, parent=block_2_0, note=note_new.evolve())
-        follower.on_block(block_2_1)
-        assert follower.tip() == block_2_1

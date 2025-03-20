@@ -26,7 +26,6 @@ class TestNode:
         parent = self.follower.tip_id()
         epoch_state = self.epoch_state(slot)
         if leader_proof := self.leader.try_prove_slot_leader(epoch_state, slot, parent):
-            self.leader.note = self.leader.note.evolve()
             return BlockHeader(
                 parent=parent,
                 slot=slot,
@@ -89,5 +88,4 @@ def mk_chain(
         block = mk_block(parent=parent, slot=s, note=note)
         chain.append(block)
         parent = block
-        note = note.evolve()
-    return chain, note
+    return chain
