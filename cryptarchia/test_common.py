@@ -60,8 +60,7 @@ def mk_genesis_state(initial_stake_distribution: list[Note]) -> LedgerState:
             ),
         ),
         nonce=bytes(32),
-        commitments_spend={n.commitment() for n in initial_stake_distribution},
-        commitments_lead={n.commitment() for n in initial_stake_distribution},
+        commitments={n.commitment() for n in initial_stake_distribution},
         nullifiers=set(),
     )
 

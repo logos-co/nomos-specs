@@ -185,21 +185,19 @@ class MockLeaderProof:
     slot: Slot
     parent: Hash
 
-    @property
-    def commitment(self):
-        return self.note.commitment()
+    def epoch_nonce_contribution(self) -> Hash:
+        return Hash(b"NOMOS_NONCE_CONTRIB", self.slot.encode(), self.note.nullifier())
 
-    @property
-    def nullifier(self):
-        return self.note.nullifier()
-
-    @property
-    def evolved_commitment(self):
-        return self.note.evolve().commitment()
-
-    def verify(self, slot: Slot, parent: Hash):
-        # TODO: verification not implemented
-        return slot == self.slot and parent == self.parent
+    def verify(
+        self, slot: Slot, parent: Hash, commitments: set[Hash], nullifiers: set[Hash]
+    ):
+        # TODO: verify slot lottery
+        return (
+            slot == self.slot
+            and parent == self.parent
+            and self.note.commitment() in commitments
+            and self.note.nullifier() not in nullifiers
+        )
 
 
 @dataclass
@@ -224,9 +222,8 @@ class BlockHeader:
             self.slot.encode(),  # slot
             self.parent,  # parent
             # leader proof
-            self.leader_proof.commitment,
-            self.leader_proof.nullifier,
-            self.leader_proof.evolved_commitment,
+            self.leader_proof.epoch_nonce_contribution(),
+            # self.leader_proof -- the proof itself needs to be include in the hash
         )
 
     def __hash__(self):
@@ -249,11 +246,8 @@ class LedgerState:
     # when the nonce snapshot is taken
     nonce: Hash = None
 
-    # set of commitments
-    commitments_spend: set[Hash] = field(default_factory=set)
-
-    # set of commitments eligible to lead
-    commitments_lead: set[Hash] = field(default_factory=set)
+    # set of note commitments
+    commitments: set[Hash] = field(default_factory=set)
 
     # set of nullified notes
     nullifiers: set[Hash] = field(default_factory=set)
@@ -267,8 +261,7 @@ class LedgerState:
         return LedgerState(
             block=self.block,
             nonce=self.nonce,
-            commitments_spend=deepcopy(self.commitments_spend),
-            commitments_lead=deepcopy(self.commitments_lead),
+            commitments=deepcopy(self.commitments),
             nullifiers=deepcopy(self.nullifiers),
             leader_count=self.leader_count,
         )
@@ -276,32 +269,17 @@ class LedgerState:
     def replace(self, **kwarg) -> "LedgerState":
         return replace(self, **kwarg)
 
-    def verify_eligible_to_spend(self, commitment: Hash) -> bool:
-        return commitment in self.commitments_spend
-
-    def verify_eligible_to_lead(self, commitment: Hash) -> bool:
-        return commitment in self.commitments_lead
-
-    def verify_unspent(self, nullifier: Hash) -> bool:
-        return nullifier not in self.nullifiers
-
     def apply(self, block: BlockHeader):
         assert block.parent == self.block.id()
 
         self.nonce = Hash(
             b"EPOCH_NONCE",
             self.nonce,
-            block.leader_proof.nullifier,
+            block.leader_proof.epoch_nonce_contribution(),
             block.slot.encode(),
         )
-        self.apply_leader_proof(block.leader_proof)
-        self.block = block
-
-    def apply_leader_proof(self, proof: MockLeaderProof):
-        self.nullifiers.add(proof.nullifier)
-        self.commitments_spend.add(proof.evolved_commitment)
-        self.commitments_lead.add(proof.evolved_commitment)
         self.leader_count += 1
+        self.block = block
 
 
 @dataclass
@@ -319,16 +297,6 @@ class EpochState:
     # epoch. This inferred total stake is used to relativize stake values in the
     # leadership lottery.
     inferred_total_active_stake: int
-
-    def verify_eligible_to_lead_due_to_age(self, commitment: Hash) -> bool:
-        # A note is eligible to lead if it was committed to before the the stake
-        # distribution snapshot was taken or it was produced by a leader proof
-        # since the snapshot was taken.
-        #
-        # This verification is checking that first condition.
-        #
-        # NOTE: `ledger_state.commitments_spend` is a super-set of `ledger_state.commitments_lead`
-        return self.stake_distribution_snapshot.verify_eligible_to_spend(commitment)
 
     def total_active_stake(self) -> int:
         """
@@ -362,35 +330,13 @@ class Follower:
         )
 
         # TODO: this is not the full block validation spec, only slot leader is verified
-        if not self.verify_slot_leader(
+        if not block.leader_proof.verify(
             block.slot,
             block.parent,
-            block.leader_proof,
-            epoch_state,
-            current_state,
+            epoch_state.stake_distribution_snapshot.commitments,
+            current_state.nullifiers,
         ):
             raise InvalidLeaderProof
-
-    def verify_slot_leader(
-        self,
-        slot: Slot,
-        parent: Hash,
-        proof: MockLeaderProof,
-        # notes are old enough if their commitment is in the stake distribution snapshot
-        epoch_state: EpochState,
-        # nullifiers (and commitments) are checked against the current state.
-        # For now, we assume proof parent state and current state are identical.
-        # This will change once we start putting merkle roots in headers
-        current_state: LedgerState,
-    ) -> bool:
-        return (
-            proof.verify(slot, parent)  # verify slot leader proof
-            and (
-                current_state.verify_eligible_to_lead(proof.commitment)
-                or epoch_state.verify_eligible_to_lead_due_to_age(proof.commitment)
-            )
-            and current_state.verify_unspent(proof.nullifier)
-        )
 
     def apply_block_to_ledger_state(self, block: BlockHeader) -> bool:
         if block.id() in self.ledger_state:
