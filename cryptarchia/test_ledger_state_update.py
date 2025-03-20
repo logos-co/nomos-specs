@@ -1,10 +1,14 @@
 from unittest import TestCase
 
-import numpy as np
-
-from .cryptarchia import Follower, Coin, iter_chain
-
-from .test_common import mk_config, mk_block, mk_genesis_state
+from .cryptarchia import (
+    Coin,
+    Follower,
+    InvalidLeaderProof,
+    MissingOrphanProof,
+    ParentNotFound,
+    iter_chain,
+)
+from .test_common import mk_block, mk_config, mk_genesis_state
 
 
 class TestLedgerStateUpdate(TestCase):
@@ -46,7 +50,8 @@ class TestLedgerStateUpdate(TestCase):
         assert follower.tip_state().verify_unspent(leader_coin.nullifier()) == False
 
         reuse_coin_block = mk_block(slot=1, parent=block, coin=leader_coin)
-        follower.on_block(reuse_coin_block)
+        with self.assertRaises(InvalidLeaderProof):
+            follower.on_block(reuse_coin_block)
 
         # Follower should *not* have accepted the block
         assert len(list(iter_chain(follower.tip_id(), follower.ledger_state))) == 2
@@ -126,7 +131,8 @@ class TestLedgerStateUpdate(TestCase):
         # Nothing changes from the local chain and forks.
         unknown_block = mk_block(parent=block_5, slot=2, coin=coins[5])
         block_6 = mk_block(parent=unknown_block, slot=2, coin=coins[6])
-        follower.on_block(block_6)
+        with self.assertRaises(ParentNotFound):
+            follower.on_block(block_6)
         assert follower.tip() == block_3
         assert len(follower.forks) == 2, f"{len(follower.forks)}"
         assert follower.forks[0] == block_4.id()
@@ -169,7 +175,8 @@ class TestLedgerStateUpdate(TestCase):
         # so that the new block can be accepted only if that is the snapshot used
         # first, verify that if we don't change the state, the block is not accepted
         block_4 = mk_block(slot=40, parent=block_3, coin=Coin(sk=4, value=100))
-        follower.on_block(block_4)
+        with self.assertRaises(InvalidLeaderProof):
+            follower.on_block(block_4)
         assert follower.tip() == block_3
         # then we add the coin to "spendable commitments" associated with slot 9
         follower.ledger_state[block_2.id()].commitments_spend.add(
@@ -193,7 +200,8 @@ class TestLedgerStateUpdate(TestCase):
 
         # coin can't be reused to win following slots:
         block_2_reuse = mk_block(slot=1, parent=block_1, coin=coin)
-        follower.on_block(block_2_reuse)
+        with self.assertRaises(InvalidLeaderProof):
+            follower.on_block(block_2_reuse)
         assert follower.tip() == block_1
 
         # but the evolved coin is eligible
@@ -224,7 +232,8 @@ class TestLedgerStateUpdate(TestCase):
 
         # the new coin is not yet eligible for elections
         block_0_1_attempt = mk_block(slot=1, parent=block_0_0, coin=coin_new)
-        follower.on_block(block_0_1_attempt)
+        with self.assertRaises(InvalidLeaderProof):
+            follower.on_block(block_0_1_attempt)
         assert follower.tip() == block_0_0
 
         # whereas the evolved coin from genesis can be spent immediately
@@ -238,7 +247,8 @@ class TestLedgerStateUpdate(TestCase):
         # stake distribution snapshot is taken at the beginning of the previous epoch
 
         block_1_0 = mk_block(slot=20, parent=block_0_1, coin=coin_new)
-        follower.on_block(block_1_0)
+        with self.assertRaises(InvalidLeaderProof):
+            follower.on_block(block_1_0)
         assert follower.tip() == block_0_1
 
         # ---- EPOCH 2 ----
@@ -267,7 +277,8 @@ class TestLedgerStateUpdate(TestCase):
         coin_new = coin.evolve()
         coin_new_new = coin_new.evolve()
         block_0_1 = mk_block(slot=1, parent=block_0_0, coin=coin_new_new)
-        follower.on_block(block_0_1)
+        with self.assertRaises(InvalidLeaderProof):
+            follower.on_block(block_0_1)
         # the coin evolved twice should not be accepted as it is not in the lead commitments
         assert follower.tip() == block_0_0
 
@@ -283,7 +294,8 @@ class TestLedgerStateUpdate(TestCase):
             coin=coin_orphan.evolve(),
             orphaned_proofs=[orphan],
         )
-        follower.on_block(block_0_1)
+        with self.assertRaises(MissingOrphanProof):
+            follower.on_block(block_0_1)
 
         # since follower had not seen this orphan prior to being included as
         # an orphan proof, it will be rejected
