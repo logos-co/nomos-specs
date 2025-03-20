@@ -55,7 +55,7 @@ def mk_genesis_state(initial_stake_distribution: list[Note]) -> LedgerState:
             parent=bytes(32),
             content_size=0,
             content_id=bytes(32),
-            leader_proof=MockLeaderProof.new(
+            leader_proof=MockLeaderProof(
                 Note(sk=0, value=0), Slot(0), parent=bytes(32)
             ),
         ),
@@ -78,7 +78,7 @@ def mk_block(
         parent=parent.id(),
         content_size=len(content),
         content_id=sha256(content).digest(),
-        leader_proof=MockLeaderProof.new(note, Slot(slot), parent=parent.id()),
+        leader_proof=MockLeaderProof(note, Slot(slot), parent=parent.id()),
         orphaned_proofs=orphaned_proofs,
     )
 

@@ -184,21 +184,21 @@ class Note:
 
 @dataclass
 class MockLeaderProof:
-    commitment: Id
-    nullifier: Id
-    evolved_commitment: Id
+    note: Note
     slot: Slot
     parent: Id
 
-    @staticmethod
-    def new(note: Note, slot: Slot, parent: Id):
-        return MockLeaderProof(
-            commitment=note.commitment(),
-            nullifier=note.nullifier(),
-            evolved_commitment=note.evolve().commitment(),
-            slot=slot,
-            parent=parent,
-        )
+    @property
+    def commitment(self):
+        return self.note.commitment()
+
+    @property
+    def nullifier(self):
+        return self.note.nullifier()
+
+    @property
+    def evolved_commitment(self):
+        return self.note.evolve().commitment()
 
     def verify(self, slot: Slot, parent: Id):
         # TODO: verification not implemented
@@ -666,7 +666,7 @@ class Leader:
         self, epoch: EpochState, slot: Slot, parent: Id
     ) -> MockLeaderProof | None:
         if self._is_slot_leader(epoch, slot):
-            return MockLeaderProof.new(self.note, slot, parent)
+            return MockLeaderProof(self.note, slot, parent)
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
         relative_stake = self.note.value / epoch.total_active_stake()
