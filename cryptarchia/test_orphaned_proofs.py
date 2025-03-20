@@ -1,14 +1,14 @@
 from unittest import TestCase
 
-from cryptarchia.cryptarchia import Coin, Follower
+from cryptarchia.cryptarchia import Note, Follower
 
 from .test_common import mk_config, mk_genesis_state, mk_block
 
 
 class TestOrphanedProofs(TestCase):
     def test_simple_orphan_import(self):
-        c_a, c_b = Coin(sk=0, value=10), Coin(sk=1, value=10)
-        coins = [c_a, c_b]
+        n_a, n_b = Note(sk=0, value=10), Note(sk=1, value=10)
+        coins = [n_a, n_b]
         config = mk_config(coins)
         genesis = mk_genesis_state(coins)
         follower = Follower(genesis, config)
@@ -22,9 +22,9 @@ class TestOrphanedProofs(TestCase):
         #   b3
         #
 
-        b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
-        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
-        b3, c_b = mk_block(b1, 2, c_b), c_b.evolve()
+        b1, n_a = mk_block(genesis.block, 1, n_a), n_a.evolve()
+        b2, n_a = mk_block(b1, 2, n_a), n_a.evolve()
+        b3, n_b = mk_block(b1, 2, n_b), n_b.evolve()
 
         for b in [b1, b2, b3]:
             follower.on_block(b)
@@ -41,7 +41,7 @@ class TestOrphanedProofs(TestCase):
         #  \  /
         #   b3
         #
-        b4, c_a = mk_block(b2, 3, c_a, orphaned_proofs=[b3]), c_a.evolve()
+        b4, n_a = mk_block(b2, 3, n_a, orphaned_proofs=[b3]), n_a.evolve()
         follower.on_block(b4)
 
         assert follower.tip() == b4
@@ -49,8 +49,8 @@ class TestOrphanedProofs(TestCase):
         assert follower.unimported_orphans() == []
 
     def test_orphan_proof_import_from_long_running_fork(self):
-        c_a, c_b = Coin(sk=0, value=10), Coin(sk=1, value=10)
-        coins = [c_a, c_b]
+        n_a, n_b = Note(sk=0, value=10), Note(sk=1, value=10)
+        coins = [n_a, n_b]
         config = mk_config(coins)
         genesis = mk_genesis_state(coins)
         follower = Follower(genesis, config)
@@ -64,13 +64,13 @@ class TestOrphanedProofs(TestCase):
         #   b4 - b5
         #
 
-        b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
+        b1, n_a = mk_block(genesis.block, 1, n_a), n_a.evolve()
 
-        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
+        b2, n_a = mk_block(b1, 2, n_a), n_a.evolve()
+        b3, n_a = mk_block(b2, 3, n_a), n_a.evolve()
 
-        b4, c_b = mk_block(b1, 2, c_b), c_b.evolve()
-        b5, c_b = mk_block(b4, 3, c_b), c_b.evolve()
+        b4, n_b = mk_block(b1, 2, n_b), n_b.evolve()
+        b5, n_b = mk_block(b4, 3, n_b), n_b.evolve()
 
         for b in [b1, b2, b3, b4, b5]:
             follower.on_block(b)
@@ -87,15 +87,15 @@ class TestOrphanedProofs(TestCase):
         #  \ /     /
         #   b4 - b5
 
-        b6, c_a = mk_block(b3, 4, c_a, orphaned_proofs=[b4, b5]), c_a.evolve()
+        b6, n_a = mk_block(b3, 4, n_a, orphaned_proofs=[b4, b5]), n_a.evolve()
         follower.on_block(b6)
 
         assert follower.tip() == b6
         assert [f for f in follower.forks] == [b5.id()]
 
     def test_orphan_proof_import_from_fork_without_direct_shared_parent(self):
-        coins = [Coin(sk=i, value=10) for i in range(2)]
-        c_a, c_b = coins
+        coins = [Note(sk=i, value=10) for i in range(2)]
+        n_a, n_b = coins
         config = mk_config(coins)
         genesis = mk_genesis_state(coins)
         follower = Follower(genesis, config)
@@ -108,15 +108,15 @@ class TestOrphanedProofs(TestCase):
         #  \
         #   b5 - b6 - b7
 
-        b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
+        b1, n_a = mk_block(genesis.block, 1, n_a), n_a.evolve()
 
-        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
-        b4, c_a = mk_block(b3, 4, c_a), c_a.evolve()
+        b2, n_a = mk_block(b1, 2, n_a), n_a.evolve()
+        b3, n_a = mk_block(b2, 3, n_a), n_a.evolve()
+        b4, n_a = mk_block(b3, 4, n_a), n_a.evolve()
 
-        b5, c_b = mk_block(b1, 2, c_b), c_b.evolve()
-        b6, c_b = mk_block(b5, 3, c_b), c_b.evolve()
-        b7, c_b = mk_block(b6, 4, c_b), c_b.evolve()
+        b5, n_b = mk_block(b1, 2, n_b), n_b.evolve()
+        b6, n_b = mk_block(b5, 3, n_b), n_b.evolve()
+        b7, n_b = mk_block(b6, 4, n_b), n_b.evolve()
 
         for b in [b1, b2, b3, b4, b5, b6, b7]:
             follower.on_block(b)
@@ -136,7 +136,7 @@ class TestOrphanedProofs(TestCase):
         # Earlier implementations of orphan proof validation failed to
         # validate b7 as an orphan here.
 
-        b8, c_a = mk_block(b4, 5, c_a, orphaned_proofs=[b5, b6, b7]), c_a.evolve()
+        b8, n_a = mk_block(b4, 5, n_a, orphaned_proofs=[b5, b6, b7]), n_a.evolve()
         follower.on_block(b8)
 
         assert follower.tip() == b8
@@ -166,21 +166,21 @@ class TestOrphanedProofs(TestCase):
         #     -- b6
         #
 
-        coins = [Coin(sk=i, value=10) for i in range(3)]
-        c_a, c_b, c_c = coins
+        coins = [Note(sk=i, value=10) for i in range(3)]
+        n_a, n_b, n_c = coins
         config = mk_config(coins)
         genesis = mk_genesis_state(coins)
         follower = Follower(genesis, config)
 
-        b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
+        b1, n_a = mk_block(genesis.block, 1, n_a), n_a.evolve()
 
-        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
+        b2, n_a = mk_block(b1, 2, n_a), n_a.evolve()
+        b3, n_a = mk_block(b2, 3, n_a), n_a.evolve()
 
-        b4, c_b = mk_block(b1, 2, c_b), c_b.evolve()
-        b5, c_b = mk_block(b4, 3, c_b), c_b.evolve()
+        b4, n_b = mk_block(b1, 2, n_b), n_b.evolve()
+        b5, n_b = mk_block(b4, 3, n_b), n_b.evolve()
 
-        b6, c_c = mk_block(b4, 3, c_c), c_c.evolve()
+        b6, n_c = mk_block(b4, 3, n_c), n_c.evolve()
 
         for b in [b1, b2, b3, b4, b5, b6]:
             follower.on_block(b)
@@ -189,7 +189,7 @@ class TestOrphanedProofs(TestCase):
         assert [f for f in follower.forks] == [b5.id(), b6.id()]
         assert follower.unimported_orphans() == [b4, b5, b6]
 
-        b7, c_a = mk_block(b3, 4, c_a, orphaned_proofs=[b4, b5, b6]), c_a.evolve()
+        b7, n_a = mk_block(b3, 4, n_a, orphaned_proofs=[b4, b5, b6]), n_a.evolve()
 
         follower.on_block(b7)
         assert follower.tip() == b7
@@ -215,23 +215,23 @@ class TestOrphanedProofs(TestCase):
         #                      \     /   \_     /
         #                       -b5(a)-----\-b7(a, o=b5)
 
-        coins = [Coin(sk=i, value=10) for i in range(2)]
-        c_a, c_b = coins
+        coins = [Note(sk=i, value=10) for i in range(2)]
+        n_a, n_b = coins
         config = mk_config(coins)
         genesis = mk_genesis_state(coins)
         follower = Follower(genesis, config)
 
-        b1, c_a = mk_block(genesis.block, 1, c_a), c_a.evolve()
-        b2, c_a = mk_block(b1, 2, c_a), c_a.evolve()
-        b3, c_a = mk_block(b2, 3, c_a), c_a.evolve()
+        b1, n_a = mk_block(genesis.block, 1, n_a), n_a.evolve()
+        b2, n_a = mk_block(b1, 2, n_a), n_a.evolve()
+        b3, n_a = mk_block(b2, 3, n_a), n_a.evolve()
 
-        b4, c_b = mk_block(b3, 4, c_b), c_b.evolve()
-        b5, c_a = mk_block(b3, 4, c_a), c_a.evolve()
+        b4, n_b = mk_block(b3, 4, n_b), n_b.evolve()
+        b5, n_a = mk_block(b3, 4, n_a), n_a.evolve()
 
-        b6, c_b = mk_block(b4, 5, c_b, orphaned_proofs=[b5]), c_b.evolve()
-        b7, c_a = mk_block(b4, 5, c_a, orphaned_proofs=[b5]), c_a.evolve()
+        b6, n_b = mk_block(b4, 5, n_b, orphaned_proofs=[b5]), n_b.evolve()
+        b7, n_a = mk_block(b4, 5, n_a, orphaned_proofs=[b5]), n_a.evolve()
 
-        b8, c_b = mk_block(b6, 6, c_b, orphaned_proofs=[b7]), c_b.evolve()
+        b8, n_b = mk_block(b6, 6, n_b, orphaned_proofs=[b7]), n_b.evolve()
 
         for b in [b1, b2, b3, b4, b5]:
             follower.on_block(b)

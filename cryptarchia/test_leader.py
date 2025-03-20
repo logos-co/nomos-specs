@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from .cryptarchia import Leader, EpochState, LedgerState, Coin, phi, Slot
+from .cryptarchia import Leader, EpochState, LedgerState, Note, phi, Slot
 from .test_common import mk_config
 
 
@@ -14,11 +14,11 @@ class TestLeader(TestCase):
             inferred_total_active_stake=1000,
         )
 
-        coin = Coin(sk=0, value=10)
+        note = Note(sk=0, value=10)
         f = 0.05
         l = Leader(
-            config=mk_config([coin]).replace(active_slot_coeff=f),
-            coin=coin,
+            config=mk_config([note]).replace(active_slot_coeff=f),
+            note=note,
         )
 
         # We'll use the Margin of Error equation to decide how many samples we need.

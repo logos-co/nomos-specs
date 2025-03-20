@@ -25,6 +25,9 @@ class Hash(bytes):
             h.update(d)
         return super().__new__(cls, h.digest())
 
+    def __deepcopy__(self, memo):
+        return self
+
 
 @dataclass(frozen=True)
 class Epoch:
@@ -138,10 +141,16 @@ class Slot:
 
 
 @dataclass
-class Coin:
-    sk: int
+class Note:
     value: int
-    nonce: bytes = bytes(32)
+    sk: int  # TODO: rename to nf_sk
+    nonce: Hash = Hash(b"nonce")
+    unit: Hash = Hash(b"NMO")
+    state: Hash = Hash(b"state")
+    zone_id: Hash = Hash(b"ZoneID")
+
+    def __post_init__(self):
+        assert 0 <= self.value <= 2**64
 
     @property
     def pk(self) -> int:
@@ -153,31 +162,24 @@ class Coin:
     def encode_pk(self) -> bytes:
         return int.to_bytes(self.pk, length=32, byteorder="big")
 
-    def evolve(self) -> "Coin":
+    def evolve(self) -> "Note":
         evolved_nonce = Hash(b"coin-evolve", self.encode_sk(), self.nonce)
-        return Coin(nonce=evolved_nonce, sk=self.sk, value=self.value)
+        return Note(nonce=evolved_nonce, sk=self.sk, value=self.value)
 
-    def commitment(self) -> Id:
-        # TODO: mocked until CL is understood
+    def commitment(self) -> Hash:
         value_bytes = int.to_bytes(self.value, length=32, byteorder="big")
-
-        h = sha256()
-        h.update(b"coin-commitment")
-        h.update(self.nonce)
-        h.update(self.encode_pk())
-        h.update(value_bytes)
-        return h.digest()
+        return Hash(
+            b"NOMOS_NOTE_CM",
+            self.state,
+            value_bytes,
+            self.unit,
+            self.nonce,
+            self.encode_pk(),
+            self.zone_id,
+        )
 
     def nullifier(self) -> Id:
-        # TODO: mocked until CL is understood
-        value_bytes = int.to_bytes(self.value, length=32, byteorder="big")
-
-        h = sha256()
-        h.update(b"coin-nullifier")
-        h.update(self.nonce)
-        h.update(self.encode_pk())
-        h.update(value_bytes)
-        return h.digest()
+        return Hash(b"NOMOS_NOTE_NF", self.commitment(), self.encode_sk())
 
 
 @dataclass
@@ -189,13 +191,11 @@ class MockLeaderProof:
     parent: Id
 
     @staticmethod
-    def new(coin: Coin, slot: Slot, parent: Id):
-        evolved_coin = coin.evolve()
-
+    def new(note: Note, slot: Slot, parent: Id):
         return MockLeaderProof(
-            commitment=coin.commitment(),
-            nullifier=coin.nullifier(),
-            evolved_commitment=evolved_coin.commitment(),
+            commitment=note.commitment(),
+            nullifier=note.nullifier(),
+            evolved_commitment=note.evolve().commitment(),
             slot=slot,
             parent=parent,
         )
@@ -281,7 +281,7 @@ class LedgerState:
     # set of commitments eligible to lead
     commitments_lead: set[Id] = field(default_factory=set)
 
-    # set of nullified coins
+    # set of nullified notes
     nullifiers: set[Id] = field(default_factory=set)
 
     # -- Stake Relativization State
@@ -348,7 +348,7 @@ class EpochState:
     inferred_total_active_stake: int
 
     def verify_eligible_to_lead_due_to_age(self, commitment: Id) -> bool:
-        # A coin is eligible to lead if it was committed to before the the stake
+        # A note is eligible to lead if it was committed to before the the stake
         # distribution snapshot was taken or it was produced by a leader proof
         # since the snapshot was taken.
         #
@@ -360,7 +360,7 @@ class EpochState:
     def total_active_stake(self) -> int:
         """
         Returns the inferred total stake participating in consensus.
-        Total active stake is used to reletivize a coin's value in leadership proofs.
+        Total active stake is used to reletivize a note's value in leadership proofs.
         """
         return self.inferred_total_active_stake
 
@@ -432,7 +432,7 @@ class Follower:
         slot: Slot,
         parent: Id,
         proof: MockLeaderProof,
-        # coins are old enough if their commitment is in the stake distribution snapshot
+        # notes are old enough if their commitment is in the stake distribution snapshot
         epoch_state: EpochState,
         # nullifiers (and commitments) are checked against the current state.
         # For now, we assume proof parent state and current state are identical.
@@ -642,13 +642,13 @@ class MOCK_LEADER_VRF:
     ORDER = 2**256
 
     @classmethod
-    def vrf(cls, coin: Coin, epoch_nonce: bytes, slot: Slot) -> int:
+    def vrf(cls, note: Note, epoch_nonce: bytes, slot: Slot) -> int:
         ticket = Hash(
             b"LEAD",
             epoch_nonce,
             slot.encode(),
-            coin.commitment(),
-            coin.encode_sk(),
+            note.commitment(),
+            note.encode_sk(),
         )
         return int.from_bytes(ticket)
 
@@ -660,18 +660,18 @@ class MOCK_LEADER_VRF:
 @dataclass
 class Leader:
     config: Config
-    coin: Coin
+    note: Note
 
     def try_prove_slot_leader(
         self, epoch: EpochState, slot: Slot, parent: Id
     ) -> MockLeaderProof | None:
         if self._is_slot_leader(epoch, slot):
-            return MockLeaderProof.new(self.coin, slot, parent)
+            return MockLeaderProof.new(self.note, slot, parent)
 
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
-        relative_stake = self.coin.value / epoch.total_active_stake()
+        relative_stake = self.note.value / epoch.total_active_stake()
 
-        r = MOCK_LEADER_VRF.vrf(self.coin, epoch.nonce(), slot)
+        r = MOCK_LEADER_VRF.vrf(self.note, epoch.nonce(), slot)
 
         return r < MOCK_LEADER_VRF.ORDER * phi(
             self.config.active_slot_coeff, relative_stake
