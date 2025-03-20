@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class Hash(bytes):
+    ORDER = 2**256
+
     def __new__(cls, dst, *data):
         assert isinstance(dst, bytes)
         h = sha256()
@@ -501,27 +503,6 @@ def phi(f: float, alpha: float) -> float:
     return 1 - (1 - f) ** alpha
 
 
-class MOCK_LEADER_VRF:
-    """A mock VRF function"""
-
-    ORDER = 2**256
-
-    @classmethod
-    def vrf(cls, note: Note, epoch_nonce: bytes, slot: Slot) -> int:
-        ticket = Hash(
-            b"LEAD",
-            epoch_nonce,
-            slot.encode(),
-            note.commitment(),
-            note.encode_sk(),
-        )
-        return int.from_bytes(ticket)
-
-    @classmethod
-    def verify(cls, r, pk, nonce, slot):
-        raise NotImplemented()
-
-
 @dataclass
 class Leader:
     config: Config
@@ -536,11 +517,16 @@ class Leader:
     def _is_slot_leader(self, epoch: EpochState, slot: Slot):
         relative_stake = self.note.value / epoch.total_active_stake()
 
-        r = MOCK_LEADER_VRF.vrf(self.note, epoch.nonce(), slot)
-
-        return r < MOCK_LEADER_VRF.ORDER * phi(
-            self.config.active_slot_coeff, relative_stake
+        ticket = Hash(
+            b"LEAD",
+            epoch.nonce(),
+            slot.encode(),
+            self.note.commitment(),
+            self.note.encode_sk(),
         )
+        ticket = int.from_bytes(ticket)
+
+        return ticket < Hash.ORDER * phi(self.config.active_slot_coeff, relative_stake)
 
 
 def iter_chain(
