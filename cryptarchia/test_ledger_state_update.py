@@ -4,7 +4,6 @@ from .cryptarchia import (
     Note,
     Follower,
     InvalidLeaderProof,
-    MissingOrphanProof,
     ParentNotFound,
     iter_chain,
 )
@@ -263,46 +262,3 @@ class TestLedgerStateUpdate(TestCase):
         block_2_1 = mk_block(slot=40, parent=block_2_0, note=note_new.evolve())
         follower.on_block(block_2_1)
         assert follower.tip() == block_2_1
-
-    def test_orphaned_proofs(self):
-        note, note_orphan = Note(sk=0, value=100), Note(sk=1, value=100)
-        genesis = mk_genesis_state([note, note_orphan])
-
-        follower = Follower(genesis, mk_config([note, note_orphan]))
-
-        block_0_0 = mk_block(slot=0, parent=genesis.block, note=note)
-        follower.on_block(block_0_0)
-        assert follower.tip() == block_0_0
-
-        note_new = note.evolve()
-        note_new_new = note_new.evolve()
-        block_0_1 = mk_block(slot=1, parent=block_0_0, note=note_new_new)
-        with self.assertRaises(InvalidLeaderProof):
-            follower.on_block(block_0_1)
-        # the note evolved twice should not be accepted as it is not in the lead commitments
-        assert follower.tip() == block_0_0
-
-        # An orphaned proof will not be accepted until a node first sees the corresponding block.
-        #
-        # Also, notice that the block is using the evolved orphan note which is not present on the main
-        # branch. The evolved orphan commitment is added from the orphan prior to validating the block
-        # header as part of orphan importing process
-        orphan = mk_block(parent=genesis.block, slot=0, note=note_orphan)
-        block_0_1 = mk_block(
-            slot=1,
-            parent=block_0_0,
-            note=note_orphan.evolve(),
-            orphaned_proofs=[orphan],
-        )
-        with self.assertRaises(MissingOrphanProof):
-            follower.on_block(block_0_1)
-
-        # since follower had not seen this orphan prior to being included as
-        # an orphan proof, it will be rejected
-        assert follower.tip() == block_0_0
-
-        # but all is fine if the follower first sees the orphan block, and then
-        # is imported into the main chain
-        follower.on_block(orphan)
-        follower.on_block(block_0_1)
-        assert follower.tip() == block_0_1

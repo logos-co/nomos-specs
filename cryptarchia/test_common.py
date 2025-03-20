@@ -7,6 +7,7 @@ from .cryptarchia import (
     MockLeaderProof,
     Leader,
     Follower,
+    Hash,
 )
 
 
@@ -29,7 +30,6 @@ class TestNode:
             return BlockHeader(
                 parent=parent,
                 slot=slot,
-                orphaned_proofs=self.follower.unimported_orphans(),
                 leader_proof=leader_proof,
                 content_size=0,
                 content_id=bytes(32),
@@ -67,19 +67,17 @@ def mk_genesis_state(initial_stake_distribution: list[Note]) -> LedgerState:
 
 
 def mk_block(
-    parent: BlockHeader, slot: int, note: Note, content=bytes(32), orphaned_proofs=[]
+    parent: BlockHeader, slot: int, note: Note, content=bytes(32)
 ) -> BlockHeader:
     assert type(parent) == BlockHeader, type(parent)
     assert type(slot) == int, type(slot)
-    from hashlib import sha256
 
     return BlockHeader(
         slot=Slot(slot),
         parent=parent.id(),
         content_size=len(content),
-        content_id=sha256(content).digest(),
+        content_id=Hash(b"CONTENT_ID", content),
         leader_proof=MockLeaderProof(note, Slot(slot), parent=parent.id()),
-        orphaned_proofs=orphaned_proofs,
     )
 
 

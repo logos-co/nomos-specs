@@ -13,9 +13,6 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-Id: TypeAlias = bytes
-
-
 class Hash(bytes):
     def __new__(cls, dst, *data):
         assert isinstance(dst, bytes)
@@ -178,7 +175,7 @@ class Note:
             self.zone_id,
         )
 
-    def nullifier(self) -> Id:
+    def nullifier(self) -> Hash:
         return Hash(b"NOMOS_NOTE_NF", self.commitment(), self.encode_sk())
 
 
@@ -186,7 +183,7 @@ class Note:
 class MockLeaderProof:
     note: Note
     slot: Slot
-    parent: Id
+    parent: Hash
 
     @property
     def commitment(self):
@@ -200,7 +197,7 @@ class MockLeaderProof:
     def evolved_commitment(self):
         return self.note.evolve().commitment()
 
-    def verify(self, slot: Slot, parent: Id):
+    def verify(self, slot: Slot, parent: Hash):
         # TODO: verification not implemented
         return slot == self.slot and parent == self.parent
 
@@ -208,52 +205,29 @@ class MockLeaderProof:
 @dataclass
 class BlockHeader:
     slot: Slot
-    parent: Id
+    parent: Hash
     content_size: int
-    content_id: Id
+    content_id: Hash
     leader_proof: MockLeaderProof
-    orphaned_proofs: List["BlockHeader"] = field(default_factory=list)
-
-    def update_header_hash(self, h):
-        # version byte
-        h.update(b"\x01")
-
-        # content size
-        h.update(int.to_bytes(self.content_size, length=4, byteorder="big"))
-
-        # content id
-        assert len(self.content_id) == 32
-        h.update(self.content_id)
-
-        # slot
-        h.update(self.slot.encode())
-
-        # parent
-        assert len(self.parent) == 32
-        h.update(self.parent)
-
-        # leader proof
-        assert len(self.leader_proof.commitment) == 32
-        h.update(self.leader_proof.commitment)
-        assert len(self.leader_proof.nullifier) == 32
-        h.update(self.leader_proof.nullifier)
-        assert len(self.leader_proof.evolved_commitment) == 32
-        h.update(self.leader_proof.evolved_commitment)
-
-        # orphaned proofs
-        h.update(int.to_bytes(len(self.orphaned_proofs), length=4, byteorder="big"))
-        for proof in self.orphaned_proofs:
-            proof.update_header_hash(h)
 
     # **Attention**:
-    # The ID of a block header is defined as the 32byte blake2b hash of its fields
+    # The ID of a block header is defined as the hash of its fields
     # as serialized in the format specified by the 'HEADER' rule in 'messages.abnf'.
     #
     # The following code is to be considered as a reference implementation, mostly to be used for testing.
-    def id(self) -> Id:
-        h = blake2b(digest_size=32)
-        self.update_header_hash(h)
-        return h.digest()
+    def id(self) -> Hash:
+        return Hash(
+            b"BLOCK_ID",
+            b"\x01",  # version
+            int.to_bytes(self.content_size, length=4, byteorder="big"),  # content size
+            self.content_id,  # content id
+            self.slot.encode(),  # slot
+            self.parent,  # parent
+            # leader proof
+            self.leader_proof.commitment,
+            self.leader_proof.nullifier,
+            self.leader_proof.evolved_commitment,
+        )
 
     def __hash__(self):
         return hash(self.id())
@@ -273,19 +247,19 @@ class LedgerState:
     #
     # NOTE that this does not prevent nonce grinding at the last slot
     # when the nonce snapshot is taken
-    nonce: Id = None
+    nonce: Hash = None
 
     # set of commitments
-    commitments_spend: set[Id] = field(default_factory=set)
+    commitments_spend: set[Hash] = field(default_factory=set)
 
     # set of commitments eligible to lead
-    commitments_lead: set[Id] = field(default_factory=set)
+    commitments_lead: set[Hash] = field(default_factory=set)
 
     # set of nullified notes
-    nullifiers: set[Id] = field(default_factory=set)
+    nullifiers: set[Hash] = field(default_factory=set)
 
     # -- Stake Relativization State
-    # The number of observed leaders (blocks + orphans), this measurement is
+    # The number of observed leaders, this measurement is
     # used in inferring total active stake in the network.
     leader_count: int = 0
 
@@ -302,13 +276,13 @@ class LedgerState:
     def replace(self, **kwarg) -> "LedgerState":
         return replace(self, **kwarg)
 
-    def verify_eligible_to_spend(self, commitment: Id) -> bool:
+    def verify_eligible_to_spend(self, commitment: Hash) -> bool:
         return commitment in self.commitments_spend
 
-    def verify_eligible_to_lead(self, commitment: Id) -> bool:
+    def verify_eligible_to_lead(self, commitment: Hash) -> bool:
         return commitment in self.commitments_lead
 
-    def verify_unspent(self, nullifier: Id) -> bool:
+    def verify_unspent(self, nullifier: Hash) -> bool:
         return nullifier not in self.nullifiers
 
     def apply(self, block: BlockHeader):
@@ -320,9 +294,8 @@ class LedgerState:
             block.leader_proof.nullifier,
             block.slot.encode(),
         )
+        self.apply_leader_proof(block.leader_proof)
         self.block = block
-        for proof in itertools.chain(block.orphaned_proofs, [block]):
-            self.apply_leader_proof(proof.leader_proof)
 
     def apply_leader_proof(self, proof: MockLeaderProof):
         self.nullifiers.add(proof.nullifier)
@@ -347,7 +320,7 @@ class EpochState:
     # leadership lottery.
     inferred_total_active_stake: int
 
-    def verify_eligible_to_lead_due_to_age(self, commitment: Id) -> bool:
+    def verify_eligible_to_lead_due_to_age(self, commitment: Hash) -> bool:
         # A note is eligible to lead if it was committed to before the the stake
         # distribution snapshot was taken or it was produced by a leader proof
         # since the snapshot was taken.
@@ -371,7 +344,7 @@ class EpochState:
 class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
         self.config = config
-        self.forks: list[Id] = []
+        self.forks: list[Hash] = []
         self.local_chain = genesis_state.block.id()
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
@@ -384,38 +357,9 @@ class Follower:
 
         current_state = self.ledger_state[block.parent].copy()
 
-        # We use the proposed block epoch state to validate orphans as well.
-        # For very old orphans, these states may be different.
         epoch_state = self.compute_epoch_state(
             block.slot.epoch(self.config), block.parent
         )
-
-        # first, we verify adopted leadership transactions
-        for orphan in block.orphaned_proofs:
-            # orphan proofs are checked in two ways
-            # 1. ensure they are valid locally in their original branch
-            # 2. ensure it does not conflict with current state
-
-            # We take a shortcut for (1.) by restricting orphans to proofs we've
-            # already processed in other branches.
-            if orphan.id() not in self.ledger_state:
-                raise MissingOrphanProof
-
-            # (2.) is satisfied by verifying the proof against current state ensuring:
-            # - it is a valid proof
-            # - and the nullifier has not already been spent
-            if not self.verify_slot_leader(
-                orphan.slot,
-                orphan.parent,
-                orphan.leader_proof,
-                epoch_state,
-                current_state,
-            ):
-                raise InvalidOrphanProof
-
-            # if an adopted leadership proof is valid we need to apply its
-            # effects to the ledger state
-            current_state.apply_leader_proof(orphan.leader_proof)
 
         # TODO: this is not the full block validation spec, only slot leader is verified
         if not self.verify_slot_leader(
@@ -430,7 +374,7 @@ class Follower:
     def verify_slot_leader(
         self,
         slot: Slot,
-        parent: Id,
+        parent: Hash,
         proof: MockLeaderProof,
         # notes are old enough if their commitment is in the stake distribution snapshot
         epoch_state: EpochState,
@@ -491,29 +435,8 @@ class Follower:
             self.forks.remove(checkpoint_block_id)
         self.local_chain = checkpoint_block_id
 
-    def unimported_orphans(self) -> list[BlockHeader]:
-        """
-        Returns all unimported orphans w.r.t. the given tip's state.
-        Orphans are returned in the order that they should be imported.
-        """
-        tip_state = self.tip_state().copy()
-        tip = tip_state.block.id()
-
-        orphans = []
-
-        for fork in self.forks:
-            _, _, fork_depth, fork_suffix = common_prefix_depth(
-                tip, fork, self.ledger_state
-            )
-            for b in fork_suffix:
-                if b.leader_proof.nullifier not in tip_state.nullifiers:
-                    tip_state.nullifiers.add(b.leader_proof.nullifier)
-                    orphans += [b]
-
-        return orphans
-
     # Evaluate the fork choice rule and return the chain we should be following
-    def fork_choice(self) -> Id:
+    def fork_choice(self) -> Hash:
         return maxvalid_bg(
             self.local_chain,
             self.forks,
@@ -525,13 +448,13 @@ class Follower:
     def tip(self) -> BlockHeader:
         return self.tip_state().block
 
-    def tip_id(self) -> Id:
+    def tip_id(self) -> Hash:
         return self.local_chain
 
     def tip_state(self) -> LedgerState:
         return self.ledger_state[self.tip_id()]
 
-    def state_at_slot_beginning(self, tip: Id, slot: Slot) -> LedgerState:
+    def state_at_slot_beginning(self, tip: Hash, slot: Slot) -> LedgerState:
         for state in iter_chain(tip, self.ledger_state):
             if state.block.slot < slot:
                 return state
@@ -540,7 +463,7 @@ class Follower:
     def epoch_start_slot(self, epoch) -> Slot:
         return Slot(epoch.epoch * self.config.epoch_length)
 
-    def stake_distribution_snapshot(self, epoch, tip: Id):
+    def stake_distribution_snapshot(self, epoch, tip: Hash):
         # stake distribution snapshot happens at the beginning of the previous epoch,
         # i.e. for epoch e, the snapshot is taken at the last block of epoch e-2
         slot = Slot(epoch.prev().epoch * self.config.epoch_length)
@@ -555,7 +478,7 @@ class Follower:
         )
         return self.state_at_slot_beginning(tip, slot)
 
-    def compute_epoch_state(self, epoch: Epoch, tip: Id) -> EpochState:
+    def compute_epoch_state(self, epoch: Epoch, tip: Hash) -> EpochState:
         if epoch.epoch == 0:
             return EpochState(
                 stake_distribution_snapshot=self.genesis_state,
@@ -663,7 +586,7 @@ class Leader:
     note: Note
 
     def try_prove_slot_leader(
-        self, epoch: EpochState, slot: Slot, parent: Id
+        self, epoch: EpochState, slot: Slot, parent: Hash
     ) -> MockLeaderProof | None:
         if self._is_slot_leader(epoch, slot):
             return MockLeaderProof(self.note, slot, parent)
@@ -679,7 +602,7 @@ class Leader:
 
 
 def iter_chain(
-    tip: Id, states: Dict[Id, LedgerState]
+    tip: Hash, states: Dict[Hash, LedgerState]
 ) -> Generator[LedgerState, None, None]:
     while tip in states:
         yield states[tip]
@@ -687,14 +610,14 @@ def iter_chain(
 
 
 def iter_chain_blocks(
-    tip: Id, states: Dict[Id, LedgerState]
+    tip: Hash, states: Dict[Hash, LedgerState]
 ) -> Generator[BlockHeader, None, None]:
     for state in iter_chain(tip, states):
         yield state.block
 
 
 def common_prefix_depth(
-    a: Id, b: Id, states: Dict[Id, LedgerState]
+    a: Hash, b: Hash, states: Dict[Hash, LedgerState]
 ) -> tuple[int, list[BlockHeader], int, list[BlockHeader]]:
     return common_prefix_depth_from_chains(
         iter_chain_blocks(a, states), iter_chain_blocks(b, states)
@@ -752,7 +675,7 @@ def chain_density(chain: list[BlockHeader], slot: Slot) -> int:
     return sum(1 for b in chain if b.slot < slot)
 
 
-def block_children(states: Dict[Id, LedgerState]) -> Dict[Id, set[Id]]:
+def block_children(states: Dict[Hash, LedgerState]) -> Dict[Hash, set[Hash]]:
     children = defaultdict(set)
     for c, state in states.items():
         children[state.block.parent].add(c)
@@ -768,14 +691,14 @@ def block_children(states: Dict[Id, LedgerState]) -> Dict[Id, set[Id]]:
 # k defines the forking depth of a chain at which point we switch phases.
 # s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
 def maxvalid_bg(
-    local_chain: Id,
-    forks: List[Id],
+    local_chain: Hash,
+    forks: List[Hash],
     k: int,
     s: int,
-    states: Dict[Id, LedgerState],
-) -> Id:
-    assert type(local_chain) == Id
-    assert all(type(f) == Id for f in forks)
+    states: Dict[Hash, LedgerState],
+) -> Hash:
+    assert type(local_chain) == Hash, type(local_chain)
+    assert all(type(f) == Hash for f in forks)
 
     cmax = local_chain
     for fork in forks:
@@ -804,16 +727,6 @@ def maxvalid_bg(
 class ParentNotFound(Exception):
     def __str__(self):
         return "Parent not found"
-
-
-class MissingOrphanProof(Exception):
-    def __str__(self):
-        return "Missing orphan proof"
-
-
-class InvalidOrphanProof(Exception):
-    def __str__(self):
-        return "Invalid orphan proof"
 
 
 class InvalidLeaderProof(Exception):

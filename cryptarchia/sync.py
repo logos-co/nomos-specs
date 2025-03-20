@@ -4,7 +4,7 @@ from typing import Generator
 from cryptarchia.cryptarchia import (
     BlockHeader,
     Follower,
-    Id,
+    Hash,
     ParentNotFound,
     Slot,
     common_prefix_depth_from_chains,
@@ -19,7 +19,7 @@ def sync(local: Follower, peers: list[Follower]):
     # Repeat the sync process until no peer has a tip ahead of the local tip,
     # because peers' tips may advance during the sync process.
     block_fetcher = BlockFetcher(peers)
-    rejected_blocks: set[Id] = set()
+    rejected_blocks: set[Hash] = set()
     while True:
         # Fetch blocks from the peers in the range of slots from the local tip to the latest tip.
         # Gather orphaned blocks, which are blocks from forks that are absent in the local block tree.
@@ -145,7 +145,7 @@ class BlockFetcher:
                 continue
 
     def fetch_chain_backward(
-        self, tip: Id, local: Follower
+        self, tip: Hash, local: Follower
     ) -> Generator[BlockHeader, None, None]:
         # Fetches a chain of blocks from the peers, starting from the given tip to the genesis.
         # Attempts to extend the chain as much as possible by querying multiple peers,
