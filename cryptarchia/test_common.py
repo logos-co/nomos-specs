@@ -79,9 +79,7 @@ def mk_block(
     )
 
 
-def mk_chain(
-    parent: BlockHeader, note: Note, slots: list[int]
-) -> tuple[list[BlockHeader], Note]:
+def mk_chain(parent: BlockHeader, note: Note, slots: list[int]) -> list[BlockHeader]:
     assert type(parent) == BlockHeader
     chain = []
     for s in slots:
