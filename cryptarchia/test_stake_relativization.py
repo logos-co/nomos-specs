@@ -3,17 +3,17 @@ import itertools
 
 import numpy as np
 
-from .cryptarchia import Config, Coin, Slot
+from .cryptarchia import Config, Note, Slot
 from .test_common import mk_config, mk_genesis_state, mk_block, TestNode, Follower
 
 
 class TestStakeRelativization(TestCase):
     def test_ledger_leader_counting(self):
-        coins = [Coin(sk=i, value=10) for i in range(2)]
-        c_a, c_b = coins
+        notes = [Note(sk=i, value=10) for i in range(2)]
+        n_a, n_b = notes
 
-        config = mk_config(coins)
-        genesis = mk_genesis_state(coins)
+        config = mk_config(notes)
+        genesis = mk_genesis_state(notes)
 
         follower = Follower(genesis, config)
 
@@ -21,31 +21,31 @@ class TestStakeRelativization(TestCase):
         assert follower.tip_state().leader_count == 0
 
         # after a block, 1 leader has been observed
-        b1 = mk_block(genesis.block, slot=1, coin=c_a)
+        b1 = mk_block(genesis.block, slot=1, note=n_a)
         follower.on_block(b1)
         assert follower.tip_state().leader_count == 1
 
         # on fork, tip state is not updated
-        orphan = mk_block(genesis.block, slot=1, coin=c_b)
-        follower.on_block(orphan)
+        fork = mk_block(genesis.block, slot=1, note=n_b)
+        follower.on_block(fork)
         assert follower.tip_state().block == b1
         assert follower.tip_state().leader_count == 1
 
-        # after orphan is adopted, leader count should jumpy by 2 (each orphan counts as a leader)
-        b2 = mk_block(b1, slot=2, coin=c_a.evolve(), orphaned_proofs=[orphan])
+        # continuing the chain increments the leader count
+        b2 = mk_block(b1, slot=2, note=n_a)
         follower.on_block(b2)
         assert follower.tip_state().block == b2
-        assert follower.tip_state().leader_count == 3
+        assert follower.tip_state().leader_count == 2
 
     def test_inference_on_empty_genesis_epoch(self):
-        coin = Coin(sk=0, value=10)
-        config = mk_config([coin]).replace(
+        note = Note(sk=0, value=10)
+        config = mk_config([note]).replace(
             initial_total_active_stake=20,
             total_active_stake_learning_rate=0.5,
             active_slot_coeff=0.5,
         )
-        genesis = mk_genesis_state([coin])
-        node = TestNode(config, genesis, coin)
+        genesis = mk_genesis_state([note])
+        node = TestNode(config, genesis, note)
 
         # -- epoch 0 --
 
@@ -77,12 +77,12 @@ class TestStakeRelativization(TestCase):
         np.random.seed(seed)
 
         stake = np.array((np.random.pareto(10, N) + 1) * 1000, dtype=np.int64)
-        coins = [Coin(sk=i, value=int(s)) for i, s in enumerate(stake)]
+        notes = [Note(sk=i, value=int(s)) for i, s in enumerate(stake)]
 
         config = Config.cryptarchia_v0_0_1(stake.sum() * 2).replace(k=40)
-        genesis = mk_genesis_state(coins)
+        genesis = mk_genesis_state(notes)
 
-        nodes = [TestNode(config, genesis, c) for c in coins]
+        nodes = [TestNode(config, genesis, n) for n in notes]
 
         T = config.epoch_length * EPOCHS
         slot_leaders = np.zeros(T, dtype=np.int32)
