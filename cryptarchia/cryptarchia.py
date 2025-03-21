@@ -188,7 +188,7 @@ class MockLeaderProof:
             b"NOMOS_NONCE_CONTRIB",
             self.slot.encode(),
             self.note.commitment(),
-            self.encode_sk(),
+            self.note.encode_sk(),
         )
 
     def verify(
