@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from cryptarchia.cryptarchia import BlockHeader, Note, Follower
 from cryptarchia.sync import InvalidBlockTree, sync
-from cryptarchia.test_common import mk_block, mk_config, mk_genesis_state
+from cryptarchia.test_common import mk_block, mk_chain, mk_config, mk_genesis_state
 
 
 class TestSync(TestCase):
@@ -13,10 +13,7 @@ class TestSync(TestCase):
         config = mk_config([note])
         genesis = mk_genesis_state([note])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, note)
-        b1 = mk_block(b0, 2, note)
-        b2 = mk_block(b1, 3, note)
-        b3 = mk_block(b2, 4, note)
+        b0, b1, b2, b3 = mk_chain(genesis.block, note, slots=[1, 2, 3, 4])
         for b in [b0, b1, b2, b3]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b3)
@@ -36,10 +33,7 @@ class TestSync(TestCase):
         config = mk_config([note])
         genesis = mk_genesis_state([note])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, note)
-        b1 = mk_block(b0, 2, note)
-        b2 = mk_block(b1, 3, note)
-        b3 = mk_block(b2, 4, note)
+        b0, b1, b2, b3 = mk_chain(genesis.block, note, slots=[1, 2, 3, 4])
         for b in [b0, b1, b2, b3]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b3)
@@ -65,14 +59,13 @@ class TestSync(TestCase):
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
-        b2 = mk_block(b1, 3, n_a)
-        b3 = mk_block(b0, 2, n_b)
-        b4 = mk_block(b3, 3, n_b)
-        b5 = mk_block(b2, 4, n_a)
+
+        b0, b1, b2, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4])
+        b3, b4 = mk_chain(b0, n_b, slots=[2, 3])
+
         for b in [b0, b1, b2, b3, b4, b5]:
             peer.on_block(b)
+
         self.assertEqual(peer.tip(), b5)
         self.assertEqual(peer.forks, [b4.id()])
 
@@ -92,12 +85,10 @@ class TestSync(TestCase):
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
-        b2 = mk_block(b1, 3, n_a)
-        b3 = mk_block(b0, 2, n_b)
-        b4 = mk_block(b3, 3, n_b)
-        b5 = mk_block(b2, 4, n_a)
+
+        b0, b1, b2, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4])
+        b3, b4 = mk_chain(b0, n_b, slots=[2, 3])
+
         for b in [b0, b1, b2, b3, b4, b5]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b5)
@@ -125,12 +116,10 @@ class TestSync(TestCase):
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
-        b2 = mk_block(b1, 3, n_a)
-        b3 = mk_block(b0, 2, n_b)
-        b4 = mk_block(b3, 3, n_b)
-        b5 = mk_block(b2, 4, n_a)
+
+        b0, b1, b2, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4])
+        b3, b4 = mk_chain(b0, n_b, slots=[2, 3])
+
         for b in [b0, b1, b2, b3, b4, b5]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b5)
@@ -159,12 +148,10 @@ class TestSync(TestCase):
         n_a, n_b = Note(sk=0, value=10), Note(sk=1, value=10)
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
-        b2 = mk_block(b1, 3, n_a)
-        b3 = mk_block(b0, 2, n_b)
-        b4 = mk_block(b3, 3, n_b)
-        b5 = mk_block(b2, 4, n_a)
+
+        b0, b1, b2, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4])
+        b3, b4 = mk_chain(b0, n_b, slots=[2, 3])
+
         peer0 = Follower(genesis, config)
         for b in [b0, b1, b2, b5]:
             peer0.on_block(b)
@@ -204,10 +191,9 @@ class TestSync(TestCase):
         config = mk_config([note])
         genesis = mk_genesis_state([note])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, note)
-        b1 = mk_block(b0, 2, note)
-        b2 = mk_block(b1, 3, note)
-        b3 = mk_block(b2, 4, note)
+
+        b0, b1, b2, b3 = mk_chain(genesis.block, note, slots=[1, 2, 3, 4])
+
         for b in [b0, b1, b2, b3]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b3)
@@ -243,12 +229,10 @@ class TestSync(TestCase):
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
+
+        b0, b1, b3, b4, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4, 5])
         b2 = mk_block(b0, 2, n_b)
-        b3 = mk_block(b1, 3, n_a)
-        b4 = mk_block(b3, 4, n_a)
-        b5 = mk_block(b4, 5, n_a)
+
         for b in [b0, b1, b2, b3, b4, b5]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b5)
@@ -256,8 +240,8 @@ class TestSync(TestCase):
 
         # And deliberately, add invalid blocks (b6 ~ b7):
         fake_note = Note(sk=2, value=10)
-        b6 = mk_block(b2, 3, fake_note)
-        b7 = mk_block(b6, 4, fake_note)
+        b6, b7 = mk_chain(b2, fake_note, slots=[3, 4])
+
         apply_invalid_block_to_ledger_state(peer, b6)
         apply_invalid_block_to_ledger_state(peer, b7)
         # the tip shouldn't be changed.
@@ -291,10 +275,9 @@ class TestSyncFromCheckpoint(TestCase):
         config = mk_config([note])
         genesis = mk_genesis_state([note])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, note)
-        b1 = mk_block(b0, 2, note)
-        b2 = mk_block(b1, 3, note)
-        b3 = mk_block(b2, 4, note)
+
+        b0, b1, b2, b3 = mk_chain(genesis.block, note, slots=[1, 2, 3, 4])
+
         for b in [b0, b1, b2, b3]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b3)
@@ -328,12 +311,10 @@ class TestSyncFromCheckpoint(TestCase):
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
-        b2 = mk_block(b1, 3, n_a)
-        b3 = mk_block(b0, 2, n_b)
-        b4 = mk_block(b3, 3, n_b)
-        b5 = mk_block(b2, 4, n_a)
+
+        b0, b1, b2, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4])
+        b3, b4 = mk_chain(b0, n_b, slots=[2, 3])
+
         for b in [b0, b1, b2, b3, b4, b5]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b5)
@@ -366,12 +347,10 @@ class TestSyncFromCheckpoint(TestCase):
         n_a, n_b = Note(sk=0, value=10), Note(sk=1, value=10)
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
-        b2 = mk_block(b1, 3, n_a)
-        b3 = mk_block(b0, 2, n_b)
-        b4 = mk_block(b3, 3, n_b)
-        b5 = mk_block(b2, 4, n_a)
+
+        b0, b1, b2, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4])
+        b3, b4 = mk_chain(b0, n_b, slots=[2, 3])
+
         peer0 = Follower(genesis, config)
         for b in [b0, b1, b2, b5]:
             peer0.on_block(b)
@@ -411,12 +390,10 @@ class TestSyncFromCheckpoint(TestCase):
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
+
+        b0, b1, b3, b4, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4, 5])
         b2 = mk_block(b0, 2, n_b)
-        b3 = mk_block(b1, 3, n_a)
-        b4 = mk_block(b3, 4, n_a)
-        b5 = mk_block(b4, 5, n_a)
+
         for b in [b0, b1, b2, b3, b4, b5]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b5)
@@ -424,8 +401,7 @@ class TestSyncFromCheckpoint(TestCase):
 
         # And deliberately, add invalid blocks (b6 ~ b7):
         fake_note = Note(sk=2, value=10)
-        b6 = mk_block(b2, 3, fake_note)
-        b7 = mk_block(b6, 4, fake_note)
+        b6, b7 = mk_chain(b2, fake_note, slots=[3, 4])
         apply_invalid_block_to_ledger_state(peer, b6)
         apply_invalid_block_to_ledger_state(peer, b7)
         # the tip shouldn't be changed.
@@ -461,12 +437,10 @@ class TestSyncFromCheckpoint(TestCase):
         config = mk_config([n_a, n_b])
         genesis = mk_genesis_state([n_a, n_b])
         peer = Follower(genesis, config)
-        b0 = mk_block(genesis.block, 1, n_a)
-        b1 = mk_block(b0, 2, n_a)
+
+        b0, b1, b3, b4, b5 = mk_chain(genesis.block, n_a, slots=[1, 2, 3, 4, 5])
         b2 = mk_block(b0, 2, n_b)
-        b3 = mk_block(b1, 3, n_a)
-        b4 = mk_block(b3, 4, n_a)
-        b5 = mk_block(b4, 5, n_a)
+
         for b in [b0, b1, b2, b3, b4, b5]:
             peer.on_block(b)
         self.assertEqual(peer.tip(), b5)
@@ -474,8 +448,7 @@ class TestSyncFromCheckpoint(TestCase):
 
         # And deliberately, add invalid blocks (b6 ~ b7):
         fake_note = Note(sk=2, value=10)
-        b6 = mk_block(b2, 3, fake_note)
-        b7 = mk_block(b6, 4, fake_note)
+        b6, b7 = mk_chain(b2, fake_note, slots=[3, 4])
         apply_invalid_block_to_ledger_state(peer, b6)
         apply_invalid_block_to_ledger_state(peer, b7)
         # the tip shouldn't be changed.

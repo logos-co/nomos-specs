@@ -24,13 +24,9 @@ class TestForkChoice(TestCase):
         note = Note(sk=1, value=100)
 
         b0 = mk_genesis_state([]).block
-        b1 = mk_block(b0, 1, note)
-        b2 = mk_block(b1, 2, note)
-        b3 = mk_block(b2, 3, note)
-        b4 = mk_block(b0, 1, note, content=b"b4")
-        b5 = mk_block(b4, 2, note)
-        b6 = mk_block(b2, 3, note, content=b"b6")
-        b7 = mk_block(b6, 4, note)
+        b1, b2, b3 = mk_chain(b0, Note(sk=1, value=1), slots=[1, 2, 3])
+        b4, b5 = mk_chain(b0, Note(sk=2, value=1), slots=[1, 2])
+        b6, b7 = mk_chain(b2, Note(sk=3, value=1), slots=[3, 4])
 
         states = {
             b.id(): LedgerState(block=b) for b in [b0, b1, b2, b3, b4, b5, b6, b7]
