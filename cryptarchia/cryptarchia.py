@@ -184,7 +184,12 @@ class MockLeaderProof:
     parent: Hash
 
     def epoch_nonce_contribution(self) -> Hash:
-        return Hash(b"NOMOS_NONCE_CONTRIB", self.slot.encode(), self.note.nullifier())
+        return Hash(
+            b"NOMOS_NONCE_CONTRIB",
+            self.slot.encode(),
+            self.note.commitment(),
+            self.encode_sk(),
+        )
 
     def verify(
         self, slot: Slot, parent: Hash, commitments: set[Hash], nullifiers: set[Hash]
@@ -238,10 +243,7 @@ class LedgerState:
 
     # This nonce is used to derive the seed for the slot leader lottery.
     # It's updated at every block by hashing the previous nonce with the
-    # leader proof's nullifier.
-    #
-    # NOTE that this does not prevent nonce grinding at the last slot
-    # when the nonce snapshot is taken
+    # leader proof's nonce contribution
     nonce: Hash = None
 
     # set of note commitments
