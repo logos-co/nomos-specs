@@ -82,7 +82,7 @@ def backfill_fork(
     # Backfills a fork, which is absent in the local block tree, by fetching blocks from the peers.
     # During backfilling, the fork choice rule is continuously applied.
 
-    suffix = find_disconnected_point(
+    suffix = find_missing_part(
         local,
         block_fetcher.fetch_chain_backward(fork_tip.id(), local),
     )
@@ -96,7 +96,7 @@ def backfill_fork(
             raise InvalidBlockFromBackfillFork(e, suffix[i:])
 
 
-def find_disconnected_point(
+def find_missing_part(
     local: Follower, fork: Generator[BlockHeader, None, None]
 ) -> list[BlockHeader]:
     # Finds the point where the fork is disconnected from the local block tree,
