@@ -99,6 +99,11 @@ def backfill_fork(
 def find_disconnected_point(
     local: Follower, fork: Generator[BlockHeader, None, None]
 ) -> list[BlockHeader]:
+    # Finds the point where the fork is disconnected from the local block tree,
+    # and returns the suffix of the fork from the disconnected point to the tip.
+    # The disconnected point may be different from the divergence point of the fork
+    # in the case where the fork has been partially backfilled.
+
     suffix: list[BlockHeader] = []
     for block in fork:
         if block.id() in local.ledger_state:
