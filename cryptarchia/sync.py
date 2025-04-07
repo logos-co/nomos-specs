@@ -18,11 +18,10 @@ def sync(local: Follower, peers: list[Follower], checkpoint: LedgerState | None 
 
     block_fetcher = BlockFetcher(peers)
 
-    # If the checkpoint is provided, backfill the checkpoint chain first
-    # before starting the sync process from the checkpoint block.
-    # If the backfilling fails, it means that the checkpoint chain is invalid.
-    # It is recommended to restart the sync process with a different checkpoint
-    # or without a checkpoint.
+    # If the checkpoint is provided, start backfilling the checkpoint chain in the background.
+    # But for simplicity, we do it in the foreground here.
+    # If the backfilling fails, it means that the checkpoint chain is invalid,
+    # and the sync process should be cancelled.
     if checkpoint:
         backfill_fork(local, checkpoint.block, block_fetcher)
 
