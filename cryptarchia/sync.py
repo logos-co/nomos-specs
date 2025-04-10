@@ -129,6 +129,7 @@ class BlockFetcher:
     def fetch_blocks_from(self, start_slot: Slot) -> Generator[tuple[BlockHeader, PeerId], None, None]:
         # Filter peers that have a tip ahead of the local tip
         # and group peers by their tip to minimize the number of fetches.
+        # This strategy can be optimized in real implementations.
         groups = self.filter_and_group_peers_by_tip(start_slot)
         for group in groups.values():
             for block, peer_id in BlockFetcher.fetch_blocks_by_slot(group, start_slot):
@@ -152,6 +153,7 @@ class BlockFetcher:
         # Fetch blocks in the given range of slots from one of the peers.
         # Blocks should be returned in order of slot.
         # If a peer fails, try the next peer.
+        # This strategy can be optimized in real implementations.
         for peer_id, peer in peers.items():
             try:
                 for block in peer.blocks_by_slot(start_slot):
@@ -168,6 +170,7 @@ class BlockFetcher:
     ) -> Generator[BlockHeader, None, None]:
         # Fetches a chain of blocks from a peer, starting from the given tip to the genesis.
         # If peer_id is not set, fetch the chain by querying multiple peers.
+        # Fetching from multiple peers can be optimized in real implementations.
         id = tip
         peers = [self.peers[peer_id]] if peer_id is not None else list(self.peers.values())
         for peer in peers:
