@@ -1,12 +1,12 @@
-from typing import TypeAlias, List, Dict, Generator
-from hashlib import sha256, blake2b
-from math import floor
-from copy import deepcopy
-import itertools
 import functools
-from dataclasses import dataclass, field, replace
+import itertools
 import logging
 from collections import defaultdict
+from copy import deepcopy
+from dataclasses import dataclass, field, replace
+from hashlib import blake2b, sha256
+from math import floor
+from typing import Dict, Generator, List, TypeAlias
 
 import numpy as np
 
@@ -338,22 +338,16 @@ class Follower:
         ):
             raise InvalidLeaderProof
 
-    def apply_block_to_ledger_state(self, block: BlockHeader) -> bool:
+    def on_block(self, block: BlockHeader):
         if block.id() in self.ledger_state:
             logger.warning("dropping already processed block")
-            return False
+            return
 
         self.validate_header(block)
 
         new_state = self.ledger_state[block.parent].copy()
         new_state.apply(block)
         self.ledger_state[block.id()] = new_state
-
-        return True
-
-    def on_block(self, block: BlockHeader):
-        if not self.apply_block_to_ledger_state(block):
-            return
 
         if block.parent == self.local_chain:
             # simply extending the local chain
@@ -371,15 +365,6 @@ class Follower:
             self.forks.append(self.local_chain)
             self.forks.remove(new_tip)
             self.local_chain = new_tip
-
-    def apply_checkpoint(self, checkpoint: LedgerState):
-        checkpoint_block_id = checkpoint.block.id()
-        self.ledger_state[checkpoint_block_id] = checkpoint
-        if self.local_chain != self.genesis_state.block.id():
-            self.forks.append(self.local_chain)
-        if checkpoint_block_id in self.forks:
-            self.forks.remove(checkpoint_block_id)
-        self.local_chain = checkpoint_block_id
 
     # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Hash:
@@ -549,15 +534,9 @@ def iter_chain_blocks(
 def common_prefix_depth(
     a: Hash, b: Hash, states: Dict[Hash, LedgerState]
 ) -> tuple[int, list[BlockHeader], int, list[BlockHeader]]:
-    return common_prefix_depth_from_chains(
-        iter_chain_blocks(a, states), iter_chain_blocks(b, states)
-    )
+    a_blocks = iter_chain_blocks(a, states)
+    b_blocks = iter_chain_blocks(b, states)
 
-
-def common_prefix_depth_from_chains(
-    a_blocks: Generator[BlockHeader, None, None],
-    b_blocks: Generator[BlockHeader, None, None],
-) -> tuple[int, list[BlockHeader], int, list[BlockHeader]]:
     seen = {}
     a_suffix: list[BlockHeader] = []
     b_suffix: list[BlockHeader] = []

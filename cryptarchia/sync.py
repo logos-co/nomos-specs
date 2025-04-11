@@ -5,20 +5,28 @@ from cryptarchia.cryptarchia import (
     BlockHeader,
     Follower,
     Hash,
+    LedgerState,
     ParentNotFound,
     Slot,
-    common_prefix_depth_from_chains,
     iter_chain_blocks,
 )
 
 
-def sync(local: Follower, peers: list[Follower]):
+def sync(local: Follower, peers: list[Follower], checkpoint: LedgerState | None = None):
     # Syncs the local block tree with the peers, starting from the local tip.
     # This covers the case where the local tip is not on the latest honest chain anymore.
 
+    block_fetcher = BlockFetcher(peers)
+
+    # If the checkpoint is provided, start backfilling the checkpoint chain in the background.
+    # But for simplicity, we do it in the foreground here.
+    # If the backfilling fails, it means that the checkpoint chain is invalid,
+    # and the sync process should be cancelled.
+    if checkpoint:
+        backfill_fork(local, checkpoint.block, block_fetcher)
+
     # Repeat the sync process until no peer has a tip ahead of the local tip,
     # because peers' tips may advance during the sync process.
-    block_fetcher = BlockFetcher(peers)
     rejected_blocks: set[Hash] = set()
     while True:
         # Fetch blocks from the peers in the range of slots from the local tip to the latest tip.
@@ -72,32 +80,36 @@ def backfill_fork(
 ):
     # Backfills a fork, which is absent in the local block tree, by fetching blocks from the peers.
     # During backfilling, the fork choice rule is continuously applied.
-    #
-    # If necessary, the local honest chain is also backfilled for the fork choice rule.
-    # This can happen if the honest chain has been built not from the genesis (i.e. checkpoint sync).
 
-    _, tip_suffix, _, fork_suffix = common_prefix_depth_from_chains(
-        block_fetcher.fetch_chain_backward(local.tip_id(), local),
+    suffix = find_missing_part(
+        local,
         block_fetcher.fetch_chain_backward(fork_tip.id(), local),
     )
 
-    # First, backfill the local honest chain if some blocks are missing.
-    # In other words, backfill the local block tree, which contains the honest chain.
-    for block in tip_suffix:
-        try:
-            # Just apply the block to the ledger state is enough
-            # instead of calling `on_block` which runs the fork choice rule.
-            local.apply_block_to_ledger_state(block)
-        except Exception as e:
-            raise InvalidBlockTree(e)
-
-    # Then, add blocks in the fork suffix with applying fork choice rule.
+    # Add blocks in the fork suffix with applying fork choice rule.
     # After all, add the tip of the fork suffix to apply the fork choice rule.
-    for i, block in enumerate(fork_suffix):
+    for i, block in enumerate(suffix):
         try:
             local.on_block(block)
         except Exception as e:
-            raise InvalidBlockFromBackfillFork(e, fork_suffix[i:])
+            raise InvalidBlockFromBackfillFork(e, suffix[i:])
+
+
+def find_missing_part(
+    local: Follower, fork: Generator[BlockHeader, None, None]
+) -> list[BlockHeader]:
+    # Finds the point where the fork is disconnected from the local block tree,
+    # and returns the suffix of the fork from the disconnected point to the tip.
+    # The disconnected point may be different from the divergence point of the fork
+    # in the case where the fork has been partially backfilled.
+
+    suffix: list[BlockHeader] = []
+    for block in fork:
+        if block.id() in local.ledger_state:
+            break
+        suffix.append(block)
+    suffix.reverse()
+    return suffix
 
 
 class BlockFetcher:
@@ -166,12 +178,6 @@ class BlockFetcher:
                 if block.id() == local.genesis_state.block.id():
                     return
                 id = block.parent
-
-
-class InvalidBlockTree(Exception):
-    def __init__(self, cause: Exception):
-        super().__init__()
-        self.cause = cause
 
 
 class InvalidBlockFromBackfillFork(Exception):

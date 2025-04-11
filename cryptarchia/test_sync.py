@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-from cryptarchia.cryptarchia import BlockHeader, Note, Follower
-from cryptarchia.sync import InvalidBlockTree, sync
+from cryptarchia.cryptarchia import BlockHeader, Follower, Note
+from cryptarchia.sync import InvalidBlockFromBackfillFork, sync
 from cryptarchia.test_common import mk_block, mk_chain, mk_config, mk_genesis_state
 
 
@@ -288,17 +288,14 @@ class TestSyncFromCheckpoint(TestCase):
         #           ||
         #       checkpoint
         #
-        # Result: A honest chain without historical blocks
-        # () - () - b2 - b3
+        # Result:
+        # b0 - b1 - b2 - b3
         checkpoint = peer.ledger_state[b2.id()]
         local = Follower(genesis, config)
-        local.apply_checkpoint(checkpoint)
-        sync(local, [peer])
+        sync(local, [peer], checkpoint)
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
-        self.assertEqual(
-            set(local.ledger_state.keys()), set([genesis.block.id(), b2.id(), b3.id()])
-        )
+        self.assertEqual(local.ledger_state.keys(), peer.ledger_state.keys())
 
     def test_sync_forks(self):
         # Prepare a peer with forks:
@@ -331,8 +328,7 @@ class TestSyncFromCheckpoint(TestCase):
         #      b3 - b4
         checkpoint = peer.ledger_state[b2.id()]
         local = Follower(genesis, config)
-        local.apply_checkpoint(checkpoint)
-        sync(local, [peer])
+        sync(local, [peer], checkpoint)
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
         self.assertEqual(set(local.ledger_state.keys()), set(peer.ledger_state.keys()))
@@ -373,8 +369,7 @@ class TestSyncFromCheckpoint(TestCase):
         #      b3 - b4
         checkpoint = peer1.ledger_state[b4.id()]
         local = Follower(genesis, config)
-        local.apply_checkpoint(checkpoint)
-        sync(local, [peer0, peer1])
+        sync(local, [peer0, peer1], checkpoint)
         self.assertEqual(local.tip(), b5)
         self.assertEqual(local.forks, [b4.id()])
         self.assertEqual(len(local.ledger_state.keys()), 7)
@@ -419,14 +414,13 @@ class TestSyncFromCheckpoint(TestCase):
         #      b2
         checkpoint = peer.ledger_state[b4.id()]
         local = Follower(genesis, config)
-        local.apply_checkpoint(checkpoint)
-        sync(local, [peer])
+        sync(local, [peer], checkpoint)
         self.assertEqual(local.tip(), peer.tip())
         self.assertEqual(local.forks, peer.forks)
         self.assertNotIn(b6.id(), local.ledger_state)
         self.assertNotIn(b7.id(), local.ledger_state)
 
-    def test_reject_invalid_blocks_from_backfilling_block_tree(self):
+    def test_reject_invalid_blocks_from_backfilling_checkpoint_chain(self):
         # Prepare a peer with invalid blocks in a fork:
         # b0 - b1 - b3 - b4 - b5 == tip
         #    \
@@ -463,9 +457,8 @@ class TestSyncFromCheckpoint(TestCase):
         # Result: `InvalidBlockTree` exception
         checkpoint = peer.ledger_state[b7.id()]
         local = Follower(genesis, config)
-        local.apply_checkpoint(checkpoint)
-        with self.assertRaises(InvalidBlockTree):
-            sync(local, [peer])
+        with self.assertRaises(InvalidBlockFromBackfillFork):
+            sync(local, [peer], checkpoint)
 
 
 def apply_invalid_block_to_ledger_state(follower: Follower, block: BlockHeader):
