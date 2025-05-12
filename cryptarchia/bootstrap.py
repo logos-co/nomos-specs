@@ -48,7 +48,7 @@ class Node:
                 if block.height <= self.tree.latest_immutable_block().height:
                     continue
                 # Switch (reset) to BOOTSTRAP fork choice if the node has fallen behind too much.
-                if max_peer_tip.height - self.tree.tip().height >= K:
+                if block.height - self.tree.tip().height >= K:
                     self.tree.fork_choice = ForkChoice(ForkChoiceRule.BOOTSTRAP)
                 self.download_blocks(peer, block.id)
 
