@@ -32,6 +32,7 @@ class Node:
             try:
                 self.tree.on_block(block)
             except ParentNotFound:
+                # Download missing blocks unless they're in a fork behind the latest immutable block.
                 if block.height <= self.tree.latest_immutable_block().height:
                     continue
                 self.download_blocks(peer, block.id)
@@ -61,6 +62,7 @@ class Node:
                 for block in peer.handle_download_blocks(req):
                     num_downloaded_blocks += 1
                     latest_downloaded_block = block
+                    # Stop downloading if the block is behind the latest immutable block.
                     if block.height <= self.tree.latest_immutable_block().height:
                         return
                     try:
@@ -68,6 +70,7 @@ class Node:
                     except Exception:
                         return
 
+                # Downloading is done if the peer returns blocks less than the limit.
                 if num_downloaded_blocks < DOWNLOAD_LIMIT:
                     return
         finally:
