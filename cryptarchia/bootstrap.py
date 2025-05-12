@@ -17,9 +17,12 @@ class Node:
 
     def run_node(self, peers: list[Node]):
         peers_by_tip = group_peers_by_tip(peers)
-        # Determine fork choice rule depending on how long the node has been offline.
+        # Determine fork choice rule depending on how much the node has fallen behind.
         max_peer_tip = max(peers_by_tip.keys(), key=lambda tip: tip.height)
-        self.tree.determine_fork_choice(max_peer_tip, self.num_downloadings)
+        if max_peer_tip.height - self.tree.tip().height >= K:
+            self.tree.fork_choice = ForkChoice(ForkChoiceRule.BOOTSTRAP)
+        else:
+            self.tree.fork_choice = ForkChoice(ForkChoiceRule.ONLINE)
 
         # In real impl, these downloads should be run in parallel.
         for _, peers in peers_by_tip.items():
@@ -27,14 +30,26 @@ class Node:
 
         # Downloads are done. Listen for new blocks.
         for block, peer in self.listen_for_new_blocks():
-            # Determine fork choice depending on how far behind the node is.
-            self.tree.determine_fork_choice(block, self.num_downloadings)
+            # Switch fork choice to ONLINE if possible.
+            if (
+                self.tree.fork_choice.rule == ForkChoiceRule.BOOTSTRAP
+                and self.num_downloadings == 0
+                and self.tree.fork_choice.elapsed() > BOOTSTRAP_TIME
+            ):
+                self.tree.fork_choice = ForkChoice(ForkChoiceRule.ONLINE)
+
+            # Try to validate and add the block to the tree.
             try:
                 self.tree.on_block(block)
+            except InvalidBlock:
+                continue
             except ParentNotFound:
                 # Download missing blocks unless they're in a fork behind the latest immutable block.
                 if block.height <= self.tree.latest_immutable_block().height:
                     continue
+                # Switch (reset) to BOOTSTRAP fork choice if the node has fallen behind too much.
+                if max_peer_tip.height - self.tree.tip().height >= K:
+                    self.tree.fork_choice = ForkChoice(ForkChoiceRule.BOOTSTRAP)
                 self.download_blocks(peer, block.id)
 
     def download_blocks(self, peer: Node, target_block: Optional[BlockId]):
@@ -119,11 +134,6 @@ class BlockTree:
         # Also, if the fork choice has been switched from ONLINE to BOOTSTRAP, we can't rely on K.
         return self.genesis_block
 
-    def determine_fork_choice(self, received_block: Block, num_downloadings: int):
-        self.fork_choice = self.fork_choice.update(
-            received_block.height, self.tip().height, num_downloadings
-        )
-
     def on_block(self, block: Block):
         pass
 
@@ -133,29 +143,21 @@ class ForkChoice:
     rule: ForkChoiceRule
     start_time: datetime
 
-    def update(
-        self, received_block_height: int, local_tip_height: int, num_downloadings: int
-    ) -> ForkChoice:
-        # If the node has been offline while more than K blocks were being created, switch to BOOTSTRAP.
-        # It means that the node is behind the k-block of the peer.
-        if received_block_height - local_tip_height >= K:
-            return ForkChoice(rule=ForkChoiceRule.BOOTSTRAP, start_time=datetime.now())
+    def __init__(self, rule: ForkChoiceRule):
+        self.rule = rule
+        self.start_time = datetime.now()
 
-        # If not, basically keep the current rule.
-        # But, if bootstrap time has passed, switch to ONLINE.
-        if (
-            self.rule == ForkChoiceRule.BOOTSTRAP
-            and num_downloadings == 0
-            and datetime.now() - self.start_time > BOOTSTRAP_TIME
-        ):
-            return ForkChoice(rule=ForkChoiceRule.ONLINE, start_time=datetime.now())
-        else:
-            return self
+    def elapsed(self) -> timedelta:
+        return datetime.now() - self.start_time
 
 
 class ForkChoiceRule(Enum):
     BOOTSTRAP = 1
     ONLINE = 2
+
+
+class InvalidBlock(Exception):
+    pass
 
 
 class ParentNotFound(Exception):
