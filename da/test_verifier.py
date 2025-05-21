@@ -5,7 +5,7 @@ from da.encoder import DAEncoder
 from da.kzg_rs import kzg
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY
 from da.test_encoder import TestEncoder
-from da.verifier import DAVerifier, DABlob
+from da.verifier import DAVerifier, DAShare
 
 
 class TestVerifier(TestCase):
@@ -13,18 +13,6 @@ class TestVerifier(TestCase):
     def setUp(self):
         self.verifier = DAVerifier()
 
-    def test_verify_column(self):
-        column = Column(int.to_bytes(i, length=32) for i in range(8))
-        _, column_commitment = kzg.bytes_to_commitment(column.as_bytes(), GLOBAL_PARAMETERS)
-        aggregated_poly, aggregated_column_commitment = kzg.bytes_to_commitment(
-            DAEncoder.hash_commitment_blake2b31(column_commitment), GLOBAL_PARAMETERS
-        )
-        aggregated_proof = kzg.generate_element_proof(0, aggregated_poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
-        self.assertTrue(
-            self.verifier._verify_column(
-                column, 0, column_commitment, aggregated_column_commitment, aggregated_proof,
-            )
-        )
 
     def test_verify(self):
         _ = TestEncoder()
@@ -32,14 +20,11 @@ class TestVerifier(TestCase):
         encoded_data = _.encoder.encode(_.data)
         for i, column in enumerate(encoded_data.chunked_data.columns):
             verifier = DAVerifier()
-            da_blob = DABlob(
+            da_blob = DAShare(
                 Column(column),
                 i,
-                encoded_data.column_commitments[i],
-                encoded_data.aggregated_column_commitment,
-                encoded_data.aggregated_column_proofs[i],
+                encoded_data.combined_column_proofs[i],
                 encoded_data.row_commitments,
-                [row[i] for row in encoded_data.row_proofs],
             )
             self.assertIsNotNone(verifier.verify(da_blob))
 
@@ -49,24 +34,18 @@ class TestVerifier(TestCase):
         encoded_data = _.encoder.encode(_.data)
         columns = enumerate(encoded_data.chunked_data.columns)
         i, column = next(columns)
-        da_blob = DABlob(
+        da_blob = DAShare(
             Column(column),
             i,
-            encoded_data.column_commitments[i],
-            encoded_data.aggregated_column_commitment,
-            encoded_data.aggregated_column_proofs[i],
+            encoded_data.combined_column_proofs[i],
             encoded_data.row_commitments,
-            [row[i] for row in encoded_data.row_proofs],
         )
         self.assertIsNotNone(self.verifier.verify(da_blob))
         for i, column in columns:
-            da_blob = DABlob(
+            da_blob = DAShare(
                 Column(column),
                 i,
-                encoded_data.column_commitments[i],
-                encoded_data.aggregated_column_commitment,
-                encoded_data.aggregated_column_proofs[i],
+                encoded_data.combined_column_proofs[i],
                 encoded_data.row_commitments,
-                [row[i] for row in encoded_data.row_proofs],
             )
             self.assertTrue(self.verifier.verify(da_blob))

@@ -6,6 +6,7 @@ from eth2spec.deneb.mainnet import bytes_to_bls_field
 
 from da import encoder
 from da.encoder import DAEncoderParams, DAEncoder
+from da.verifier import DAVerifier
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
 
 from da.kzg_rs.common import BLS_MODULUS, ROOTS_OF_UNITY
@@ -33,24 +34,26 @@ class TestEncoder(TestCase):
         self.assertEqual(columns_len, column_count)
         chunks_size = (len(data) // encoder_params.bytes_per_chunk) // encoder_params.column_count
         self.assertEqual(len(encoded_data.row_commitments), chunks_size)
-        self.assertEqual(len(encoded_data.row_proofs), chunks_size)
-        self.assertEqual(len(encoded_data.row_proofs[0]), column_count)
-        self.assertIsNotNone(encoded_data.aggregated_column_commitment)
-        self.assertEqual(len(encoded_data.aggregated_column_proofs), columns_len)
+        self.assertEqual(len(encoded_data.combined_column_proofs), columns_len)
 
         # verify rows
-        for row, proofs, commitment in zip(encoded_data.extended_matrix, encoded_data.row_proofs, encoded_data.row_commitments):
-            for i, (chunk, proof) in enumerate(zip(row, proofs)):
-                self.assertTrue(
-                    kzg.verify_element_proof(bytes_to_bls_field(chunk), commitment, proof, i, ROOTS_OF_UNITY)
-                )
+        h = DAVerifier._derive_challenge(encoded_data.row_commitments)
+        com_C = encoded_data.row_commitments[0]
+        power = h
+        for com in encoded_data.row_commitments[1:]:
+            com_C = com_C + com * int(power)
+            power = power * h
 
-        # verify column aggregation
-        for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.aggregated_column_proofs)):
-            data = DAEncoder.hash_commitment_blake2b31(commitment)
+        for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.combined_column_proofs)):
+            v = BLSFieldElement(0)
+            power = BLSFieldElement(1)
+            for chunk in column.chunks:
+                x = BLSFieldElement(int.from_bytes(bytes(chunk), byteorder="big"))
+                v = v + x * power
+                power = power * h
             kzg.verify_element_proof(
-                bytes_to_bls_field(data),
-                encoded_data.aggregated_column_commitment,
+                v,
+                com_C,
                 proof,
                 i,
                 ROOTS_OF_UNITY
@@ -84,41 +87,14 @@ class TestEncoder(TestCase):
             poly_2 = rs.decode(r2, ROOTS_OF_UNITY, len(poly_1))
             self.assertEqual(poly_1, poly_2)
 
-    def test_compute_rows_proofs(self):
-        chunks_matrix = self.encoder._chunkify_data(self.data)
-        polynomials, commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix))
-        extended_chunks_matrix = self.encoder._rs_encode_rows(chunks_matrix)
-        original_proofs = self.encoder._compute_rows_proofs(chunks_matrix, polynomials, commitments)
-        extended_proofs = self.encoder._compute_rows_proofs(extended_chunks_matrix, polynomials, commitments)
-        # check original sized matrix
-        for row, poly, commitment, proofs in zip(chunks_matrix, polynomials, commitments, original_proofs):
-            self.assertEqual(len(proofs), len(row))
-            for i, chunk in enumerate(row):
-                self.assertTrue(kzg.verify_element_proof(BLSFieldElement.from_bytes(chunk), commitment, proofs[i], i, ROOTS_OF_UNITY))
-        # check extended matrix
-        for row, poly, commitment, proofs in zip(extended_chunks_matrix, polynomials, commitments, extended_proofs):
-            for i, chunk in enumerate(row):
-                self.assertTrue(kzg.verify_element_proof(BLSFieldElement.from_bytes(chunk), commitment, proofs[i], i, ROOTS_OF_UNITY))
 
-    def test_compute_column_kzg_commitments(self):
+    def test_generate_combined_column_proofs(self):
         chunks_matrix = self.encoder._chunkify_data(self.data)
-        polynomials, commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
-        self.assertEqual(len(commitments), len(chunks_matrix[0]))
-        self.assertEqual(len(polynomials), len(chunks_matrix[0]))
-
-    def test_generate_aggregated_column_commitments(self):
-        chunks_matrix = self.encoder._chunkify_data(self.data)
-        _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
-        poly, commitment = self.encoder._compute_aggregated_column_commitment(column_commitments)
-        self.assertIsNotNone(poly)
-        self.assertIsNotNone(commitment)
-
-    def test_generate_aggregated_column_proofs(self):
-        chunks_matrix = self.encoder._chunkify_data(self.data)
-        _, column_commitments = zip(*self.encoder._compute_column_kzg_commitments(chunks_matrix))
-        poly, _ = self.encoder._compute_aggregated_column_commitment(column_commitments)
-        proofs = self.encoder._compute_aggregated_column_proofs(poly, column_commitments)
-        self.assertEqual(len(proofs), len(column_commitments))
+        row_polynomials, row_commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix))
+        h = self.encoder._derive_challenge(row_commitments)
+        combined_poly = self.encoder._combined_polynomial(row_polynomials, h)
+        proofs = self.encoder._compute_combined_column_proofs(combined_poly)
+        self.assertEqual(len(proofs), len(row_commitments))
 
     def test_encode(self):
         from random import randbytes

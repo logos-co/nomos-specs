@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from hashlib import sha256
+from hashlib import blake2b
 from itertools import chain, zip_longest, compress
 from typing import List, Generator, Self, Sequence
 
@@ -42,7 +42,7 @@ class Bitfield(List[bool]):
 
 
 def build_blob_id(row_commitments: Sequence[Commitment]) -> BlobId:
-    hasher = sha256()
+    hasher = blake2b(digest_size=32)
     for c in row_commitments:
         hasher.update(bytes(c))
     return hasher.digest()
