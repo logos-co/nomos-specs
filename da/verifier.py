@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Sequence, Set
 from hashlib import blake2b
+from eth2spec.utils import bls
 from eth2spec.deneb.mainnet import BLSFieldElement
 from eth2spec.eip7594.mainnet import (
     KZGCommitment as Commitment,
@@ -40,15 +41,15 @@ class DAVerifier:
         combined_commitment = blob.row_commitments[0]
         power = h
         for com in blob.row_commitments[1:]:
-            combined_commitment = combined_commitment + com * int(power)
+            combined_commitment = bls.add(combined_commitment,bls.multiply(com, power))
             power = power * h
 
         # 3. Compute combined evaluation v = sum_{i=0..l-1} (h^i * column_data[i])
-        v = BLSFieldElement(0)
+        combined_eval_point = BLSFieldElement(0)
         power = BLSFieldElement(1)
-        for chunk in blob.column.chunks:
-            x = BLSFieldElement(int.from_bytes(bytes(chunk), byteorder="big"))
-            v = v + x * power
+        for data in blob.column.chunks:
+            chunk = BLSFieldElement(int.from_bytes(bytes(data), byteorder="big"))
+            combined_eval_point = combined_eval_point + chunk * power
             power = power * h
         # 4. Verify the single KZG proof for evaluation at point w^{column_idx}
-        return kzg.verify_element_proof(v,combined_commitment,blob.combined_column_proof,blob.column_idx,ROOTS_OF_UNITY)
+        return kzg.verify_element_proof(combined_eval_point,combined_commitment,blob.combined_column_proof,blob.column_idx,ROOTS_OF_UNITY)
