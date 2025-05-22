@@ -5,7 +5,7 @@ from hashlib import blake2b
 
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof, BLSFieldElement
 
-from da.common import ChunksMatrix, Chunk, Row
+from da.common import ChunksMatrix, Chunk, Row, derive_challenge
 from da.kzg_rs import kzg, rs
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY, BYTES_PER_FIELD_ELEMENT, BLS_MODULUS
 from da.kzg_rs.poly import Polynomial
@@ -64,23 +64,16 @@ class DAEncoder:
             )
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
 
-    def _derive_challenge(self, commitments: Sequence[Commitment]) -> BLSFieldElement:
-        h = blake2b(digest_size=31)
-        h.update(_DST)
-        for com in commitments:
-            h.update(bytes(com))
-        digest31 = h.digest()
-        # pad to 32 bytes
-        return BLSFieldElement.from_bytes(digest31 + b'\x00')
     @staticmethod
     def _combined_polynomial(
         polys: Sequence[Polynomial], h: BLSFieldElement
     ) -> Polynomial:
         combined = Polynomial([0], BLS_MODULUS)
-        power = BLSFieldElement(1)
+        h_int = int(h)  # raw integer challenge
+        int_pow = 1
         for poly in polys:
-            combined = combined + poly * int(power)
-            power = power * h
+            combined = combined + (poly * int_pow)
+            int_pow = (int_pow * h_int) % BLS_MODULUS
         return combined
 
     def _compute_combined_column_proofs(self, combined_poly: Polynomial) -> List[Proof]:
@@ -94,7 +87,7 @@ class DAEncoder:
         chunks_matrix = self._chunkify_data(data)
         row_polynomials, row_commitments = zip(*self._compute_row_kzg_commitments(chunks_matrix))
         extended_matrix = self._rs_encode_rows(chunks_matrix)
-        h = self._derive_challenge(row_commitments)
+        h = derive_challenge(row_commitments)
         combined_poly = self._combined_polynomial(row_polynomials, h)
         combined_column_proofs = self._compute_combined_column_proofs(combined_poly)
         result = EncodedData(
