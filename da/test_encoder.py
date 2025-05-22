@@ -38,7 +38,7 @@ class TestEncoder(TestCase):
 
         # verify rows
         h = DAVerifier._derive_challenge(encoded_data.row_commitments)
-        com_C = encoded_data.row_commitments[0]
+        combined_commitment = encoded_data.row_commitments[0]
         power = h
         for com in encoded_data.row_commitments[1:]:
             com_C = com_C + com * int(power)
