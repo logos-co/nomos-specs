@@ -41,8 +41,8 @@ class TestEncoder(TestCase):
         h = derive_challenge(encoded_data.row_commitments)
         combined_commitment = encoded_data.row_commitments[0]
         power = h
-        for com in encoded_data.row_commitments[1:]:
-            combined_commitment = bls.add(combined_commitment,bls.multiply(com, power))
+        for commitment in encoded_data.row_commitments[1:]:
+            combined_commitment = bls.add(combined_commitment,bls.multiply(commitment, power))
             power = power * h
 
         for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.combined_column_proofs)):
