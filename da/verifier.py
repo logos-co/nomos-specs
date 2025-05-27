@@ -40,8 +40,8 @@ class DAVerifier:
         # 2. Reconstruct combined commitment: combined_commitment = sum_{i=0..l-1} h^i * row_commitments[i]
         combined_commitment = blob.row_commitments[0]
         power = h
-        for com in blob.row_commitments[1:]:
-            combined_commitment = bls.add(combined_commitment,bls.multiply(com, power))
+        for commitment in blob.row_commitments[1:]:
+            combined_commitment = bls.add(combined_commitment,bls.multiply(commitment, power))
             power = power * h
 
         # 3. Compute combined evaluation v = sum_{i=0..l-1} (h^i * column_data[i])
