@@ -1,5 +1,5 @@
 import functools
-import itertools
+from itertools import islice
 import logging
 from collections import defaultdict
 from copy import deepcopy
@@ -322,6 +322,7 @@ class Follower:
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
         self.state = State.BOOTSTRAPPING
+        self.lib = genesis_state.block.id()  # Last immutable block, initially the genesis block
 
     def to_online(self):
         """
@@ -332,11 +333,16 @@ class Follower:
         if self.state != State.BOOTSTRAPPING:
             raise RuntimeError("Follower is not in BOOTSTRAPPING state")
         self.state = State.ONLINE
+        self.update_lib()
 
     def validate_header(self, block: BlockHeader):
         # TODO: verify blocks are not in the 'future'
         if block.parent not in self.ledger_state:
             raise ParentNotFound
+
+        if not is_ancestor(self.lib, block.parent, self.ledger_state):
+            # If the block is not an ancestor of the last immutable block, we cannot process it.
+            raise ImmutableFork
 
         current_state = self.ledger_state[block.parent].copy()
 
@@ -380,6 +386,27 @@ class Follower:
             self.forks.append(self.local_chain)
             self.forks.remove(new_tip)
             self.local_chain = new_tip
+
+        if self.state == State.ONLINE:
+            self.update_lib()
+
+
+    # Update the lib, and prune forks that do not descend from it.
+    def update_lib(self):
+        """
+        Computes the last immutable block, which is the k-th block in the chain.
+        The last immutable block is the block that is guaranteed to be part of the chain
+        and will not be reverted.
+        """
+        if self.state != State.ONLINE:
+            return
+        # prune forks that do not descend from the last immutable block, this is needed to avoid Genesis rule to roll back
+        # past the LIB
+        self.lib = next(islice(iter_chain(self.local_chain, self.ledger_state), self.config.k, None), self.local_chain).block.id()
+        self.forks = [
+            f for f in self.forks if is_ancestor(self.lib, f, self.ledger_state)
+        ]
+
 
     # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Hash:
@@ -555,6 +582,14 @@ def iter_chain_blocks(
     for state in iter_chain(tip, states):
         yield state.block
 
+def is_ancestor(a: Hash, b: Hash, states: Dict[Hash, LedgerState]) -> bool:
+    """
+    Returns True if `a` is an ancestor of `b` in the chain.
+    """
+    for state in iter_chain(b, states):
+        if state.block.id() == a:
+            return True
+    return False
 
 def common_prefix_depth(
     a: Hash, b: Hash, states: Dict[Hash, LedgerState]
@@ -675,7 +710,7 @@ def maxvalid_mc(
 
     cmax = local_chain
     for fork in forks:
-        cmax_depth, cmax_suffix, fork_depth, fork_suffix = common_prefix_depth(
+        cmax_depth, _, fork_depth, _ = common_prefix_depth(
             cmax, fork, states
         )
         if cmax_depth <= k:
@@ -693,6 +728,10 @@ class ParentNotFound(Exception):
 class InvalidLeaderProof(Exception):
     def __str__(self):
         return "Invalid leader proof"
+
+class ImmutableFork(Exception):
+    def __str__(self):
+        return "Block is forking from the last immutable block"
 
 
 if __name__ == "__main__":
