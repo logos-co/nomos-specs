@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 from hashlib import blake2b, sha256
 from math import floor
 from typing import Dict, Generator, List, TypeAlias
+from enum import Enum
 
 import numpy as np
 
@@ -308,6 +309,9 @@ class EpochState:
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
 
+class State(Enum):
+    ONLINE = 1
+    BOOTSTRAPPING = 2
 
 class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
@@ -317,6 +321,17 @@ class Follower:
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
+        self.state = State.BOOTSTRAPPING
+
+    def to_online(self):
+        """
+        Call this method when the follower has finished bootstrapping. While this is somewhat left to implementations
+        https://www.notion.so/Cryptarchia-v1-Bootstrapping-Synchronization-1fd261aa09df81ac94b5fb6a4eff32a6 contains a great deal
+        of information and is the reference for the Rust implementation.
+        """
+        if self.state != State.BOOTSTRAPPING:
+            raise RuntimeError("Follower is not in BOOTSTRAPPING state")
+        self.state = State.ONLINE
 
     def validate_header(self, block: BlockHeader):
         # TODO: verify blocks are not in the 'future'
@@ -368,13 +383,23 @@ class Follower:
 
     # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Hash:
-        return maxvalid_bg(
-            self.local_chain,
-            self.forks,
-            k=self.config.k,
-            s=self.config.s,
-            states=self.ledger_state,
-        )
+        if self.state == State.BOOTSTRAPPING:
+            return maxvalid_bg(
+                self.local_chain,
+                self.forks,
+                k=self.config.k,
+                s=self.config.s,
+                states=self.ledger_state,
+            )
+        elif self.state == State.ONLINE:
+            return maxvalid_mc(
+                self.local_chain,
+                self.forks,
+                k=self.config.k,
+                states=self.ledger_state,
+            )
+        else:
+            raise RuntimeError(f"Unknown follower state: {self.state}")
 
     def tip(self) -> BlockHeader:
         return self.tip_state().block
@@ -592,7 +617,7 @@ def block_children(states: Dict[Hash, LedgerState]) -> Dict[Hash, set[Hash]]:
     return children
 
 
-# Implementation of the Cryptarchia fork choice rule (following Ouroborous Genesis).
+# Implementation of the Ouroboros Genesis fork choice rule.
 # The fork choice has two phases:
 # 1. if the chain is not forking too deeply, we apply the longest chain fork choice rule
 # 2. otherwise we look at the chain density immidiately following the fork
@@ -632,6 +657,33 @@ def maxvalid_bg(
 
     return cmax
 
+
+# Implementation of the Ouroboros Praos fork choice rule.
+# The fork choice has two phases:
+# 1. if the chain is not forking too deeply, we apply the longest chain fork choice rule
+# 2. otherwise we discard the fork
+#
+# k defines the forking depth of a chain at which point we switch phases.
+def maxvalid_mc(
+    local_chain: Hash,
+    forks: List[Hash],
+    k: int,
+    states: Dict[Hash, LedgerState],
+) -> Hash:
+    assert type(local_chain) == Hash, type(local_chain)
+    assert all(type(f) == Hash for f in forks)
+
+    cmax = local_chain
+    for fork in forks:
+        cmax_depth, cmax_suffix, fork_depth, fork_suffix = common_prefix_depth(
+            cmax, fork, states
+        )
+        if cmax_depth <= k:
+            # Longest chain fork choice rule
+            if cmax_depth < fork_depth:
+                cmax = fork
+
+    return cmax
 
 class ParentNotFound(Exception):
     def __str__(self):

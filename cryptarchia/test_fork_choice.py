@@ -3,6 +3,7 @@ from unittest import TestCase
 from copy import deepcopy
 from cryptarchia.cryptarchia import (
     maxvalid_bg,
+    maxvalid_mc,
     Slot,
     Note,
     Follower,
@@ -200,10 +201,20 @@ class TestForkChoice(TestCase):
             == short_chain[-1].id()
         )
 
+        assert (
+            maxvalid_mc(short_chain[-1].id(), [long_chain[-1].id()], k,states)
+            == short_chain[-1].id()
+        )
+
         # However, if we set k to the fork length, it will be accepted
         k = len(long_chain)
         assert (
             maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], k, s, states)
+            == long_chain[-1].id()
+        )
+
+        assert (
+            maxvalid_mc(short_chain[-1].id(), [long_chain[-1].id()], k, states)
             == long_chain[-1].id()
         )
 
@@ -233,6 +244,13 @@ class TestForkChoice(TestCase):
         assert (
             maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], k, s, states)
             == long_chain[-1].id()
+        )
+
+        # praos fc rule should not accept a chain that diverged more than k blocks,
+        # even if it is longer
+        assert (
+            maxvalid_mc(short_chain[-1].id(), [long_chain[-1].id()], k, states)
+            == short_chain[-1].id()
         )
 
     def test_fork_choice_integration(self):
@@ -281,3 +299,41 @@ class TestForkChoice(TestCase):
 
         assert follower.tip_id() == b4.id()
         assert len(follower.forks) == 1 and follower.forks[0] == b2.id(), follower.forks
+
+        # -- switch to online mode --
+        follower.to_online()
+
+        # -- extend a fork deeper than k --
+        #
+        #
+        #    b2 - b5 - b6
+        #   /
+        # b1
+        #   \
+        #    b3 - b4 == tip
+        #
+        b5 = mk_block(b2, 3, n_a)
+        b6 = mk_block(b5, 4, n_a)
+        follower.on_block(b5)
+        follower.on_block(b6)
+
+        assert follower.tip_id() == b4.id()
+        assert len(follower.forks) == 1 and follower.forks[0] == b6.id()
+
+        # -- extend the main chain shallower than k --
+        #
+        #
+        #    b2 - b5 - b6
+        #   /
+        # b1
+        #   \
+        #    b3 - b4
+        #    \
+        #     - - b7 - b8 == tip
+        b7 = mk_block(b3, 4, n_b)
+        b8 = mk_block(b7, 5, n_b)
+
+        follower.on_block(b7)
+        follower.on_block(b8)
+        assert follower.tip_id() == b8.id()
+        assert len(follower.forks) == 2 and {b6.id(), b4.id()}.issubset(follower.forks)
