@@ -330,8 +330,7 @@ class Follower:
         https://www.notion.so/Cryptarchia-v1-Bootstrapping-Synchronization-1fd261aa09df81ac94b5fb6a4eff32a6 contains a great deal
         of information and is the reference for the Rust implementation.
         """
-        if self.state != State.BOOTSTRAPPING:
-            raise RuntimeError("Follower is not in BOOTSTRAPPING state")
+        assert self.state == State.BOOTSTRAPPING, "Follower is not in BOOTSTRAPPING state"
         self.state = State.ONLINE
         self.update_lib()
 
@@ -340,8 +339,8 @@ class Follower:
         if block.parent not in self.ledger_state:
             raise ParentNotFound
 
-        if not is_ancestor(self.lib, block.parent, self.ledger_state):
-            # If the block is not an ancestor of the last immutable block, we cannot process it.
+        if  height(block.parent, self.ledger_state) < height(self.lib, self.ledger_state):
+            # If the block is not a descendant of the last immutable block, we cannot process it.
             raise ImmutableFork
 
         current_state = self.ledger_state[block.parent].copy()
@@ -406,6 +405,11 @@ class Follower:
         self.forks = [
             f for f in self.forks if is_ancestor(self.lib, f, self.ledger_state)
         ]
+        self.ledger_state = {
+            k: v
+            for k, v in self.ledger_state.items()
+            if is_ancestor(self.lib, k, self.ledger_state) or is_ancestor(k, self.lib, self.ledger_state)
+        }
 
 
     # Evaluate the fork choice rule and return the chain we should be following
@@ -567,6 +571,20 @@ class Leader:
 
         return ticket < Hash.ORDER * phi(self.config.active_slot_coeff, relative_stake)
 
+def height(block: Hash, states: Dict[Hash, LedgerState]) -> int:
+    """
+    Returns the height of the block in the chain, i.e. the number of blocks
+    between this block and the genesis block.
+    """
+    if block not in states:
+        raise ValueError("State not found in states")
+
+    height = 0
+    while block in states:
+        height += 1
+        block = states[block].block.parent
+
+    return height
 
 def iter_chain(
     tip: Hash, states: Dict[Hash, LedgerState]
@@ -731,7 +749,7 @@ class InvalidLeaderProof(Exception):
 
 class ImmutableFork(Exception):
     def __str__(self):
-        return "Block is forking from the last immutable block"
+        return "Block is forking deeper than the last immutable block"
 
 
 if __name__ == "__main__":
