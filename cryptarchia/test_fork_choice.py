@@ -3,11 +3,14 @@ from unittest import TestCase
 from copy import deepcopy
 from cryptarchia.cryptarchia import (
     maxvalid_bg,
+    maxvalid_mc,
     Slot,
     Note,
+    State,
     Follower,
     common_prefix_depth,
     LedgerState,
+    ImmutableFork,
 )
 
 from .test_common import mk_chain, mk_config, mk_genesis_state, mk_block
@@ -200,10 +203,20 @@ class TestForkChoice(TestCase):
             == short_chain[-1].id()
         )
 
+        assert (
+            maxvalid_mc(short_chain[-1].id(), [long_chain[-1].id()], k,states)
+            == short_chain[-1].id()
+        )
+
         # However, if we set k to the fork length, it will be accepted
         k = len(long_chain)
         assert (
             maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], k, s, states)
+            == long_chain[-1].id()
+        )
+
+        assert (
+            maxvalid_mc(short_chain[-1].id(), [long_chain[-1].id()], k, states)
             == long_chain[-1].id()
         )
 
@@ -233,6 +246,13 @@ class TestForkChoice(TestCase):
         assert (
             maxvalid_bg(short_chain[-1].id(), [long_chain[-1].id()], k, s, states)
             == long_chain[-1].id()
+        )
+
+        # praos fc rule should not accept a chain that diverged more than k blocks,
+        # even if it is longer
+        assert (
+            maxvalid_mc(short_chain[-1].id(), [long_chain[-1].id()], k, states)
+            == short_chain[-1].id()
         )
 
     def test_fork_choice_integration(self):
@@ -281,3 +301,76 @@ class TestForkChoice(TestCase):
 
         assert follower.tip_id() == b4.id()
         assert len(follower.forks) == 1 and follower.forks[0] == b2.id(), follower.forks
+
+        # -- switch to online mode --
+        #
+        #    b2 (does not descend from the LIB and is thus pruned)
+        #   /
+        # b1
+        #   \
+        #    b3 (LIB) - b4 == tip
+        #
+        follower.to_online()
+        assert follower.lib == b3.id(), follower.lib
+        assert len(follower.forks) == 0, follower.forks
+        assert b2.id() not in follower.forks
+
+        # -- extend a fork deeper than the LIB --
+        #
+        #     - - - - - - b5
+        #   /
+        # b1
+        #   \
+        #    b3 (LIB) - b4 == tip
+        #
+        b5 = mk_block(b1, 4, n_a)
+        with self.assertRaises(ImmutableFork):
+            follower.on_block(b5)
+
+        # -- extend the main chain shallower than k --
+        #
+        # b1
+        #   \
+        #    b3 - b4 (pruned)
+        #    \
+        #     - - b7 (LIB) - b8 == tip
+        b7 = mk_block(b3, 4, n_b)
+        b8 = mk_block(b7, 5, n_b)
+
+        follower.on_block(b7)
+        assert len(follower.forks) == 1 and b7.id() in follower.forks
+
+        follower.on_block(b8)
+        assert follower.tip_id() == b8.id()
+        # b4 was pruned as it forks deeper than the LIB
+        assert len(follower.forks) == 0, follower.forks
+
+        # Even in bootstrap mode, the follower should not accept blocks that fork deeper than k
+        follower.state = State.BOOTSTRAPPING
+        with self.assertRaises(ImmutableFork):
+            follower.on_block(b5)
+
+        # But it should switch a chain diverging more than k as long as it
+        # descends from the LIB
+        #
+        # b1
+        #   \
+        #    b3    - - - - - - - b10 - b11 - b12
+        #    \     |
+        #     - - b7 (LIB) - b8 - b9 == tip
+        b8 = mk_block(b7, 5, n_b)
+        b9 = mk_block(b8, 6, n_b)
+        b10 = mk_block(b7, 7, n_a)
+        b11 = mk_block(b10, 8, n_a)
+        b12 = mk_block(b11, 9, n_a)
+        follower.on_block(b8)
+        follower.on_block(b9)
+
+        assert follower.tip_id() == b9.id()
+
+        follower.on_block(b10)
+        follower.on_block(b11)
+        follower.on_block(b12)
+
+        assert follower.tip_id() == b12.id()
+        assert follower.lib == b7.id(), follower.lib

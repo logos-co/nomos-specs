@@ -1,5 +1,5 @@
 import functools
-import itertools
+from itertools import islice
 import logging
 from collections import defaultdict
 from copy import deepcopy
@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 from hashlib import blake2b, sha256
 from math import floor
 from typing import Dict, Generator, List, TypeAlias
+from enum import Enum
 
 import numpy as np
 
@@ -308,6 +309,9 @@ class EpochState:
     def nonce(self) -> bytes:
         return self.nonce_snapshot.nonce
 
+class State(Enum):
+    ONLINE = 1
+    BOOTSTRAPPING = 2
 
 class Follower:
     def __init__(self, genesis_state: LedgerState, config: Config):
@@ -317,11 +321,27 @@ class Follower:
         self.genesis_state = genesis_state
         self.ledger_state = {genesis_state.block.id(): genesis_state.copy()}
         self.epoch_state = {}
+        self.state = State.BOOTSTRAPPING
+        self.lib = genesis_state.block.id()  # Last immutable block, initially the genesis block
+
+    def to_online(self):
+        """
+        Call this method when the follower has finished bootstrapping. While this is somewhat left to implementations
+        https://www.notion.so/Cryptarchia-v1-Bootstrapping-Synchronization-1fd261aa09df81ac94b5fb6a4eff32a6 contains a great deal
+        of information and is the reference for the Rust implementation.
+        """
+        assert self.state == State.BOOTSTRAPPING, "Follower is not in BOOTSTRAPPING state"
+        self.state = State.ONLINE
+        self.update_lib()
 
     def validate_header(self, block: BlockHeader):
         # TODO: verify blocks are not in the 'future'
         if block.parent not in self.ledger_state:
             raise ParentNotFound
+
+        if  height(block.parent, self.ledger_state) < height(self.lib, self.ledger_state):
+            # If the block is not a descendant of the last immutable block, we cannot process it.
+            raise ImmutableFork
 
         current_state = self.ledger_state[block.parent].copy()
 
@@ -366,15 +386,51 @@ class Follower:
             self.forks.remove(new_tip)
             self.local_chain = new_tip
 
+        if self.state == State.ONLINE:
+            self.update_lib()
+
+
+    # Update the lib, and prune forks that do not descend from it.
+    def update_lib(self):
+        """
+        Computes the last immutable block, which is the k-th block in the chain.
+        The last immutable block is the block that is guaranteed to be part of the chain
+        and will not be reverted.
+        """
+        if self.state != State.ONLINE:
+            return
+        # prune forks that do not descend from the last immutable block, this is needed to avoid Genesis rule to roll back
+        # past the LIB
+        self.lib = next(islice(iter_chain(self.local_chain, self.ledger_state), self.config.k, None), self.local_chain).block.id()
+        self.forks = [
+            f for f in self.forks if is_ancestor(self.lib, f, self.ledger_state)
+        ]
+        self.ledger_state = {
+            k: v
+            for k, v in self.ledger_state.items()
+            if is_ancestor(self.lib, k, self.ledger_state) or is_ancestor(k, self.lib, self.ledger_state)
+        }
+
+
     # Evaluate the fork choice rule and return the chain we should be following
     def fork_choice(self) -> Hash:
-        return maxvalid_bg(
-            self.local_chain,
-            self.forks,
-            k=self.config.k,
-            s=self.config.s,
-            states=self.ledger_state,
-        )
+        if self.state == State.BOOTSTRAPPING:
+            return maxvalid_bg(
+                self.local_chain,
+                self.forks,
+                k=self.config.k,
+                s=self.config.s,
+                states=self.ledger_state,
+            )
+        elif self.state == State.ONLINE:
+            return maxvalid_mc(
+                self.local_chain,
+                self.forks,
+                k=self.config.k,
+                states=self.ledger_state,
+            )
+        else:
+            raise RuntimeError(f"Unknown follower state: {self.state}")
 
     def tip(self) -> BlockHeader:
         return self.tip_state().block
@@ -515,6 +571,20 @@ class Leader:
 
         return ticket < Hash.ORDER * phi(self.config.active_slot_coeff, relative_stake)
 
+def height(block: Hash, states: Dict[Hash, LedgerState]) -> int:
+    """
+    Returns the height of the block in the chain, i.e. the number of blocks
+    between this block and the genesis block.
+    """
+    if block not in states:
+        raise ValueError("State not found in states")
+
+    height = 0
+    while block in states:
+        height += 1
+        block = states[block].block.parent
+
+    return height
 
 def iter_chain(
     tip: Hash, states: Dict[Hash, LedgerState]
@@ -530,6 +600,14 @@ def iter_chain_blocks(
     for state in iter_chain(tip, states):
         yield state.block
 
+def is_ancestor(a: Hash, b: Hash, states: Dict[Hash, LedgerState]) -> bool:
+    """
+    Returns True if `a` is an ancestor of `b` in the chain.
+    """
+    for state in iter_chain(b, states):
+        if state.block.id() == a:
+            return True
+    return False
 
 def common_prefix_depth(
     a: Hash, b: Hash, states: Dict[Hash, LedgerState]
@@ -592,7 +670,7 @@ def block_children(states: Dict[Hash, LedgerState]) -> Dict[Hash, set[Hash]]:
     return children
 
 
-# Implementation of the Cryptarchia fork choice rule (following Ouroborous Genesis).
+# Implementation of the Ouroboros Genesis fork choice rule.
 # The fork choice has two phases:
 # 1. if the chain is not forking too deeply, we apply the longest chain fork choice rule
 # 2. otherwise we look at the chain density immidiately following the fork
@@ -633,6 +711,33 @@ def maxvalid_bg(
     return cmax
 
 
+# Implementation of the Ouroboros Praos fork choice rule.
+# The fork choice has two phases:
+# 1. if the chain is not forking too deeply, we apply the longest chain fork choice rule
+# 2. otherwise we discard the fork
+#
+# k defines the forking depth of a chain at which point we switch phases.
+def maxvalid_mc(
+    local_chain: Hash,
+    forks: List[Hash],
+    k: int,
+    states: Dict[Hash, LedgerState],
+) -> Hash:
+    assert type(local_chain) == Hash, type(local_chain)
+    assert all(type(f) == Hash for f in forks)
+
+    cmax = local_chain
+    for fork in forks:
+        cmax_depth, _, fork_depth, _ = common_prefix_depth(
+            cmax, fork, states
+        )
+        if cmax_depth <= k:
+            # Longest chain fork choice rule
+            if cmax_depth < fork_depth:
+                cmax = fork
+
+    return cmax
+
 class ParentNotFound(Exception):
     def __str__(self):
         return "Parent not found"
@@ -641,6 +746,10 @@ class ParentNotFound(Exception):
 class InvalidLeaderProof(Exception):
     def __str__(self):
         return "Invalid leader proof"
+
+class ImmutableFork(Exception):
+    def __str__(self):
+        return "Block is forking deeper than the last immutable block"
 
 
 if __name__ == "__main__":
