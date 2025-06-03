@@ -401,7 +401,7 @@ class Follower:
             return
         # prune forks that do not descend from the last immutable block, this is needed to avoid Genesis rule to roll back
         # past the LIB
-        self.lib = next(islice(iter_chain(self.local_chain, self.ledger_state), self.config.k, None), self.local_chain).block.id()
+        self.lib = next(islice(iter_chain(self.local_chain, self.ledger_state), self.config.k, None), self.genesis_state).block.id()
         self.forks = [
             f for f in self.forks if is_ancestor(self.lib, f, self.ledger_state)
         ]

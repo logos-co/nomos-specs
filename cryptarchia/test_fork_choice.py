@@ -374,3 +374,26 @@ class TestForkChoice(TestCase):
 
         assert follower.tip_id() == b12.id()
         assert follower.lib == b7.id(), follower.lib
+
+    def test_lib_calc_short_chain(self):
+        # Test that the LIB is correctly calculated for a short chain
+        n_a = Note(sk=0, value=10)
+        notes = [n_a]
+        config = mk_config(notes)
+        config.k = 10
+        genesis = mk_genesis_state(notes)
+        follower = Follower(genesis, config)
+        follower.to_online()
+
+        assert follower.lib == genesis.block.id(), follower.lib
+        blocks = [genesis.block]
+        for i in range(1, 11):
+            b = mk_block(blocks[-1], i, n_a)
+            blocks.append(b)
+            follower.on_block(b)
+            assert follower.lib == genesis.block.id(), follower.lib
+
+        b11 = mk_block(blocks[-1], 11, n_a)
+        follower.on_block(b11)
+
+        assert follower.lib == blocks[1].id(), follower.lib
