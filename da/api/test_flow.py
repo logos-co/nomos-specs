@@ -2,6 +2,7 @@ from unittest import TestCase
 from collections import defaultdict
 
 from da.api.common import *
+from da.verifier import DAShare
 
 
 @dataclass
@@ -25,7 +26,7 @@ class MockStore(BlobStore):
         self.app_id_store[metadata.app_id][metadata.index] = cert_id
 
     # Implements `get_multiple` method from BlobStore abstract class.
-    def get_multiple(self, app_id, indexes) -> List[Optional[DABlob]]:
+    def get_multiple(self, app_id, indexes) -> List[Optional[DAShare]]:
         return [
             self.blob_store.get(self.app_id_store[app_id].get(i), None) if self.app_id_store[app_id].get(i) else None for i in indexes
         ]
