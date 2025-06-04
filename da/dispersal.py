@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Generator
 
-from da.common import NodeId
+from da.common import NodeId, Column
 from da.encoder import EncodedData
 from da.verifier import DAShare
 
@@ -19,24 +19,16 @@ class Dispersal:
         self.settings.nodes_ids.sort()
 
     def _prepare_data(self, encoded_data: EncodedData) -> Generator[DAShare, None, None]:
-        assert len(encoded_data.column_commitments) == len(self.settings.nodes_ids)
-        assert len(encoded_data.aggregated_column_proofs) == len(self.settings.nodes_ids)
         columns = encoded_data.extended_matrix.columns
-        column_commitments = encoded_data.column_commitments
         row_commitments = encoded_data.row_commitments
-        rows_proofs = encoded_data.row_proofs
-        aggregated_column_commitment = encoded_data.aggregated_column_commitment
-        aggregated_column_proofs = encoded_data.aggregated_column_proofs
-        blobs_data = zip(columns, column_commitments, zip(*rows_proofs), aggregated_column_proofs)
-        for column_idx, (column, column_commitment, row_proofs, column_proof) in enumerate(blobs_data):
+        column_proofs = encoded_data.combined_column_proofs
+        blobs_data = zip(columns, column_proofs)
+        for column_idx, (column, proof) in enumerate(blobs_data):
             blob = DAShare(
-                column,
+                Column(column),
                 column_idx,
-                column_commitment,
-                aggregated_column_commitment,
-                column_proof,
-                row_commitments,
-                row_proofs
+                proof,
+                row_commitments
             )
             yield blob
 
