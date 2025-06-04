@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from da import encoder
 from da.common import Column
-from kzg_rs.bdfg_proving import derive_challenge
+from da.kzg_rs.bdfg_proving import derive_challenge
 from da.encoder import DAEncoderParams, DAEncoder
 from da.verifier import DAVerifier, DAShare
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
