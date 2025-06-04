@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Sequence
 
 from da.common import BlobId
-from da.verifier import DABlob
+from da.verifier import DAShare
 
 
 @dataclass
@@ -31,7 +31,7 @@ class BlobStore(ABC):
         pass
 
     @abstractmethod
-    def get_multiple(self, app_id: bytes, indexes: Sequence[int]) -> List[Optional[DABlob]]:
+    def get_multiple(self, app_id: bytes, indexes: Sequence[int]) -> List[Optional[DAShare]]:
         pass
 
 
@@ -48,7 +48,7 @@ class DAApi:
         """
         self.store.add(id, metadata)
 
-    def read(self, app_id, indexes) -> List[Optional[DABlob]]:
+    def read(self, app_id, indexes) -> List[Optional[DAShare]]:
         """
         Read method should accept only `app_id` and a list of indexes. The returned list of
         blobs should be ordered in the same sequence as `indexes` in a request.
