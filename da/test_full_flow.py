@@ -2,9 +2,9 @@ from itertools import chain
 from unittest import TestCase
 from typing import List, Optional
 
-from da.common import NodeId, build_blob_id, NomosDaG2ProofOfPossession as bls_pop
+from da.common import NodeId, build_blob_id
 from da.api.common import DAApi, BlobMetadata, Metadata
-from da.verifier import DAVerifier, DABlob 
+from da.verifier import DAVerifier, DAShare
 from da.api.test_flow import MockStore
 from da.dispersal import Dispersal, DispersalSettings
 from da.test_encoder import TestEncoder
@@ -17,11 +17,11 @@ class DAVerifierWApi:
         self.api = DAApi(self.store)
         self.verifier = DAVerifier()
 
-    def receive_blob(self, blob: DABlob):
+    def receive_blob(self, blob: DAShare):
         if self.verifier.verify(blob):
             # Warning: If aggregated col commitment and row commitment are the same,
             # the build_attestation_message method will produce the same output.
-            blob_id = build_blob_id(blob.aggregated_column_commitment, blob.rows_commitments)
+            blob_id = build_blob_id(blob.row_commitments)
             self.store.populate(blob, blob_id)
 
     def receive_metadata(self, blob_metadata: BlobMetadata):
@@ -30,7 +30,7 @@ class DAVerifierWApi:
         # in which case all certificates had been already verified by the DA Node.
         self.api.write(blob_metadata.blob_id, blob_metadata.metadata)
 
-    def read(self, app_id, indexes) -> List[Optional[DABlob]]:
+    def read(self, app_id, indexes) -> List[Optional[DAShare]]:
         return self.api.read(app_id, indexes)
 
 
@@ -59,14 +59,14 @@ class TestFullFlow(TestCase):
         encoded_data = DAEncoder(encoding_params).encode(data)
 
         # mock send and await method with local verifiers
-        def __send_and_await_response(node: int, blob: DABlob):
+        def __send_and_await_response(node: int, blob: DAShare):
             node = self.api_nodes[int.from_bytes(node)]
             node.receive_blob(blob)
 
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
         self.dispersal.disperse(encoded_data)
-        blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
+        blob_id = build_blob_id(encoded_data.row_commitments)
         blob_metadata = BlobMetadata(
             blob_id,
             Metadata(app_id, index)
@@ -96,14 +96,14 @@ class TestFullFlow(TestCase):
         encoded_data = DAEncoder(encoding_params).encode(data)
 
         # mock send and await method with local verifiers
-        def __send_and_await_response(node: int, blob: DABlob):
+        def __send_and_await_response(node: int, blob: DAShare):
             node = self.api_nodes[int.from_bytes(node)]
             return node.receive_blob(blob)
 
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
         self.dispersal.disperse(encoded_data)
-        blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
+        blob_id = build_blob_id(encoded_data.row_commitments)
 
         # Loop through each index and simulate dispersal with the same cert_id but different metadata
         for index in indexes:

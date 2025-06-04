@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from hashlib import sha3_256
+from hashlib import blake2b
 from itertools import chain, zip_longest, compress
 from typing import List, Generator, Self, Sequence
 
 from eth2spec.eip7594.mainnet import Bytes32, KZGCommitment as Commitment
 from py_ecc.bls import G2ProofOfPossession
-
 
 type BlobId = bytes
 
@@ -41,12 +40,12 @@ class Bitfield(List[bool]):
     pass
 
 
-def build_blob_id(aggregated_column_commitment: Commitment, row_commitments: Sequence[Commitment]) -> BlobId:
-    hasher = sha3_256()
-    hasher.update(bytes(aggregated_column_commitment))
+def build_blob_id(row_commitments: Sequence[Commitment]) -> BlobId:
+    hasher = blake2b(digest_size=32)
     for c in row_commitments:
         hasher.update(bytes(c))
     return hasher.digest()
+
 
 class NomosDaG2ProofOfPossession(G2ProofOfPossession):
     # Domain specific tag for Nomos DA protocol

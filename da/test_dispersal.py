@@ -1,10 +1,9 @@
-from hashlib import sha3_256
 from unittest import TestCase
 
 from da.encoder import DAEncoderParams, DAEncoder
 from da.test_encoder import TestEncoder
-from da.verifier import DAVerifier, DABlob
-from da.common import NodeId, NomosDaG2ProofOfPossession as bls_pop
+from da.verifier import DAVerifier, DAShare
+from da.common import NodeId
 from da.dispersal import Dispersal, DispersalSettings
 
 
@@ -27,7 +26,7 @@ class TestDispersal(TestCase):
 
         # mock send and await method with local verifiers
         verifiers_res = []
-        def __send_and_await_response(_, blob: DABlob):
+        def __send_and_await_response(_, blob: DAShare):
             verifier = DAVerifier()
             res = verifier.verify(blob)
             verifiers_res.append(res)
