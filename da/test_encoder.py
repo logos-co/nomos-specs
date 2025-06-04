@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from da import encoder
 from da.common import Column
-from da.kzg_rs.bdfg_proving import derive_challenge
+from da.kzg_rs.bdfg_proving import derive_challenge, compute_combined_polynomial
 from da.encoder import DAEncoderParams, DAEncoder
 from da.verifier import DAVerifier, DAShare
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
@@ -81,7 +81,7 @@ class TestEncoder(TestCase):
         chunks_matrix = self.encoder._chunkify_data(self.data)
         row_polynomials, row_commitments = zip(*self.encoder._compute_row_kzg_commitments(chunks_matrix))
         h = derive_challenge(row_commitments)
-        combined_poly = self.encoder._combined_polynomial(row_polynomials, h)
+        combined_poly = compute_combined_polynomial(row_polynomials, h)
         proofs = self.encoder._compute_combined_column_proofs(combined_poly)
         expected_extended_columns = self.params.column_count * 2
         self.assertEqual(len(proofs), expected_extended_columns)
