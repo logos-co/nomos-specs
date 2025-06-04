@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from itertools import batched
-from typing import List, Sequence, Tuple
-from hashlib import blake2b
+from typing import List, Tuple
 
 from eth2spec.eip7594.mainnet import KZGCommitment as Commitment, KZGProof as Proof, BLSFieldElement
 
@@ -9,6 +8,7 @@ from da.common import ChunksMatrix, Chunk, Row, derive_challenge
 from da.kzg_rs import kzg, rs
 from da.kzg_rs.common import GLOBAL_PARAMETERS, ROOTS_OF_UNITY, BYTES_PER_FIELD_ELEMENT, BLS_MODULUS
 from da.kzg_rs.poly import Polynomial
+from da.kzg_rs.bdfg_proving import compute_combined_polynomial
 
 # Domain separation tag
 _DST = b"NOMOS_DA_V1"
@@ -64,18 +64,6 @@ class DAEncoder:
             )
         return ChunksMatrix(__rs_encode_row(row) for row in chunks_matrix)
 
-    @staticmethod
-    def _combined_polynomial(
-        polys: Sequence[Polynomial], h: BLSFieldElement
-    ) -> Polynomial:
-        combined_polynomial = polys[0]
-        h_int = int(h)  # raw integer challenge
-        int_pow = 1
-        for poly in polys[1:]:
-            int_pow = (int_pow * h_int) % BLS_MODULUS
-            combined_polynomial = combined_polynomial + Polynomial({int_pow * coeff for coeff in poly},BLS_MODULUS)
-        return combined_polynomial
-
     def _compute_combined_column_proofs(self, combined_poly: Polynomial) -> List[Proof]:
         total_cols = self.params.column_count * 2
         return [
@@ -88,7 +76,7 @@ class DAEncoder:
         row_polynomials, row_commitments = zip(*self._compute_row_kzg_commitments(chunks_matrix))
         extended_matrix = self._rs_encode_rows(chunks_matrix)
         h = derive_challenge(row_commitments)
-        combined_poly = self._combined_polynomial(row_polynomials, h)
+        combined_poly = compute_combined_polynomial(row_polynomials, h)
         combined_column_proofs = self._compute_combined_column_proofs(combined_poly)
         result = EncodedData(
             data,

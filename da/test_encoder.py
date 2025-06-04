@@ -1,16 +1,15 @@
 from itertools import chain, batched
-from random import randrange, randbytes
+from random import randbytes
 from unittest import TestCase
-from eth2spec.utils import bls
-from eth2spec.deneb.mainnet import bytes_to_bls_field
 
 from da import encoder
-from da.common import derive_challenge
+from da.common import Column
+from kzg_rs.bdfg_proving import derive_challenge
 from da.encoder import DAEncoderParams, DAEncoder
-from da.verifier import DAVerifier
+from da.verifier import DAVerifier, DAShare
 from eth2spec.eip7594.mainnet import BYTES_PER_FIELD_ELEMENT, BLSFieldElement
 
-from da.kzg_rs.common import BLS_MODULUS, ROOTS_OF_UNITY
+from da.kzg_rs.common import ROOTS_OF_UNITY
 from da.kzg_rs import kzg, rs
 
 
@@ -35,32 +34,19 @@ class TestEncoder(TestCase):
         self.assertEqual(columns_len, column_count)
         chunks_size = (len(data) // encoder_params.bytes_per_chunk) // encoder_params.column_count
         self.assertEqual(len(encoded_data.row_commitments), chunks_size)
-        self.assertEqual(len(encoded_data.combined_column_proofs), columns_len)
 
-        # verify rows
-        h = derive_challenge(encoded_data.row_commitments)
-        combined_commitment = bls.bytes48_to_G1(encoded_data.row_commitments[0])
-        power = int(h) % BLS_MODULUS
-        for commitment in encoded_data.row_commitments[1:]:
-            commitment=bls.bytes48_to_G1(commitment)
-            combined_commitment = bls.add(combined_commitment,bls.multiply(commitment,power))
-            power = (power * int(h)) % BLS_MODULUS
-        combined_commitment = bls.G1_to_bytes48(combined_commitment)
-        for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.combined_column_proofs)):
-            combined_eval_int = 0
-            power_int = 1
-            h_int = int(h)
-            for data in column:
-                chunk_int = int.from_bytes(bytes(data), byteorder="big")
-                combined_eval_point = (combined_eval_int + chunk_int * power_int) % BLS_MODULUS
-                power_int = (power_int * h_int) % BLS_MODULUS
-            kzg.verify_element_proof(
-                combined_eval_point,
-                combined_commitment,
-                proof,
-                i,
-                ROOTS_OF_UNITY
+        verifier = DAVerifier()
+        # verify columns
+        for idx, (column, column_proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.combined_column_proofs)):
+            share = DAShare(
+                column=Column(column),
+                column_idx=idx,
+                combined_column_proof=column_proof,
+                row_commitments=encoded_data.row_commitments
             )
+            verifier.verify(share)
+
+
 
     def test_chunkify(self):
         encoder_settings = DAEncoderParams(column_count=2, bytes_per_chunk=31)
