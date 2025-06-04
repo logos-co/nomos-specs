@@ -3,7 +3,7 @@ from typing import List, Generator
 
 from da.common import NodeId
 from da.encoder import EncodedData
-from da.verifier import DABlob
+from da.verifier import DAShare
 
 
 @dataclass
@@ -18,7 +18,7 @@ class Dispersal:
         # sort over public keys
         self.settings.nodes_ids.sort()
 
-    def _prepare_data(self, encoded_data: EncodedData) -> Generator[DABlob, None, None]:
+    def _prepare_data(self, encoded_data: EncodedData) -> Generator[DAShare, None, None]:
         assert len(encoded_data.column_commitments) == len(self.settings.nodes_ids)
         assert len(encoded_data.aggregated_column_proofs) == len(self.settings.nodes_ids)
         columns = encoded_data.extended_matrix.columns
@@ -29,7 +29,7 @@ class Dispersal:
         aggregated_column_proofs = encoded_data.aggregated_column_proofs
         blobs_data = zip(columns, column_commitments, zip(*rows_proofs), aggregated_column_proofs)
         for column_idx, (column, column_commitment, row_proofs, column_proof) in enumerate(blobs_data):
-            blob = DABlob(
+            blob = DAShare(
                 column,
                 column_idx,
                 column_commitment,
@@ -40,7 +40,7 @@ class Dispersal:
             )
             yield blob
 
-    def _send_and_await_response(self, node: NodeId, blob: DABlob) -> bool:
+    def _send_and_await_response(self, node: NodeId, blob: DAShare) -> bool:
         pass
 
     def disperse(self, encoded_data: EncodedData):
