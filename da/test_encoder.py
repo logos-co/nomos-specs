@@ -39,19 +39,21 @@ class TestEncoder(TestCase):
 
         # verify rows
         h = derive_challenge(encoded_data.row_commitments)
-        combined_commitment = encoded_data.row_commitments[0]
-        power = h
+        combined_commitment = bls.bytes48_to_G1(encoded_data.row_commitments[0])
+        power = int(h) % BLS_MODULUS
         for commitment in encoded_data.row_commitments[1:]:
-            combined_commitment = bls.add(combined_commitment,bls.multiply(commitment, power))
-            power = power * h
-
+            commitment=bls.bytes48_to_G1(commitment)
+            combined_commitment = bls.add(combined_commitment,bls.multiply(commitment,power))
+            power = (power * int(h)) % BLS_MODULUS
+        combined_commitment = bls.G1_to_bytes48(combined_commitment)
         for i, (column, proof) in enumerate(zip(encoded_data.extended_matrix.columns, encoded_data.combined_column_proofs)):
-            combined_eval_point = BLSFieldElement(0)
-            power = BLSFieldElement(1)
-            for data in column.chunks:
-                chunk = BLSFieldElement(int.from_bytes(bytes(data), byteorder="big"))
-                combined_eval_point = combined_eval_point + chunk * power
-                power = power * h
+            combined_eval_int = 0
+            power_int = 1
+            h_int = int(h)
+            for data in column:
+                chunk_int = int.from_bytes(bytes(data), byteorder="big")
+                combined_eval_point = (combined_eval_int + chunk_int * power_int) % BLS_MODULUS
+                power_int = (power_int * h_int) % BLS_MODULUS
             kzg.verify_element_proof(
                 combined_eval_point,
                 combined_commitment,
@@ -95,7 +97,8 @@ class TestEncoder(TestCase):
         h = derive_challenge(row_commitments)
         combined_poly = self.encoder._combined_polynomial(row_polynomials, h)
         proofs = self.encoder._compute_combined_column_proofs(combined_poly)
-        self.assertEqual(len(proofs), len(row_commitments))
+        expected_extended_columns = self.params.column_count * 2
+        self.assertEqual(len(proofs), expected_extended_columns)
 
     def test_encode(self):
         from random import randbytes

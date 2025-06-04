@@ -1,3 +1,4 @@
+
 from itertools import zip_longest
 from typing import List, Sequence, Self
 
@@ -49,19 +50,11 @@ class Polynomial[T]:
         )
 
     def __mul__(self, other):
-        if isinstance(other, int):
-            return Polynomial(
-                [(a * other) % self.modulus for a in self.coefficients],
-                self.modulus
-            )
-        elif isinstance(other, Polynomial):
-            result = [0] * (len(self.coefficients) + len(other.coefficients) - 1)
-            for i in range(len(self.coefficients)):
-                for j in range(len(other.coefficients)):
-                    result[i + j] = (result[i + j] + self.coefficients[i] * other.coefficients[j]) % self.modulus
-            return Polynomial(result, self.modulus)
-        else:
-            raise TypeError(f"Unsupported type for multiplication: {type(other)}")
+        result = [0] * (len(self.coefficients) + len(other.coefficients) - 1)
+        for i in range(len(self.coefficients)):
+            for j in range(len(other.coefficients)):
+                result[i + j] = (result[i + j] + self.coefficients[i] * other.coefficients[j]) % self.modulus
+        return Polynomial(result, self.modulus)
 
     def divide(self, other):
         if not isinstance(other, Polynomial):

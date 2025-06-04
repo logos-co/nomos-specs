@@ -68,19 +68,19 @@ class DAEncoder:
     def _combined_polynomial(
         polys: Sequence[Polynomial], h: BLSFieldElement
     ) -> Polynomial:
-        combined = Polynomial([0], BLS_MODULUS)
+        combined_polynomial = polys[0]
         h_int = int(h)  # raw integer challenge
         int_pow = 1
-        for poly in polys:
-            combined = combined + (poly * int_pow)
+        for poly in polys[1:]:
             int_pow = (int_pow * h_int) % BLS_MODULUS
-        return combined
+            combined_polynomial = combined_polynomial + Polynomial({int_pow * coeff for coeff in poly},BLS_MODULUS)
+        return combined_polynomial
 
     def _compute_combined_column_proofs(self, combined_poly: Polynomial) -> List[Proof]:
         total_cols = self.params.column_count * 2
         return [
-            kzg.generate_element_proof(j, combined_poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
-            for j in range(total_cols)
+            kzg.generate_element_proof(i, combined_poly, GLOBAL_PARAMETERS, ROOTS_OF_UNITY)
+            for i in range(total_cols)
         ]
 
     def encode(self, data: bytes) -> EncodedData:

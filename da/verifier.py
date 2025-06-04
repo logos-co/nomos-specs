@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import List, Sequence, Set
-from hashlib import blake2b
 from eth2spec.utils import bls
 from eth2spec.deneb.mainnet import BLSFieldElement
 from eth2spec.eip7594.mainnet import (
@@ -30,26 +29,29 @@ class DAVerifier:
     @staticmethod
     def verify(blob: DAShare) -> bool:
         """
-        Verifies that blob.column.chunks at index blob.column_idx is consistent
-        with the row commitments and the single column proof.
+        Verifies that blob.column at index blob.column_idx is consistent
+        with the row commitments and the combined column proof.
 
         Returns True if verification succeeds, False otherwise.
         """
         # 1. Derive challenge
         h = derive_challenge(blob.row_commitments)
         # 2. Reconstruct combined commitment: combined_commitment = sum_{i=0..l-1} h^i * row_commitments[i]
-        combined_commitment = blob.row_commitments[0]
-        power = h
+        combined_commitment = bls.bytes48_to_G1(blob.row_commitments[0])
+        power = int(h) % BLS_MODULUS
         for commitment in blob.row_commitments[1:]:
+            commitment = bls.bytes48_to_G1(commitment)
             combined_commitment = bls.add(combined_commitment,bls.multiply(commitment, power))
-            power = power * h
-
+            power = (power * int(h)) % BLS_MODULUS
+        combined_commitment = bls.G1_to_bytes48(combined_commitment)
         # 3. Compute combined evaluation v = sum_{i=0..l-1} (h^i * column_data[i])
-        combined_eval_point = BLSFieldElement(0)
-        power = BLSFieldElement(1)
-        for data in blob.column.chunks:
-            chunk = BLSFieldElement(int.from_bytes(bytes(data), byteorder="big"))
-            combined_eval_point = combined_eval_point + chunk * power
-            power = power * h
+        combined_eval_int = 0
+        power_int = 1
+        h_int = int(h) % BLS_MODULUS
+        for chunk in blob.column:
+            chunk_int = int.from_bytes(bytes(chunk), byteorder="big")
+            combined_eval_int = (combined_eval_int + chunk_int * power_int) % BLS_MODULUS
+            power_int = (power_int * h_int) % BLS_MODULUS
+        combined_eval_point = BLSFieldElement(combined_eval_int)
         # 4. Verify the single KZG proof for evaluation at point w^{column_idx}
         return kzg.verify_element_proof(combined_eval_point,combined_commitment,blob.combined_column_proof,blob.column_idx,ROOTS_OF_UNITY)

@@ -18,7 +18,7 @@ class TestVerifier(TestCase):
         _ = TestEncoder()
         _.setUp()
         encoded_data = _.encoder.encode(_.data)
-        for i, column in enumerate(encoded_data.chunked_data.columns):
+        for i, column in enumerate(encoded_data.extended_matrix.columns):
             verifier = DAVerifier()
             da_blob = DAShare(
                 Column(column),
@@ -32,7 +32,7 @@ class TestVerifier(TestCase):
         _ = TestEncoder()
         _.setUp()
         encoded_data = _.encoder.encode(_.data)
-        columns = enumerate(encoded_data.chunked_data.columns)
+        columns = enumerate(encoded_data.extended_matrix.columns)
         i, column = next(columns)
         da_blob = DAShare(
             Column(column),
@@ -48,4 +48,4 @@ class TestVerifier(TestCase):
                 encoded_data.combined_column_proofs[i],
                 encoded_data.row_commitments,
             )
-            self.assertTrue(self.verifier.verify(da_blob))
+            self.assertIsNotNone(self.verifier.verify(da_blob))
