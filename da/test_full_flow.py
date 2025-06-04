@@ -2,7 +2,7 @@ from itertools import chain
 from unittest import TestCase
 from typing import List, Optional
 
-from da.common import NodeId, build_blob_id, NomosDaG2ProofOfPossession as bls_pop
+from da.common import NodeId, build_blob_id
 from da.api.common import DAApi, BlobMetadata, Metadata
 from da.verifier import DAVerifier, DAShare
 from da.api.test_flow import MockStore
@@ -21,7 +21,7 @@ class DAVerifierWApi:
         if self.verifier.verify(blob):
             # Warning: If aggregated col commitment and row commitment are the same,
             # the build_attestation_message method will produce the same output.
-            blob_id = build_blob_id(blob.aggregated_column_commitment, blob.rows_commitments)
+            blob_id = build_blob_id(blob.row_commitments)
             self.store.populate(blob, blob_id)
 
     def receive_metadata(self, blob_metadata: BlobMetadata):
@@ -66,7 +66,7 @@ class TestFullFlow(TestCase):
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
         self.dispersal.disperse(encoded_data)
-        blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
+        blob_id = build_blob_id(encoded_data.row_commitments)
         blob_metadata = BlobMetadata(
             blob_id,
             Metadata(app_id, index)
@@ -103,7 +103,7 @@ class TestFullFlow(TestCase):
         # inject mock send and await method
         self.dispersal._send_and_await_response = __send_and_await_response
         self.dispersal.disperse(encoded_data)
-        blob_id = build_blob_id(encoded_data.aggregated_column_commitment, encoded_data.row_commitments)
+        blob_id = build_blob_id(encoded_data.row_commitments)
 
         # Loop through each index and simulate dispersal with the same cert_id but different metadata
         for index in indexes:
