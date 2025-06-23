@@ -101,27 +101,3 @@ def calculate_subnetwork_assignations(
         heappush(available_nodes, participant)
         heappush(subnetworks, subnetwork)
     return [subnetwork.participants for subnetwork in sorted(subnetworks, key=lambda x: x.subnetwork_id)]
-
-
-
-
-if __name__ == "__main__":
-    import random
-    number_of_columns = 4096
-    for size in [100, 500, 1000, 10000]:
-        nodes_ids = [random.randbytes(32) for _ in range(size)]
-        replication_factor = 3
-        print(size, replication_factor)
-        # print(a := calculate_subnets(nodes_ids, number_of_columns, replication_factor))
-        from pprint import pprint
-        b = calculate_subnetwork_assignations(nodes_ids, [set() for _ in range(number_of_columns)], replication_factor)
-        # pprint(b)
-        assert len(set(chain.from_iterable(b))) == len(nodes_ids)
-        # fill up new nodes
-        for i in range(0, size, 5):
-            nodes_ids[i] = random.randbytes(32)
-        b = calculate_subnetwork_assignations(nodes_ids, b, replication_factor)
-        # pprint(b)
-        assert len(set(chain.from_iterable(b))) == len(nodes_ids), f"{len(set(chain.from_iterable(b)))} != {len(nodes_ids)}"
-        print(Counter(chain.from_iterable(b)).values())
-
