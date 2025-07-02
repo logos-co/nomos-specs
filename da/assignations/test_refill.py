@@ -17,14 +17,26 @@ class TestRefill(TestCase):
             with self.subTest(i):
                 self.test_single_with(network_size=i)
 
-    def test_same_sized_evolving_network(self):
+    def test_evolving_increasing_network(self):
         network_size = 100
         replication_factor = 3
         nodes = [random.randbytes(32) for _ in range(network_size)]
-        assignations = [set() for _ in range(network_size)]
+        assignations = [set() for _ in range(2048)]
         assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
         for network_size in [300, 500, 1000, 10000, 100000]:
-            new_nodes = self.expand_nodes(nodes, network_size)
+            new_nodes = self.expand_nodes(nodes, network_size - len(nodes))
+            self.mutate_nodes(new_nodes, network_size//3)
+            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
+            self.assert_assignations(assignations, new_nodes, replication_factor)
+
+    def test_evolving_decreasing_network(self):
+        network_size = 100000
+        replication_factor = 3
+        nodes = [random.randbytes(32) for _ in range(network_size)]
+        assignations = [set() for _ in range(2048)]
+        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
+        for network_size in reversed([100, 300, 500, 1000, 10000]):
+            new_nodes = self.shrink_nodes(nodes, network_size)
             self.mutate_nodes(new_nodes, network_size//3)
             assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
             self.assert_assignations(assignations, new_nodes, replication_factor)
@@ -38,6 +50,10 @@ class TestRefill(TestCase):
     @classmethod
     def expand_nodes(cls, nodes: List[DeclarationId], count: int) -> List[DeclarationId]:
         return [*nodes, *(random.randbytes(32) for _ in range(count))]
+
+    @classmethod
+    def shrink_nodes(cls, nodes: List[DeclarationId], count: int) -> List[DeclarationId]:
+        return list(random.sample(nodes, k=count))
 
 
     def assert_assignations(self, assignations: Assignations, nodes: List[DeclarationId], replication_factor: int):
