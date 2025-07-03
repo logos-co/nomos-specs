@@ -23,8 +23,9 @@ class TestRefill(TestCase):
         nodes = [random.randbytes(32) for _ in range(network_size)]
         assignations = [set() for _ in range(2048)]
         assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
+        new_nodes = nodes
         for network_size in [300, 500, 1000, 10000, 100000]:
-            new_nodes = self.expand_nodes(nodes, network_size - len(nodes))
+            new_nodes = self.expand_nodes(new_nodes, network_size - len(nodes))
             self.mutate_nodes(new_nodes, network_size//3)
             assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
             self.assert_assignations(assignations, new_nodes, replication_factor)
@@ -35,11 +36,32 @@ class TestRefill(TestCase):
         nodes = [random.randbytes(32) for _ in range(network_size)]
         assignations = [set() for _ in range(2048)]
         assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
+        new_nodes = nodes
         for network_size in reversed([100, 300, 500, 1000, 10000]):
-            new_nodes = self.shrink_nodes(nodes, network_size)
+            new_nodes = self.shrink_nodes(new_nodes, network_size)
             self.mutate_nodes(new_nodes, network_size//3)
             assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
             self.assert_assignations(assignations, new_nodes, replication_factor)
+
+
+    def test_random_increase_decrease_network(self):
+        network_size = 10000
+        replication_factor = 3
+        nodes = [random.randbytes(32) for _ in range(network_size)]
+        assignations = [set() for _ in range(2048)]
+        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
+        new_nodes = nodes
+        for step in (random.randrange(100, 1000) for _ in range(100)):
+            if bool(random.choice((0, 1))):
+                network_size += step
+                new_nodes = self.expand_nodes(new_nodes, network_size)
+            else:
+                network_size -= step
+                new_nodes = self.shrink_nodes(new_nodes, network_size)
+            self.mutate_nodes(new_nodes, network_size//3)
+            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
+            self.assert_assignations(assignations, new_nodes, replication_factor)
+
 
     @classmethod
     def mutate_nodes(cls, nodes: List[DeclarationId], count: int):
