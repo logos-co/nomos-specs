@@ -49,6 +49,44 @@ def heappop_next_for_subnetwork(subnetwork: Subnetwork, participants: List[Parti
         heappush(participants, poped)
     return participant
 
+def fill_subnetworks(
+        available_nodes: List[Participant],
+        subnetworks: List[Subnetwork],
+        average_participation: int,
+        replication_factor: int,
+):
+    while not (
+            are_subnetworks_filled_up_to_replication_factor(subnetworks, replication_factor) and
+            all_nodes_are_assigned(available_nodes, average_participation)
+    ):
+        # take less participants subnetwork
+        subnetwork = heappop(subnetworks)
+
+        # take less participations declaration not included in the subnetwork
+        participant = heappop_next_for_subnetwork(subnetwork, available_nodes)
+
+        # fill into subnetwork
+        subnetwork.participants.add(participant.declaration_id)
+        participant.participation += 1
+        # push to heaps
+        heappush(available_nodes, participant)
+        heappush(subnetworks, subnetwork)
+
+
+def balance_subnetworks(
+        subnetworks: List[Subnetwork],
+):
+    while (len(max(subnetworks)) - len(min(subnetworks))) > 1:
+        max_subnetwork = max(subnetworks)
+        min_subnetwork = min(subnetworks)
+        diff_count = (len(max_subnetwork.participants) - len(min_subnetwork.participants)) // 2
+        diff_participants = sorted(max_subnetwork.participants - min_subnetwork.participants)
+        for i in range(diff_count):
+            move_participant = diff_participants.pop(0)
+            min_subnetwork.participants.add(move_participant)
+            max_subnetwork.participants.remove(move_participant)
+    heapify(subnetworks)
+
 def calculate_subnetwork_assignations(
         new_nodes_list: Sequence[DeclarationId],
         previous_subnets: Assignations,
@@ -105,41 +143,3 @@ def calculate_subnetwork_assignations(
 
     return [subnetwork.participants for subnetwork in sorted(subnetworks, key=lambda x: x.subnetwork_id)]
 
-
-def fill_subnetworks(
-        available_nodes: List[Participant],
-        subnetworks: List[Subnetwork],
-        average_participation: int,
-        replication_factor: int,
-):
-    while not (
-            are_subnetworks_filled_up_to_replication_factor(subnetworks, replication_factor) and
-            all_nodes_are_assigned(available_nodes, average_participation)
-    ):
-        # take less participants subnetwork
-        subnetwork = heappop(subnetworks)
-
-        # take less participations declaration not included in the subnetwork
-        participant = heappop_next_for_subnetwork(subnetwork, available_nodes)
-
-        # fill into subnetwork
-        subnetwork.participants.add(participant.declaration_id)
-        participant.participation += 1
-        # push to heaps
-        heappush(available_nodes, participant)
-        heappush(subnetworks, subnetwork)
-
-
-def balance_subnetworks(
-        subnetworks: List[Subnetwork],
-):
-    while (len(max(subnetworks)) - len(min(subnetworks))) > 1:
-        max_subnetwork = max(subnetworks)
-        min_subnetwork = min(subnetworks)
-        diff_count = (len(max_subnetwork.participants) - len(min_subnetwork.participants)) // 2
-        diff_participants = sorted(max_subnetwork.participants - min_subnetwork.participants)
-        for i in range(diff_count):
-            move_participant = diff_participants.pop(0)
-            min_subnetwork.participants.add(move_participant)
-            max_subnetwork.participants.remove(move_participant)
-    heapify(subnetworks)
