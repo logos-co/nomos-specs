@@ -62,10 +62,10 @@ def fill_subnetworks(
             are_subnetworks_filled_up_to_replication_factor(subnetworks, replication_factor) and
             all_nodes_are_assigned(available_nodes, average_participation)
     ):
-        # take fewer participants subnetwork
+        # take the fewest participants subnetwork
         subnetwork = heappop(subnetworks)
 
-        # take less participation declaration not included in the subnetwork
+        # take the declaration with the lowest participation that is not included in the subnetwork
         participant = heappop_next_for_subnetwork(subnetwork, available_nodes)
 
         # fill into subnetwork
