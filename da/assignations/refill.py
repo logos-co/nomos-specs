@@ -4,17 +4,18 @@ from itertools import cycle, chain
 from collections import Counter
 from heapq import heappush, heappop, heapify
 
-from numpy.f2py.crackfortran import previous_context
 
 DeclarationId:  TypeAlias = bytes
 Assignations: TypeAlias = List[Set[DeclarationId]]
 
+
 @dataclass(order=True)
 class Participant:
-    # Participants wrapper class
+    # Participant's wrapper class
     # Used for keeping ordering in the heap by the participation first and the declaration id second
     participation: int              # prioritize participation count first
     declaration_id: DeclarationId   # sort by id on default
+
 
 @dataclass
 class Subnetwork:
@@ -35,6 +36,7 @@ class Subnetwork:
 def are_subnetworks_filled_up_to_replication_factor(subnetworks: Sequence[Subnetwork], replication_factor: int) -> bool:
     return all(len(subnetwork) >= replication_factor for subnetwork in subnetworks)
 
+
 def all_nodes_are_assigned(participants: Sequence[Participant], average_participation: int) -> bool:
     return all(participant.participation > average_participation for participant in participants)
 
@@ -49,6 +51,7 @@ def heappop_next_for_subnetwork(subnetwork: Subnetwork, participants: List[Parti
         heappush(participants, poped)
     return participant
 
+
 def fill_subnetworks(
         available_nodes: List[Participant],
         subnetworks: List[Subnetwork],
@@ -59,10 +62,10 @@ def fill_subnetworks(
             are_subnetworks_filled_up_to_replication_factor(subnetworks, replication_factor) and
             all_nodes_are_assigned(available_nodes, average_participation)
     ):
-        # take less participants subnetwork
+        # take fewer participants subnetwork
         subnetwork = heappop(subnetworks)
 
-        # take less participations declaration not included in the subnetwork
+        # take less participation declaration not included in the subnetwork
         participant = heappop_next_for_subnetwork(subnetwork, available_nodes)
 
         # fill into subnetwork
@@ -87,6 +90,7 @@ def balance_subnetworks(
             max_subnetwork.participants.remove(move_participant)
     heapify(subnetworks)
 
+
 def calculate_subnetwork_assignations(
         new_nodes_list: Sequence[DeclarationId],
         previous_subnets: Assignations,
@@ -97,12 +101,12 @@ def calculate_subnetwork_assignations(
     # 2. Create a heap with the set of active nodes ordered by, primary the number of subnetworks each participant is at
     #    and secondary by the DeclarationId of the participant (ascending order).
     # 3. Create a heap with the subnetworks ordered by the number of participants in each subnetwork
-    # 4. If network is decreasing (less availabe nodes than previous nodes), balance subnetworks:
+    # 4. If the network is decreasing (less available nodes than previous nodes), balance subnetworks:
     #    1) Until the biggest subnetwork and the smallest subnetwork size difference is <= 1
-    #    2) Pick the biggest subnetwork and migrate half of the nodes difference to the smallest subnetwork
-    # 5. Until all subnetworks are filled up to replication factor and all nodes are assigned:
-    #    1) pop the subnetwork with the least participants
-    #    2) pop the participant with less participations
+    #    2) Pick the biggest subnetwork and migrate half of the node difference to the smallest subnetwork
+    # 5. Until all subnetworks are filled up to a replication factor and all nodes are assigned:
+    #    1) pop the subnetwork with the fewest participants
+    #    2) pop the participant with less participation
     #    3) push the participant into the subnetwork and increment its participation count
     #    4) push the participant and the subnetwork into the respective heaps
     # 6. Return the subnetworks ordered by its subnetwork id
@@ -134,7 +138,7 @@ def calculate_subnetwork_assignations(
     )
     heapify(subnetworks)
 
-    # when shrinking the network diversify nodes in major subnetworks into emptier ones
+    # when shrinking, the network diversifies nodes in major subnetworks into emptier ones
     if len(previous_nodes) > len(new_nodes):
         balance_subnetworks(subnetworks)
 
