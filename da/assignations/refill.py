@@ -59,12 +59,15 @@ def calculate_subnetwork_assignations(
     # 2. Create a heap with the set of active nodes ordered by, primary the number of subnetworks each participant is at
     #    and secondary by the DeclarationId of the participant (ascending order).
     # 3. Create a heap with the subnetworks ordered by the number of participants in each subnetwork
-    # 4. Until all subnetworks are filled up to replication factor and all nodes are assigned:
+    # 4. If network is decreasing (less availabe nodes than previous nodes), balance subnetworks:
+    #    1) Until the biggest subnetwork and the smallest subnetwork size difference is <= 1
+    #    2) Pick the biggest subnetwork and migrate half of the nodes difference to the smallest subnetwork
+    # 5. Until all subnetworks are filled up to replication factor and all nodes are assigned:
     #    1) pop the subnetwork with the least participants
     #    2) pop the participant with less participations
     #    3) push the participant into the subnetwork and increment its participation count
     #    4) push the participant and the subnetwork into the respective heaps
-    # 5. Return the subnetworks ordered by its subnetwork id
+    # 6. Return the subnetworks ordered by its subnetwork id
 
     # average participation per node
     average_participation = max((len(previous_subnets) * replication_factor) // len(new_nodes_list), 1)
