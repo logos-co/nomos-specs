@@ -1,6 +1,6 @@
 import random
 from itertools import chain
-from typing import List
+from typing import List, Counter
 from unittest import TestCase
 from da.assignations.refill import calculate_subnetwork_assignations, Assignations, DeclarationId
 
@@ -101,5 +101,10 @@ class TestRefill(TestCase):
             msg="Subnetwork size variant should not be bigger than 1",
             delta=1
         )
-        # add assert on balance participation per node
+        self.assertAlmostEqual(
+            len(set(Counter(chain.from_iterable(assignations)).values())),
+            1,
+            msg="Nodes should be assigned uniformly to subnetworks",
+            delta=1,
+        )
 
