@@ -7,9 +7,10 @@ from da.assignations.refill import calculate_subnetwork_assignations, Assignatio
 
 class TestRefill(TestCase):
     def test_single_with(self, subnetworks_size = 2048, replication_factor: int = 3, network_size: int = 100):
+        random_seed = random.randbytes(32)
         nodes = [random.randbytes(32) for _ in range(network_size)]
         previous_nodes = [set() for _ in range(subnetworks_size)]
-        assignations = calculate_subnetwork_assignations(nodes, previous_nodes, replication_factor)
+        assignations = calculate_subnetwork_assignations(nodes, previous_nodes, replication_factor, random_seed)
         self.assert_assignations(assignations, nodes, replication_factor)
 
     def test_single_network_sizes(self):
@@ -18,40 +19,46 @@ class TestRefill(TestCase):
                 self.test_single_with(network_size=i)
 
     def test_evolving_increasing_network(self):
+        random_seed = random.randbytes(32)
         network_size = 100
         replication_factor = 3
         nodes = [random.randbytes(32) for _ in range(network_size)]
         assignations = [set() for _ in range(2048)]
-        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
+        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor, random_seed)
         new_nodes = nodes
         for network_size in [300, 500, 1000, 10000, 100000]:
+            random_seed = random.randbytes(32)
             new_nodes = self.expand_nodes(new_nodes, network_size - len(nodes))
             self.mutate_nodes(new_nodes, network_size//3)
-            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
+            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor, random_seed)
             self.assert_assignations(assignations, new_nodes, replication_factor)
 
     def test_evolving_decreasing_network(self):
+        random_seed = random.randbytes(32)
         network_size = 100000
         replication_factor = 3
         nodes = [random.randbytes(32) for _ in range(network_size)]
         assignations = [set() for _ in range(2048)]
-        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
+        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor, random_seed)
         new_nodes = nodes
         for network_size in reversed([100, 300, 500, 1000, 10000]):
+            random_seed = random.randbytes(32)
             new_nodes = self.shrink_nodes(new_nodes, network_size)
             self.mutate_nodes(new_nodes, network_size//3)
-            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
+            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor, random_seed)
             self.assert_assignations(assignations, new_nodes, replication_factor)
 
 
     def test_random_increase_decrease_network(self):
+        random_seed = random.randbytes(32)
         network_size = 10000
         replication_factor = 3
         nodes = [random.randbytes(32) for _ in range(network_size)]
         assignations = [set() for _ in range(2048)]
-        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor)
+        assignations = calculate_subnetwork_assignations(nodes, assignations, replication_factor, random_seed)
         new_nodes = nodes
         for step in (random.randrange(100, 1000) for _ in range(100)):
+            random_seed = random.randbytes(32)
             if bool(random.choice((0, 1))):
                 network_size += step
                 new_nodes = self.expand_nodes(new_nodes, network_size)
@@ -59,7 +66,7 @@ class TestRefill(TestCase):
                 network_size -= step
                 new_nodes = self.shrink_nodes(new_nodes, network_size)
             self.mutate_nodes(new_nodes, network_size//3)
-            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor)
+            assignations = calculate_subnetwork_assignations(new_nodes, assignations, replication_factor, random_seed)
             self.assert_assignations(assignations, new_nodes, replication_factor)
 
 
@@ -94,4 +101,5 @@ class TestRefill(TestCase):
             msg="Subnetwork size variant should not be bigger than 1",
             delta=1
         )
+        # add assert on balance participation per node
 
