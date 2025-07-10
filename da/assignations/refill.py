@@ -134,6 +134,8 @@ def calculate_subnetwork_assignations(
         replication_factor: int,
         random_seed: bytes,
 ) -> Assignations:
+    if len(new_nodes_list) < replication_factor:
+        raise ValueError("The network size is smaller than the replication factor")
     # The algorithm works as follows:
     # 1. Remove nodes that are not active from the previous subnetworks assignations
     # 2. If the network is decreasing (less available nodes than previous nodes), balance subnetworks:
