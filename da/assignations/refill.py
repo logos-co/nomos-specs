@@ -9,7 +9,7 @@ from heapq import heappush, heappop, heapify
 
 DeclarationId:  TypeAlias = bytes
 Assignations: TypeAlias = List[Set[DeclarationId]]
-ChaCha20: TypeAlias = Any
+BlakeRng: TypeAlias = Any
 
 
 @dataclass(order=True)
@@ -36,11 +36,11 @@ class Subnetwork:
         return len(self.participants)
 
 
-def are_subnetworks_filled_up_to_replication_factor(subnetworks: Sequence[Subnetwork], replication_factor: int) -> bool:
+def subnetworks_filled_up_to_replication_factor(subnetworks: Sequence[Subnetwork], replication_factor: int) -> bool:
     return all(len(subnetwork) >= replication_factor for subnetwork in subnetworks)
 
 
-def all_nodes_are_assigned(participants: Sequence[Participant], average_participation: int) -> bool:
+def all_nodes_assigned(participants: Sequence[Participant], average_participation: int) -> bool:
     return all(participant.participation >= average_participation for participant in participants)
 
 
@@ -55,7 +55,7 @@ def heappop_next_for_subnetwork(subnetwork: Subnetwork, participants: List[Parti
     return participant
 
 # sample using fisher yates shuffling, returning
-def sample(elements: Sequence[Any], random: ChaCha20, k: int) -> List[Any]:
+def sample(elements: Sequence[Any], random: BlakeRng, k: int) -> List[Any]:
     # list is sorted for reproducibility
     elements = sorted(elements)
     # pythons built-in is fisher yates shuffling
@@ -73,8 +73,8 @@ def fill_subnetworks(
     heapify(subnetworks)
 
     while not (
-            are_subnetworks_filled_up_to_replication_factor(subnetworks, replication_factor) and
-            all_nodes_are_assigned(available_nodes, average_participation)
+            subnetworks_filled_up_to_replication_factor(subnetworks, replication_factor) and
+            all_nodes_assigned(available_nodes, average_participation)
     ):
         # take the fewest participants subnetwork
         subnetwork = heappop(subnetworks)
@@ -92,7 +92,7 @@ def fill_subnetworks(
 
 def balance_subnetworks_shrink(
         subnetworks: List[Subnetwork],
-        random: ChaCha20,
+        random: BlakeRng,
 ):
     while (len(max(subnetworks)) - len(min(subnetworks))) > 1:
         max_subnetwork = max(subnetworks)
@@ -108,7 +108,7 @@ def balance_subnetworks_grow(
         subnetworks: List[Subnetwork],
         participants: List[Participant],
         average_participation: int,
-        random: ChaCha20,
+        random: BlakeRng,
 ):
     for participant in filter(lambda x: x.participation > average_participation, sorted(participants)):
         for subnework in sample(
