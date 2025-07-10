@@ -54,6 +54,14 @@ def heappop_next_for_subnetwork(subnetwork: Subnetwork, participants: List[Parti
         heappush(participants, poped)
     return participant
 
+# sample using fisher yates shuffling, returning
+def sample(elements: Sequence[Any], random: ChaCha20, k: int) -> List[Any]:
+    # list is sorted for reproducibility
+    elements = sorted(elements)
+    # pythons built-in is fisher yates shuffling
+    random.shuffle(elements)
+    return elements[:k]
+
 
 def fill_subnetworks(
         available_nodes: List[Participant],
@@ -91,7 +99,7 @@ def balance_subnetworks_shrink(
         min_subnetwork = min(subnetworks)
         diff_count = (len(max_subnetwork.participants) - len(min_subnetwork.participants)) // 2
         diff_participants = sorted(max_subnetwork.participants - min_subnetwork.participants)
-        for participant in random.sample(diff_participants, k=diff_count):
+        for participant in sample(diff_participants, random, k=diff_count):
             min_subnetwork.participants.add(participant)
             max_subnetwork.participants.remove(participant)
 
@@ -103,8 +111,9 @@ def balance_subnetworks_grow(
         random: ChaCha20,
 ):
     for participant in filter(lambda x: x.participation > average_participation, sorted(participants)):
-        for subnework in random.sample(
+        for subnework in sample(
                 sorted(filter(lambda subnetwork: participant.declaration_id in subnetwork.participants, subnetworks)),
+                random,
                 k=participant.participation - average_participation
         ):
             subnework.participants.remove(participant.declaration_id)
